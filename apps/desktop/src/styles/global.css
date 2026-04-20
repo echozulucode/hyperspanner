@@ -1,0 +1,261 @@
+/**
+ * Hyperspanner Global Styles
+ * Adapted from LCARS-24.2 reference; tuned for the picard-modern variant.
+ */
+
+@charset "utf-8";
+
+/* Antonio — vendored from reference/lcars-example */
+@font-face {
+  font-family: 'Antonio';
+  font-weight: 400;
+  src:
+    url('../assets/fonts/Antonio-Regular.woff2') format('woff2'),
+    url('../assets/fonts/Antonio-Regular.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Antonio';
+  font-weight: 700;
+  src:
+    url('../assets/fonts/Antonio-Bold.woff2') format('woff2'),
+    url('../assets/fonts/Antonio-Bold.woff') format('woff');
+  font-display: swap;
+}
+
+/* Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: var(--lcars-font-size-base, 1.375rem);
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--lcars-font-family, 'Antonio', 'Arial Narrow', sans-serif);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--lcars-color-text, #eae4d6);
+  background-color: var(--lcars-color-background, #0a0a0f);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden; /* shell owns scrolling */
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: normal;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-block: 1.25rem;
+}
+
+h1 {
+  font-size: var(--lcars-font-size-h1);
+  color: var(--lcars-color-african-violet, #8a7aa8);
+}
+
+h2 {
+  font-size: var(--lcars-font-size-h2);
+  color: var(--lcars-color-african-violet, #8a7aa8);
+}
+
+h3 {
+  font-size: var(--lcars-font-size-h3);
+  color: var(--lcars-color-african-violet, #8a7aa8);
+}
+
+h4 {
+  font-size: var(--lcars-font-size-h4);
+  color: var(--lcars-color-african-violet, #8a7aa8);
+}
+
+p {
+  margin-block: 1rem;
+}
+
+button {
+  border: none;
+  outline: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2rem;
+  color: var(--lcars-color-lilac, #8f6fb0);
+}
+
+a:hover {
+  filter: brightness(115%);
+}
+
+a:active {
+  filter: brightness(80%);
+}
+
+::selection {
+  background-color: var(--lcars-color-orange, #d88463);
+  color: black;
+}
+
+/* Focus rings: preserved despite LCARS chrome */
+:focus-visible {
+  outline: 2px solid var(--lcars-color-almond-creme, #d7a99a);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Utilities */
+.uppercase {
+  text-transform: uppercase;
+}
+
+.go-center {
+  text-align: center !important;
+}
+
+.go-right {
+  text-align: right !important;
+}
+
+.go-left {
+  text-align: left !important;
+}
+
+/* LCARS-24.2 keyframes */
+@keyframes blink {
+  0% {
+    opacity: 0;
+  }
+  49% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.blink-slow {
+  animation: blink var(--lcars-animation-blink-slow, 3500ms) infinite;
+}
+
+.blink {
+  animation: blink var(--lcars-animation-blink, 2000ms) infinite;
+}
+
+.blink-fast {
+  animation: blink var(--lcars-animation-blink-fast, 1000ms) infinite;
+}
+
+@keyframes pulse {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(0.4);
+  }
+}
+
+.pulse {
+  animation: pulse var(--lcars-animation-pulse, 2000ms) infinite;
+}
+
+/* Responsive scaling — preserved from LCARS-24.2 */
+@media (max-width: 1500px) {
+  :root {
+    --lcars-spacing-left-frame-width: 200px;
+    --lcars-spacing-radius-top: 0 0 0 130px;
+    --lcars-spacing-radius-bottom: 130px 0 0 0;
+    --lcars-spacing-bar-height: 24px;
+  }
+}
+
+@media (max-width: 1300px) {
+  html {
+    font-size: 1.2rem;
+  }
+
+  :root {
+    --lcars-spacing-left-frame-width: 180px;
+    --lcars-spacing-radius-top: 0 0 0 100px;
+    --lcars-spacing-radius-bottom: 100px 0 0 0;
+    --lcars-spacing-bar-height: 20px;
+  }
+}
+
+@media (max-width: 950px) {
+  :root {
+    --lcars-spacing-left-frame-width: 150px;
+  }
+}
+
+@media (max-width: 750px) {
+  :root {
+    --lcars-spacing-left-frame-width: 120px;
+    --lcars-spacing-radius-top: 0 0 0 80px;
+    --lcars-spacing-radius-bottom: 80px 0 0 0;
+    --lcars-spacing-bar-height: 16px;
+  }
+}
+
+@media (max-width: 525px) {
+  :root {
+    --lcars-spacing-left-frame-width: 62px;
+    --lcars-spacing-left-frame-padding: 0.5rem;
+    --lcars-spacing-radius-top: 0 0 0 40px;
+    --lcars-spacing-radius-bottom: 40px 0 0 0;
+    --lcars-spacing-bar-height: 10px;
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "hyperspanner",
+  "private": true,
+  "version": "0.0.0",
+  "description": "A Starfleet engineering console for developer utility workflows.",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm --filter @hyperspanner/desktop dev",
+    "tauri:dev": "pnpm --filter @hyperspanner/desktop tauri dev",
+    "tauri:build": "pnpm --filter @hyperspanner/desktop tauri build",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,css,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,css,json,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  }
+}

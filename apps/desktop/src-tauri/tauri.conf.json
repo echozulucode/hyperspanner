@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "Hyperspanner",
+  "version": "0.0.0",
+  "identifier": "dev.hyperspanner.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @hyperspanner/desktop dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm --filter @hyperspanner/desktop build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "Hyperspanner",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "backgroundColor": "#0a0a0f",
+        "theme": "Dark",
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "A Starfleet engineering console for developer utility workflows.",
+    "longDescription": "Hyperspanner is a developer utility suite presented as a polished engineering console. Managed docking, a full tool catalog, and keyboard-first operation."
+  }
+}

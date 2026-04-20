@@ -1,0 +1,26 @@
+[package]
+name = "hyperspanner"
+version = "0.0.0"
+description = "A Starfleet engineering console for developer utility workflows."
+authors = ["Hyperspanner contributors"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "hyperspanner_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[features]
+# Default-enabled features go here as the project grows.
+custom-protocol = ["tauri/custom-protocol"]
