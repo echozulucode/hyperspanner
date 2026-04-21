@@ -1,0 +1,63 @@
+.handle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--split-handle-bg, var(--lcars-color-text-dark, #000));
+  flex: 0 0 auto;
+  transition: background-color 150ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.vertical {
+  width: var(--lcars-spacing-panel-border, 0.25rem);
+  cursor: col-resize;
+  align-self: stretch;
+  min-height: 24px;
+}
+
+.horizontal {
+  height: var(--lcars-spacing-panel-border, 0.25rem);
+  cursor: row-resize;
+  align-self: stretch;
+  min-width: 24px;
+}
+
+.handle:hover,
+.active {
+  background-color: var(--lcars-color-orange);
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--lcars-color-almond-creme, #fff);
+  outline-offset: -2px;
+}
+
+.grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--lcars-color-almond-creme, #eae4d6);
+  pointer-events: none;
+  border-radius: 100vmax;
+  opacity: 0.55;
+  transition: opacity 150ms ease;
+}
+
+.vertical .grip {
+  width: 2px;
+  height: 22px;
+}
+
+.horizontal .grip {
+  width: 22px;
+  height: 2px;
+}
+
+.handle:hover .grip,
+.active .grip {
+  opacity: 1;
+  background-color: var(--lcars-color-text-dark, #000);
+}

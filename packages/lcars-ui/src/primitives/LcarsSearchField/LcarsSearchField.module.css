@@ -1,0 +1,89 @@
+.field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.25rem 0.25rem 1rem;
+  background-color: var(--field-bg, var(--lcars-color-background, #0a0a0f));
+  border: var(--lcars-spacing-bar-border, 0.25rem solid black);
+  border-radius: 100vmax;
+  color: var(--lcars-color-text, #eae4d6);
+  font-family: var(--lcars-font-family, 'Antonio', sans-serif);
+  min-height: 44px;
+  transition: box-shadow 150ms ease, border-color 150ms ease;
+}
+
+.field:focus-within {
+  border-color: var(--lcars-color-almond-creme, #fff);
+  box-shadow: 0 0 0 2px var(--lcars-color-orange);
+}
+
+.prefix {
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lcars-color-orange);
+  white-space: nowrap;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  padding: 0;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--lcars-color-text, #eae4d6);
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+}
+
+.clearButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background-color: var(--lcars-color-african-violet);
+  color: var(--lcars-color-text-dark, #000);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  flex: 0 0 auto;
+  transition: filter 150ms ease;
+}
+
+.clearButton:hover {
+  filter: brightness(115%);
+}
+
+.clearButton:focus-visible {
+  outline: 2px solid var(--lcars-color-almond-creme, #fff);
+  outline-offset: 2px;
+}
+
+.kbd {
+  font-family: var(--lcars-font-family, 'Antonio', sans-serif);
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  background-color: var(--lcars-color-gray);
+  color: var(--lcars-color-text-dark, #000);
+  border-radius: 100vmax;
+  opacity: 0.8;
+  flex: 0 0 auto;
+}

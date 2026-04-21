@@ -1,0 +1,22 @@
+.barPanel {
+  display: flex;
+  height: var(--lcars-spacing-bar-height, 28px);
+  gap: 0;
+}
+
+.segment {
+  height: 100%;
+  border-right: var(--lcars-spacing-bar-border, 0.25rem solid black);
+}
+
+.segment:last-child {
+  border-right: none;
+}
+
+.widthFlex {
+  flex: 1;
+}
+
+.halfHeight {
+  height: 50%;
+}

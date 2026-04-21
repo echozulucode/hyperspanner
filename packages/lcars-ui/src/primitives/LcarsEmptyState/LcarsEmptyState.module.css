@@ -1,0 +1,77 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: var(--lcars-color-text, #eae4d6);
+  min-height: 240px;
+}
+
+.compact {
+  min-height: 120px;
+  padding: 1rem;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background-color: var(--empty-icon-bg, transparent);
+  border: var(--lcars-spacing-panel-border, 0.25rem solid black);
+  color: var(--lcars-color-orange);
+  font-size: 2.25rem;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.compact .icon {
+  width: 56px;
+  height: 56px;
+  font-size: 1.35rem;
+}
+
+.title {
+  font-family: var(--lcars-font-family, 'Antonio', sans-serif);
+  font-size: 1.35rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lcars-color-orange);
+  line-height: 1.1;
+}
+
+.compact .title {
+  font-size: 1rem;
+}
+
+.description {
+  font-family: var(--lcars-font-family, 'Antonio', sans-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  max-width: 48ch;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+.compact .description {
+  font-size: 0.85rem;
+}
+
+.action {
+  margin-top: 0.5rem;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  color: var(--lcars-color-african-violet);
+}

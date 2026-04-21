@@ -1,0 +1,24 @@
+project: "Hyperspanner"
+created: 2026-04-20
+docs:
+  - file: docs/plan-001-lcars-approach-research.md
+    type: research
+    status: active
+    note: "Design research & LCARS approach — source for plan-002."
+  - file: docs/plan-002-implementation.md
+    type: plan
+    status: active
+    note: "Authoritative phased implementation plan. 12 phases."
+  - file: docs/plan.md
+    type: plan
+    status: active
+    note: "Summary view with phase status; detailed plan in plan-002."
+  - file: docs/status.md
+    type: status
+    status: active
+  - file: docs/research.md
+    type: research
+    status: active
+  - file: docs/lessons.yaml
+    type: lessons
+    status: active

@@ -1,0 +1,45 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  background-color: var(--command-bar-bg, transparent);
+  border-bottom: var(--lcars-spacing-bar-border, 0.25rem solid black);
+  flex-wrap: wrap;
+}
+
+.start {
+  justify-content: flex-start;
+}
+
+.end {
+  justify-content: flex-end;
+}
+
+.space-between {
+  justify-content: space-between;
+}
+
+.label {
+  font-family: var(--lcars-font-family, 'Antonio', sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  font-weight: bold;
+  opacity: 0.65;
+  margin-right: 0.25rem;
+}
+
+.divider {
+  width: var(--lcars-spacing-panel-border, 0.25rem);
+  height: 22px;
+  background-color: var(--lcars-color-text-dark, #000);
+  align-self: center;
+}
+
+.group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}

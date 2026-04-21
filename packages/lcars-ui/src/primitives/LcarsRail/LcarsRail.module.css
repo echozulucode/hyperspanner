@@ -1,0 +1,58 @@
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lcars-spacing-panel-border, 0.25rem);
+  width: var(--lcars-spacing-left-frame-width, 240px);
+  min-height: 100%;
+  background-color: var(--rail-bg, transparent);
+}
+
+.wide {
+  width: calc(var(--lcars-spacing-left-frame-width, 240px) + 64px);
+}
+
+.narrow {
+  width: calc(var(--lcars-spacing-left-frame-width, 240px) - 48px);
+}
+
+.curveTop {
+  border-top-left-radius: 0;
+  border-top-right-radius: var(--lcars-rail-top-radius, 120px);
+  overflow: hidden;
+}
+
+.curveBottom {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: var(--lcars-rail-bottom-radius, 120px);
+  overflow: hidden;
+}
+
+.railCap {
+  flex: 0 0 auto;
+  background-color: var(--rail-cap-color, var(--lcars-color-orange));
+  min-height: var(--lcars-rail-cap-height, 96px);
+}
+
+.capTop {
+  border-top-right-radius: var(--lcars-rail-top-radius, 120px);
+  border-bottom: var(--lcars-spacing-panel-border, 0.25rem solid black);
+}
+
+.capBottom {
+  border-bottom-right-radius: var(--lcars-rail-bottom-radius, 120px);
+  border-top: var(--lcars-spacing-panel-border, 0.25rem solid black);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lcars-spacing-panel-border, 0.25rem);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 525px) {
+  .rail {
+    width: calc(var(--lcars-spacing-left-frame-width, 240px) * 0.75);
+  }
+}

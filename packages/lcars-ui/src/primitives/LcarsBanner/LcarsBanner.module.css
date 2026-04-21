@@ -1,0 +1,19 @@
+.banner {
+  padding-inline: 0.5rem 0.25rem;
+  text-align: right;
+  text-transform: uppercase;
+  line-height: 1.1;
+  color: var(--banner-color, var(--lcars-color-orange));
+  font-weight: normal;
+  letter-spacing: 0.04em;
+}
+
+.large {
+  padding-block-end: 0.75rem;
+  font-size: var(--lcars-font-size-banner, clamp(1.25rem, 0.75rem + 4vw, 4rem));
+}
+
+.compact {
+  padding-block: 0.25rem;
+  font-size: clamp(0.95rem, 0.75rem + 0.5vw, 1.4rem);
+}

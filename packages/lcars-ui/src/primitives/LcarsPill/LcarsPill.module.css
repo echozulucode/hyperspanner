@@ -1,0 +1,76 @@
+.pill {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 0.75rem 1.25rem 0.6rem;
+  background-color: var(--pill-color, var(--lcars-color-african-violet));
+  border: none;
+  color: var(--lcars-color-text-dark, #000);
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: right;
+  line-height: 1.175;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 150ms ease, transform 150ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pill:hover {
+  filter: brightness(115%);
+}
+
+.pill:active {
+  filter: brightness(85%);
+}
+
+.pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(40%);
+}
+
+.roundedBoth {
+  border-radius: 100vmax;
+}
+
+.roundedLeft {
+  border-radius: 100vmax 0 0 100vmax;
+}
+
+.roundedRight {
+  border-radius: 0 100vmax 100vmax 0;
+}
+
+.roundedNone {
+  border-radius: 0;
+}
+
+.small {
+  height: 40px;
+  padding: 0.35rem 0.9rem 0.3rem;
+  font-size: 0.75rem;
+}
+
+.medium {
+  height: 64px;
+  font-size: 0.875rem;
+}
+
+.large {
+  height: 96px;
+  padding: 0.75rem 1.75rem 0.9rem;
+  font-size: 1.125rem;
+}
+
+.navigation {
+  flex-direction: column;
+  padding-block: 0.5rem 0.7rem;
+}
+
+.active {
+  box-shadow: inset 0 0 0 2px var(--lcars-color-almond-creme);
+  filter: brightness(115%);
+}

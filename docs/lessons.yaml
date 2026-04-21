@@ -1,0 +1,97 @@
+lessons:
+  - id: 1
+    date: 2026-04-20
+    source: "session"
+    category: tooling
+    lesson: |
+      On Windows, `tauri-build` unconditionally generates a Windows resource file
+      during every `cargo` invocation (including `cargo tauri dev`). This requires
+      `apps/desktop/src-tauri/icons/icon.ico` to exist with valid multi-resolution
+      content. Icons cannot be deferred to bundling — they're a dev-time requirement.
+      Generate a proper multi-resolution ICO (16/24/32/48/64/128/256) up front.
+    applied: true
+
+  - id: 2
+    date: 2026-04-20
+    source: "session"
+    category: tooling
+    lesson: |
+      The Linux bash sandbox cannot traverse pnpm's symlink-based node_modules layout
+      when the project is mounted from the Windows host — following any symlink inside
+      `node_modules/` returns I/O errors. This means `tsc`, `eslint`, `vitest`, and any
+      other node-based verifier cannot be run from the sandbox. Plan verification
+      (typecheck, lint, test) to run on the Windows host; reserve the sandbox for
+      pure filesystem and non-node tooling work.
+    applied: true
+
+  - id: 3
+    date: 2026-04-20
+    source: "decision"
+    category: architecture
+    lesson: |
+      Keep the primitive library (`@hyperspanner/lcars-ui`) framework-pure: no hooks
+      from the host app (no `useTheme`, no `useSound`). Primitives consume CSS custom
+      properties injected by `ThemeContext` on `:root`, and accept optional `color` /
+      `background` props for local overrides. Hosts wire cross-cutting concerns (sound,
+      haptics) via onClick wrappers. This lets the library move to a separate repo or
+      package later without a dependency graph rewrite.
+    applied: true
+
+  - id: 4
+    date: 2026-04-20
+    source: "session"
+    category: tooling
+    lesson: |
+      With `verbatimModuleSyntax` and strict mode, every workspace package that imports
+      CSS Modules needs its own ambient declaration (`declare module '*.module.css'`).
+      The consuming app's `vite-env.d.ts` does NOT cover source files inside a sibling
+      workspace package — tsc's type root is per-project. Add a `globals.d.ts` to each
+      package that uses CSS Modules.
+    applied: true
+
+  - id: 5
+    date: 2026-04-20
+    source: "decision"
+    category: architecture
+    lesson: |
+      Data-visualization primitives (LcarsTable, LcarsSparkline, LcarsGauge, LcarsChart,
+      LcarsDataCascade) are deferred to Phase 6 where the tools that consume them land.
+      Building them in Phase 1 risks designing against imagined consumers. The original
+      plan listed them as Phase 1 items — revised during Phase 1 when it became clear
+      the shell doesn't need them.
+    applied: true
+
+  - id: 6
+    date: 2026-04-20
+    source: "decision"
+    category: architecture
+    lesson: |
+      Map semantic roles to tokens inside the primitive package
+      (`LcarsSemanticRole -> LcarsColorToken`), not inside each primitive. This keeps
+      the variant→color mapping in one place; switching themes (picard-modern / classic
+      / nemesis-blue / lower-decks) remaps the CSS vars without any primitive knowing
+      which variant is active.
+    applied: true
+
+  - id: 7
+    date: 2026-04-20
+    source: "observation"
+    category: process
+    lesson: |
+      "proceed" in this project means continue autonomously until reaching a reviewable
+      milestone (an artifact the user can inspect), not "do exactly one more step".
+      Phase 1's milestone is the runnable `/primitive-gallery` — stopping before that
+      would force another round-trip.
+    applied: true
+
+  - id: 8
+    date: 2026-04-20
+    source: "decision"
+    category: architecture
+    lesson: |
+      The `picard-modern` variant (muted salmon #d88463, dusty purple #8a7aa8, charcoal
+      #0a0a0f, sand #eae4d6) was added as the default because the classic LCARS palette
+      reads as cosplay at developer-tool fidelity. Productivity-console muting preserves
+      LCARS grammar (shapes, layout, typography) while changing the color register.
+      Classic variant still ships for theme switching.
+    applied: true
