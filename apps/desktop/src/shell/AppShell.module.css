@@ -23,6 +23,11 @@
     'top    top    top'
     'nav    center right'
     'nav    bottom right';
+  /* Collapsed stub widths — keep the restore affordance visible instead of
+     hiding the track entirely (lesson 12: collapsed panes need a handle). */
+  --shell-nav-closed-width: 44px;
+  --shell-right-closed-width: 40px;
+  --shell-bottom-closed-height: 32px;
   height: 100vh;
   width: 100vw;
   min-height: 0;
@@ -66,11 +71,57 @@
   transition: filter 140ms ease;
 }
 
-.navRestoreButton:hover {
+.rightRestoreButton {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--lcars-color-african-violet);
+  color: black;
+  font-weight: bold;
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  border: none;
+  border-top-left-radius: 128px;
+  border-bottom-left-radius: 128px;
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  padding: 0.75rem 0;
+  transition: filter 140ms ease;
+}
+
+.bottomRestoreButton {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background-color: var(--lcars-color-butterscotch, #f1a55a);
+  color: black;
+  font-weight: bold;
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  border: none;
+  border-top-left-radius: 128px;
+  border-top-right-radius: 128px;
+  cursor: pointer;
+  padding: 0 1.25rem;
+  transition: filter 140ms ease;
+}
+
+.navRestoreButton:hover,
+.rightRestoreButton:hover,
+.bottomRestoreButton:hover {
   filter: brightness(1.1);
 }
 
-.navRestoreButton:focus-visible {
+.navRestoreButton:focus-visible,
+.rightRestoreButton:focus-visible,
+.bottomRestoreButton:focus-visible {
   outline: 2px solid var(--lcars-color-almond-creme, #fff);
   outline-offset: -2px;
 }
@@ -99,10 +150,9 @@
   align-items: stretch;
 }
 
-/* Collapsed states — collapse the relevant track.
- * We keep the Left track visible at a reduced width when collapsed so the
- * restore affordance remains clickable; Right and Bottom collapse to 0 and
- * the grid area becomes a zero-size slot. */
+/* Collapsed states — collapse each track to a narrow stub so the restore
+ * affordance inside that track remains visible and clickable. The 1fr
+ * center track still reclaims the freed space. */
 
 .leftClosed {
   grid-template-columns:
@@ -115,21 +165,21 @@
   grid-template-columns:
     var(--shell-nav-width, 264px)
     1fr
-    0;
+    var(--shell-right-closed-width, 40px);
 }
 
 .leftClosed.rightClosed {
   grid-template-columns:
     var(--shell-nav-closed-width, 44px)
     1fr
-    0;
+    var(--shell-right-closed-width, 40px);
 }
 
 .bottomClosed {
   grid-template-rows:
     var(--shell-top-height, 48px)
     1fr
-    0;
+    var(--shell-bottom-closed-height, 32px);
 }
 
 /* Responsive breakpoints — shell compresses at narrower widths. */
@@ -161,6 +211,12 @@
 
   .shell .right {
     display: none;
+  }
+
+  .shell {
+    grid-template-columns:
+      var(--shell-nav-width, 64px)
+      1fr;
   }
 
   .rightClosed {

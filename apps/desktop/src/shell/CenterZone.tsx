@@ -1,9 +1,12 @@
 import type { FC, ReactNode } from 'react';
 import { LcarsEmptyState, LcarsPill, LcarsZoneHeader } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
-import type { CenterSplit, OpenTool } from '../state';
+import type { CenterSplit, OpenTool, SplitSide } from '../state';
+import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
 import { ZoneTabStrip } from './ZoneTabStrip';
+import { PaneDropTarget } from './PaneDropTarget';
+import type { DropRegion } from './PaneDropTarget';
 import styles from './CenterZone.module.css';
 
 export interface CenterZoneProps {
@@ -35,6 +38,38 @@ export const CenterZone: FC<CenterZoneProps> = ({
   const activeTool = tools.find((t) => t.id === activeTabId) ?? null;
   const activeDescriptor = activeTool ? getTool(activeTool.id) : null;
   const hasTabs = tools.length > 0;
+
+  const moveTool = useWorkspaceStore((s) => s.moveTool);
+  const splitCenter = useWorkspaceStore((s) => s.splitCenter);
+
+  /**
+   * Single-pane drop composition:
+   *   - center  → move the tool into center (no split change)
+   *   - left    → split vertical, tool lands on side 'a' (leftmost)
+   *   - right   → split vertical, tool lands on side 'b' (rightmost)
+   *   - top     → split horizontal, tool lands on side 'a' (top)
+   *   - bottom  → split horizontal, tool lands on side 'b' (bottom)
+   *
+   * Order matters: splitCenter runs first so the splitSide assignment on
+   * the subsequent moveTool lands in a valid split state.
+   */
+  const handleCenterSingleDrop = (region: DropRegion, toolId: string) => {
+    if (region === 'center') {
+      moveTool(toolId, 'center');
+      return;
+    }
+    const dir: 'vertical' | 'horizontal' =
+      region === 'left' || region === 'right' ? 'vertical' : 'horizontal';
+    const side: SplitSide =
+      region === 'left' || region === 'top' ? 'a' : 'b';
+    splitCenter(dir);
+    moveTool(toolId, 'center', side);
+  };
+
+  /** In a split pane, drops on the side only move the tool onto that side. */
+  const handleSideDrop = (side: SplitSide) => (_region: DropRegion, toolId: string) => {
+    moveTool(toolId, 'center', side);
+  };
 
   const renderTool = (tool: OpenTool | null): ReactNode => {
     if (!tool) {
@@ -79,9 +114,14 @@ export const CenterZone: FC<CenterZoneProps> = ({
         <>
           <ZoneTabStrip zone="center" tools={tools} activeId={activeTabId} />
           <div
-            className={`${styles.content} ${hasTabs ? '' : styles.contentEmpty}`}
+            className={`${styles.content} ${hasTabs ? '' : styles.contentEmpty} ${styles.dropHost}`}
           >
             {renderTool(activeTool)}
+            <PaneDropTarget
+              variant="center-single"
+              label={activeDescriptor?.name?.toUpperCase() ?? 'CENTER'}
+              onDrop={handleCenterSingleDrop}
+            />
           </div>
         </>
       ) : (
@@ -95,12 +135,14 @@ export const CenterZone: FC<CenterZoneProps> = ({
             activeTabId={activeTabId}
             side="a"
             renderTool={renderTool}
+            onDrop={handleSideDrop('a')}
           />
           <SplitPane
             tools={tools}
             activeTabId={activeTabId}
             side="b"
             renderTool={renderTool}
+            onDrop={handleSideDrop('b')}
           />
         </div>
       )}
@@ -113,9 +155,16 @@ interface SplitPaneProps {
   activeTabId: string | null;
   side: 'a' | 'b';
   renderTool: (tool: OpenTool | null) => ReactNode;
+  onDrop: (region: DropRegion, toolId: string) => void;
 }
 
-const SplitPane: FC<SplitPaneProps> = ({ tools, activeTabId, side, renderTool }) => {
+const SplitPane: FC<SplitPaneProps> = ({
+  tools,
+  activeTabId,
+  side,
+  renderTool,
+  onDrop,
+}) => {
   const sideTools = tools.filter((t) => t.splitSide === side);
   const activeOnSide =
     sideTools.find((t) => t.id === activeTabId) ??
@@ -130,7 +179,7 @@ const SplitPane: FC<SplitPaneProps> = ({ tools, activeTabId, side, renderTool })
         filterSide={side}
       />
       <div
-        className={`${styles.content} ${sideTools.length === 0 ? styles.contentEmpty : ''}`}
+        className={`${styles.content} ${sideTools.length === 0 ? styles.contentEmpty : ''} ${styles.dropHost}`}
       >
         {sideTools.length === 0 ? (
           <div className={styles.splitEmpty}>
@@ -139,6 +188,11 @@ const SplitPane: FC<SplitPaneProps> = ({ tools, activeTabId, side, renderTool })
         ) : (
           renderTool(activeOnSide)
         )}
+        <PaneDropTarget
+          variant="center-side"
+          label={`SIDE ${side.toUpperCase()}`}
+          onDrop={onDrop}
+        />
       </div>
     </div>
   );

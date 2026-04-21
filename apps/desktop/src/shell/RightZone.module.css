@@ -27,3 +27,8 @@
   justify-content: center;
   padding: 1rem;
 }
+
+/* Anchor for PaneDropTarget overlay. */
+.dropHost {
+  position: relative;
+}

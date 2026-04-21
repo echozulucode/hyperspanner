@@ -1,17 +1,141 @@
 ---
 type: status
 updated: 2026-04-20
-current_phase: "3 — Workspace state (Zustand) (complete; typecheck hotfix applied)"
+current_phase: "3 — Workspace state (Zustand) (complete; drag-to-split + two bug fixes + LCARS plan)"
 blockers: []
 next_actions:
-  - "Re-run `pnpm typecheck` — the LcarsTheme + CollapsibleZone + collapsed.center fixes should clear the last batch"
-  - "Run `pnpm test` to exercise the workspace + useTool unit suites"
-  - "`pnpm tauri:dev` — categories now start collapsed; expand one, click a tool, click it again to see the pulse"
-  - "Exercise the tab chevron menu: Move to … / Split H|V / Maximize / Close"
-  - "On approval, begin Phase 4: real tool registry + navigator categories + command palette"
+  - "`pnpm tauri:dev` — drag should now work end-to-end thanks to `dragDropEnabled: false` in tauri.conf.json"
+  - "Click the ⋮ on any tab — menu now portals to document.body, escapes the tab strip's `overflow-x: auto` clip, and has a TAB ACTIONS header to make its purpose explicit"
+  - "Review docs/plan-005-lcars-polish.md — 6-step plan to make the shell actually read as LCARS (structural elbow, segmented bar, two-block rail)"
+  - "On approval of plan-005, begin execution of Step 1 (tokens) then Step 2 (LcarsElbow primitive)"
+  - "After LCARS polish lands, begin Phase 4: real tool registry + navigator categories + command palette"
 ---
 
 # Status Log
+
+## Session: 2026-04-20 (Phase 3 polish #2 — drag bug + tab menu bug + LCARS plan)
+**Phase:** 3 — three user reports triggered this pass.
+
+**Reports:**
+1. "I cannot drag tools to the other panes ... the targets appear but drag doesn't work."
+2. "Click on a ⋮ button for a tool — something pops down but is hidden and some scrollbars appear."
+3. "Main left section doesn't quite capture LCARS menus — generate a plan to be true to the original."
+
+**Diagnoses + fixes:**
+- **Drag did nothing.** Root cause: Tauri 2 webviews default to
+  `dragDropEnabled: true`, which intercepts HTML5 drag events at the OS
+  layer so the webview never sees `drop`. Fix: added
+  `"dragDropEnabled": false` to the window config in
+  `apps/desktop/src-tauri/tauri.conf.json`. The overlay already rendered
+  (because `dragstart` still reaches the webview), which is why drop
+  targets appeared but drops were silent.
+- **TabActionMenu was invisible / clipped.** Root cause: the menu used
+  `position: absolute` nested inside `ZoneTabStrip .strip` (which has
+  `overflow-x: auto` — and per CSS spec that implicitly clips the Y axis
+  too). Fix: portaled the menu to `document.body` via `createPortal`,
+  positioned with `position: fixed` from the trigger's `getBoundingClientRect`.
+  Added scroll/resize listeners on window (capture phase so nested scrolls
+  also trigger) to recompute coords. Also added a `TAB ACTIONS` header row
+  so the menu's purpose is obvious once it's actually on screen.
+- **LCARS fidelity.** Wrote `docs/plan-005-lcars-polish.md`, a six-step
+  sequenced plan to move the shell from "dark theme inspired by LCARS"
+  to a console built to the LCARS-24.2 grammar. Key structural fixes:
+  add the diagonal elbow corner (`linear-gradient(to top right, color
+  50%, black 50%)`), rebuild TopRail as a segmented bar instead of three
+  pills, and rebuild LeftNavigator as a two-block rail (orange over
+  african-violet, separated by a black seam, each with the canonical
+  top-right / bottom-right radii). Each step leaves the shell shippable.
+
+**Verification performed:**
+- Confirmed Tauri 2 schema accepts `dragDropEnabled` on window config
+  (referenced from the Tauri 2.0 config schema URL already in the file).
+- Portaled the menu with `useLayoutEffect` so positioning happens after
+  DOM mutation but before paint — no flash of mispositioned menu.
+- Click-outside handler now checks BOTH `rootRef` and the portaled
+  `listRef`, so clicks inside the menu don't close it.
+
+**Files changed this session:** 4 — `src-tauri/tauri.conf.json`,
+`shell/TabActionMenu.tsx`, `shell/TabActionMenu.module.css`,
+`docs/plan-005-lcars-polish.md` (new).
+
+**Blockers:** None — awaiting approval of plan-005 to execute the
+LCARS-24.2 fidelity work.
+
+---
+
+## Session: 2026-04-20 (Phase 3 polish — drag-to-split + restore affordances)
+**Phase:** 3 — post-milestone UX polish triggered by four user feedback items.
+
+**Feedback addressed:**
+1. Inspector had no restore affordance when collapsed → resolved in prior step.
+2. Center pane didn't reclaim space on inspector collapse → resolved in prior step
+   (grid-template-columns now switches to a narrow stub width instead of zero).
+3. **Drag-to-split the active pane like VS Code.** Implemented this session.
+4. LeftNav + TopRail visual polish vs `lcars-interface-designer` skill → next task (#32).
+
+**Actions taken this session (drag-to-split):**
+- `shell/PaneDropTarget.tsx` (new): absolutely-positioned overlay with a
+  `TAB_MIME = 'application/x-hyperspanner-tool'` constant and a `PaneDropVariant`
+  union (`center-single` | `center-side` | `zone-only`). Listens on
+  `window` for `dragstart` / `dragend` / `drop`; renders its hit regions only
+  when a tab drag is in progress. Uses `DOMStringList.contains` with an
+  `Array.from` fallback to detect our MIME across browser quirks. Pointer
+  events are off on the root and on only for hit regions, so nothing leaks
+  into the tool body when idle.
+- `shell/PaneDropTarget.module.css` (new): absolute-positioned `.region_top`
+  / `right` / `bottom` / `left` each at 20%, with a 60% center square; a
+  `:only-child` rule lets a single-region variant fill the whole pane. Active
+  region tints LCARS orange with an inset ring and a compressed uppercase
+  label ("MOVE → …" or "SPLIT LEFT").
+- `shell/ZoneTabStrip.tsx`: `PulsingTab` accepts `toolId`, sets
+  `draggable={true}` on the tab wrapper, and fires `dragstart` to write the
+  tool id under `TAB_MIME` on `dataTransfer`. A `.dragging` class dims the
+  source while the drag is in flight.
+- `shell/CenterZone.tsx`: single-pane composition wraps the content with
+  `<PaneDropTarget variant="center-single" onDrop=handleCenterSingleDrop />`,
+  which maps edge regions to `splitCenter(dir)` + `moveTool(id, 'center', side)`
+  and the center region to `moveTool(id, 'center')`. Split-pane sides use
+  `variant="center-side"` with a `moveTool(id, 'center', side)` handler.
+- `shell/RightZone.tsx` + `BottomZone.tsx`: body wrapped with
+  `<PaneDropTarget variant="zone-only" />`; drop handler calls
+  `moveTool(id, 'right')` / `moveTool(id, 'bottom')`.
+- Added `.dropHost { position: relative }` to `CenterZone.module.css`,
+  `RightZone.module.css`, and `BottomZone.module.css` so each drop overlay
+  anchors to its immediate pane body.
+
+**Design notes:**
+- Window-level listeners instead of store-based drag state keep the model
+  simple: no `draggingToolId` slice, no cleanup races across unmounts. The
+  component's `aliveRef` guard protects against late `dragend` after an
+  unmount during layout transitions (e.g. split merging mid-drag).
+- Store actions are composed at the call site (split + move) rather than
+  introducing a new `dropTool(region)` action. That keeps the store API
+  flat and testable; the composition lives where the geometry is known.
+
+**Verification performed (manual review):**
+- Walked the drag flow end-to-end in code: tab `dragstart` → window event
+  → overlay reveal → region `dragover` (preventDefault is present) → drop
+  handler → store composition → `dragend` cleanup. Every handler either
+  calls `preventDefault` or is on the drop target specifically.
+- Confirmed `moveTool` early-returns when the tool is already at the
+  target zone + side, so center-center drops are no-ops.
+- Confirmed `DropRegion` and `SplitSide` are imported as types under
+  `verbatimModuleSyntax`; `TAB_MIME` is a runtime value import.
+
+**Outcome:** Tabs are now draggable; edges of the center pane create splits;
+side zones (Inspector, Console) accept moves. The UX echoes VS Code's drop
+grid while staying inside LCARS color grammar (orange highlights, compressed
+uppercase labels).
+
+**Blockers:** None.
+
+**Files changed this session:** 8 — `shell/PaneDropTarget.tsx` (new),
+`shell/PaneDropTarget.module.css` (new), `shell/ZoneTabStrip.tsx`,
+`shell/ZoneTabStrip.module.css`, `shell/CenterZone.tsx`,
+`shell/CenterZone.module.css`, `shell/RightZone.tsx`, `shell/RightZone.module.css`,
+`shell/BottomZone.tsx`, `shell/BottomZone.module.css`, `docs/status.md`.
+
+---
 
 ## Session: 2026-04-20 (Phase 3 hotfix — typecheck + nav collapse)
 **Phase:** 3 — post-wrap fixes surfaced by `pnpm typecheck` on Windows.

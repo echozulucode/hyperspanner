@@ -36,13 +36,13 @@
 }
 
 .menu {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  z-index: 40;
-  min-width: 220px;
+  /* Positioning comes from inline style (fixed top/left) so the menu
+     escapes every ancestor `overflow` clip. z-index stays high for
+     stacking above the workspace. */
+  z-index: 1000;
+  min-width: 240px;
   margin: 0;
-  padding: 0.4rem 0;
+  padding: 0;
   list-style: none;
   background-color: var(--lcars-color-background, #0a0a0f);
   color: var(--lcars-color-text, #eae4d6);
@@ -52,6 +52,18 @@
   font-size: 0.8rem;
   letter-spacing: 0.04em;
   animation: menuIn 120ms ease-out;
+  overflow: hidden;
+}
+
+.menuHeader {
+  padding: 0.5rem 0.9rem;
+  background-color: var(--lcars-color-african-violet, #8a7aa8);
+  color: black;
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  user-select: none;
 }
 
 @keyframes menuIn {
@@ -68,10 +80,15 @@
 .item {
   display: flex;
   align-items: center;
-  padding: 0.45rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   cursor: pointer;
   transition: background-color 90ms ease, color 90ms ease;
   text-transform: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.item:first-of-type {
+  border-top: none;
 }
 
 .itemActive {

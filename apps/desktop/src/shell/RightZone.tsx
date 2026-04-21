@@ -2,8 +2,10 @@ import type { FC } from 'react';
 import { LcarsEmptyState, LcarsPill, LcarsZoneHeader } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
 import type { OpenTool } from '../state';
+import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
 import { ZoneTabStrip } from './ZoneTabStrip';
+import { PaneDropTarget } from './PaneDropTarget';
 import styles from './RightZone.module.css';
 
 export interface RightZoneProps {
@@ -34,6 +36,7 @@ export const RightZone: FC<RightZoneProps> = ({
   const activeTool = tools.find((t) => t.id === activeTabId) ?? null;
   const activeDescriptor = activeTool ? getTool(activeTool.id) : null;
   const computedTitle = title ?? activeDescriptor?.name?.toUpperCase() ?? 'INSPECTOR';
+  const moveTool = useWorkspaceStore((s) => s.moveTool);
 
   return (
     <aside
@@ -60,7 +63,9 @@ export const RightZone: FC<RightZoneProps> = ({
 
       <ZoneTabStrip zone="right" tools={tools} activeId={activeTabId} />
 
-      <div className={`${styles.body} ${tools.length === 0 ? styles.bodyEmpty : ''}`}>
+      <div
+        className={`${styles.body} ${tools.length === 0 ? styles.bodyEmpty : ''} ${styles.dropHost}`}
+      >
         {tools.length === 0 || !activeTool || !activeDescriptor ? (
           <LcarsEmptyState
             eyebrow="RGT-00"
@@ -74,6 +79,11 @@ export const RightZone: FC<RightZoneProps> = ({
             return <ToolBody toolId={activeTool.id} />;
           })()
         )}
+        <PaneDropTarget
+          variant="zone-only"
+          label="INSPECTOR"
+          onDrop={(_region, toolId) => moveTool(toolId, 'right')}
+        />
       </div>
     </aside>
   );

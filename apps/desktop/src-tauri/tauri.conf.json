@@ -23,7 +23,8 @@
         "transparent": false,
         "backgroundColor": "#0a0a0f",
         "theme": "Dark",
-        "fullscreen": false
+        "fullscreen": false,
+        "dragDropEnabled": false
       }
     ],
     "security": {

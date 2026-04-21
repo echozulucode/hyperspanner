@@ -31,6 +31,20 @@
   animation: tabPulse 520ms ease-out;
 }
 
+.tabWrap.dragging {
+  opacity: 0.55;
+  outline: 1px dashed var(--lcars-color-orange, #d88463);
+  outline-offset: 2px;
+}
+
+.tabWrap[draggable='true'] {
+  cursor: grab;
+}
+
+.tabWrap[draggable='true']:active {
+  cursor: grabbing;
+}
+
 @keyframes tabPulse {
   0% {
     box-shadow: 0 0 0 0 var(--lcars-color-orange, #d88463);

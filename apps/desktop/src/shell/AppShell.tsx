@@ -133,21 +133,43 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery }) => {
       </div>
 
       <div className={styles.right}>
-        <RightZone
-          collapsed={collapsed.right}
-          onToggle={() => toggleZone('right')}
-          tools={rightTools}
-          activeTabId={rightActive}
-        />
+        {!collapsed.right ? (
+          <RightZone
+            collapsed={false}
+            onToggle={() => toggleZone('right')}
+            tools={rightTools}
+            activeTabId={rightActive}
+          />
+        ) : (
+          <button
+            type="button"
+            className={styles.rightRestoreButton}
+            onClick={() => toggleZone('right')}
+            aria-label="Expand inspector (Cmd/Ctrl+Shift+E)"
+          >
+            INSPECTOR
+          </button>
+        )}
       </div>
 
       <div className={styles.bottom}>
-        <BottomZone
-          collapsed={collapsed.bottom}
-          onToggle={() => toggleZone('bottom')}
-          tools={bottomTools}
-          activeTabId={bottomActive}
-        />
+        {!collapsed.bottom ? (
+          <BottomZone
+            collapsed={false}
+            onToggle={() => toggleZone('bottom')}
+            tools={bottomTools}
+            activeTabId={bottomActive}
+          />
+        ) : (
+          <button
+            type="button"
+            className={styles.bottomRestoreButton}
+            onClick={() => toggleZone('bottom')}
+            aria-label="Expand console (Cmd/Ctrl+J)"
+          >
+            CONSOLE
+          </button>
+        )}
       </div>
     </div>
   );

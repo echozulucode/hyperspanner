@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FC } from 'react';
+import type { DragEvent, FC } from 'react';
 import { LcarsPill } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
 import type { OpenTool, Zone } from '../state';
 import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
 import { TabActionMenu } from './TabActionMenu';
+import { TAB_MIME } from './PaneDropTarget';
 import styles from './ZoneTabStrip.module.css';
 
 export interface ZoneTabStripProps {
@@ -65,6 +66,7 @@ export const ZoneTabStrip: FC<ZoneTabStripProps> = ({
         return (
           <PulsingTab
             key={tool.id}
+            toolId={tool.id}
             label={label}
             isActive={isActive}
             pulseId={tool.pulseId}
@@ -98,6 +100,7 @@ export const ZoneTabStrip: FC<ZoneTabStripProps> = ({
 };
 
 interface PulsingTabProps {
+  toolId: string;
   label: string;
   isActive: boolean;
   pulseId: number | undefined;
@@ -110,8 +113,13 @@ interface PulsingTabProps {
 /**
  * Tab pill with a transient "pulse" animation triggered whenever `pulseId`
  * changes. The pulse is purely presentational — no store mutation.
+ *
+ * Also acts as a drag source for pane-level drop targets: `dragstart` tags
+ * `dataTransfer` with the tool id under the shell-wide TAB_MIME, which the
+ * window-level listener on every `PaneDropTarget` uses to light up.
  */
 const PulsingTab: FC<PulsingTabProps> = ({
+  toolId,
   label,
   isActive,
   pulseId,
@@ -121,6 +129,7 @@ const PulsingTab: FC<PulsingTabProps> = ({
   trailing,
 }) => {
   const [pulsing, setPulsing] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const lastPulse = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -132,11 +141,29 @@ const PulsingTab: FC<PulsingTabProps> = ({
     return () => window.clearTimeout(t);
   }, [pulseId]);
 
+  const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer) return;
+    event.dataTransfer.setData(TAB_MIME, toolId);
+    // Text fallback so dropping on non-targets shows something sensible.
+    event.dataTransfer.setData('text/plain', label);
+    event.dataTransfer.effectAllowed = 'move';
+    setDragging(true);
+  };
+
+  const handleDragEnd = () => {
+    setDragging(false);
+  };
+
   return (
     <div
-      className={`${styles.tabWrap} ${pulsing ? styles.pulsing : ''}`}
+      className={`${styles.tabWrap} ${pulsing ? styles.pulsing : ''} ${
+        dragging ? styles.dragging : ''
+      }`}
       role="tab"
       aria-selected={isActive}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
       <LcarsPill
         size="small"

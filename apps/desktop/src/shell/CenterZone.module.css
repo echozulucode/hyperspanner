@@ -17,6 +17,11 @@
   justify-content: stretch;
 }
 
+/* Anchor for PaneDropTarget overlay — must be non-static positioning. */
+.dropHost {
+  position: relative;
+}
+
 .contentEmpty {
   align-items: center;
   justify-content: center;

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FC, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import type { CSSProperties, FC, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Zone } from '../state';
 import styles from './TabActionMenu.module.css';
 
@@ -61,7 +62,9 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
 
   const entries: Entry[] = [
@@ -101,14 +104,16 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
     { id: 'close', label: 'Close', variant: 'danger' },
   ];
 
-  // Click outside → close.
+  // Click outside → close. Click-outside checks both the trigger root AND
+  // the portaled menu, so clicks inside the dropdown (which is outside
+  // rootRef's DOM subtree) don't self-close.
   useEffect(() => {
     if (!open) return;
     const handler = (event: MouseEvent) => {
-      if (!rootRef.current) return;
-      if (!rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (listRef.current?.contains(target)) return;
+      setOpen(false);
     };
     window.addEventListener('mousedown', handler);
     return () => window.removeEventListener('mousedown', handler);
@@ -117,6 +122,37 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
   // Reset cursor when opening.
   useEffect(() => {
     if (open) setCursor(0);
+  }, [open]);
+
+  /** Position the portaled menu below the trigger. `position: fixed` is
+   *  measured in viewport coords from the trigger's bounding rect so it
+   *  escapes every ancestor `overflow` clip. Recomputed on scroll/resize. */
+  useLayoutEffect(() => {
+    if (!open) return;
+    const recompute = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const MENU_W = 240;
+      const GAP = 6;
+      // Right-align the menu under the trigger; clamp to viewport.
+      let left = rect.right - MENU_W;
+      left = Math.max(8, Math.min(left, window.innerWidth - MENU_W - 8));
+      const top = rect.bottom + GAP;
+      setMenuStyle({
+        position: 'fixed',
+        top: `${top}px`,
+        left: `${left}px`,
+        minWidth: `${MENU_W}px`,
+      });
+    };
+    recompute();
+    window.addEventListener('resize', recompute);
+    window.addEventListener('scroll', recompute, true); // capture — catches nested scrolls
+    return () => {
+      window.removeEventListener('resize', recompute);
+      window.removeEventListener('scroll', recompute, true);
+    };
   }, [open]);
 
   const dispatch = useCallback(
@@ -204,18 +240,59 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
     }
   };
 
+  const menu =
+    open && typeof document !== 'undefined'
+      ? createPortal(
+          <ul
+            ref={listRef}
+            role="menu"
+            aria-label="Tab actions"
+            className={styles.menu}
+            style={menuStyle}
+            onKeyDown={handleKey}
+            onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+          >
+            <li className={styles.menuHeader} aria-hidden="true">
+              Tab Actions
+            </li>
+            {entries.map((entry, index) => (
+              <li
+                key={entry.id}
+                role="menuitem"
+                aria-disabled={entry.disabled || undefined}
+                className={[
+                  styles.item,
+                  index === cursor ? styles.itemActive : '',
+                  entry.disabled ? styles.itemDisabled : '',
+                  entry.variant === 'danger' ? styles.itemDanger : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onMouseEnter={() => !entry.disabled && setCursor(index)}
+                onClick={() => {
+                  if (entry.disabled) return;
+                  dispatch(entry.id);
+                }}
+              >
+                {entry.label}
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )
+      : null;
+
   return (
-    <div
-      ref={rootRef}
-      className={styles.root}
-      onKeyDown={handleKey}
-    >
+    <div ref={rootRef} className={styles.root} onKeyDown={handleKey}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.trigger}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Tab actions"
+        aria-label="Tab actions menu"
+        title="Tab actions"
         onClick={(e) => {
           e.stopPropagation();
           setOpen((prev) => !prev);
@@ -223,38 +300,7 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
       >
         ⋮
       </button>
-
-      {open && (
-        <ul
-          ref={listRef}
-          role="menu"
-          className={styles.menu}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {entries.map((entry, index) => (
-            <li
-              key={entry.id}
-              role="menuitem"
-              aria-disabled={entry.disabled || undefined}
-              className={[
-                styles.item,
-                index === cursor ? styles.itemActive : '',
-                entry.disabled ? styles.itemDisabled : '',
-                entry.variant === 'danger' ? styles.itemDanger : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onMouseEnter={() => !entry.disabled && setCursor(index)}
-              onClick={() => {
-                if (entry.disabled) return;
-                dispatch(entry.id);
-              }}
-            >
-              {entry.label}
-            </li>
-          ))}
-        </ul>
-      )}
+      {menu}
     </div>
   );
 };
