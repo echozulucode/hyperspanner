@@ -149,3 +149,95 @@ lessons:
       their toggle pills live on the zone header which remains visible in the
       expanded state, so there's a round-trip affordance elsewhere.
     applied: true
+
+  - id: 13
+    date: 2026-04-20
+    source: "session"
+    category: architecture
+    lesson: |
+      Zustand v5 selectors that derive a new array or object on every call
+      (e.g. `s.open.filter(t => t.zone === 'center')`) must be wrapped in
+      `useShallow` from `zustand/react/shallow`, or the consuming component
+      re-renders every time the store updates at all. In AppShell the three
+      zone arrays are subscribed with `useShallow` while scalar + function
+      selections remain bare. Function references returned by the store are
+      stable across renders, so `useCallback` wrappers around them only need
+      the function itself as a dep.
+    applied: true
+
+  - id: 14
+    date: 2026-04-20
+    source: "session"
+    category: correctness
+    lesson: |
+      When a hook exposes a `setState` that supports a function form
+      (`setState(prev => next)`), computing `prev` from a closed-over state
+      snapshot is wrong if two `setState` calls can be batched in a single
+      tick. The second call reads the stale snapshot and overwrites the
+      first's update. Fix by reading the live value from the store
+      synchronously inside `setState` (`useStore.getState().byId[id]`)
+      rather than from the selector closure. `useTool.test.ts` catches
+      this exactly — two `prev => prev.count + N` calls in one `act()`
+      must compose.
+    applied: true
+
+  - id: 15
+    date: 2026-04-20
+    source: "session"
+    category: tooling
+    lesson: |
+      React 19 removed the ad-hoc `renderHook` export that was briefly
+      available in an RFC; hook tests must import `renderHook` and `act`
+      from `@testing-library/react`. That package in turn needs
+      `@testing-library/dom` as an explicit dep and `jsdom` as a devDep
+      (Vitest's default `node` env has no DOM). Store tests that go
+      through `useWorkspaceStore.getState()` / `setState(DEFAULT_WORKSPACE)`
+      don't need the DOM and stay on the default node env; only hook
+      tests opt in via `// @vitest-environment jsdom`.
+    applied: true
+
+  - id: 16
+    date: 2026-04-20
+    source: "session"
+    category: ux
+    lesson: |
+      Single-instance tool focus needs a visible signal when the user
+      re-opens something that's already open, or the click feels broken.
+      The store carries a transient `pulseId` per `OpenTool` and a global
+      `pulseCounter`; `openTool` on an existing id bumps both. Consumers
+      render a `PulsingTab` that watches `pulseId` via effect and toggles
+      a `.pulsing` class for one 520ms CSS keyframe, then clears it.
+      The `pulseId` is opaque — any new value triggers the animation —
+      which lets the same tab pulse repeatedly without manual reset logic.
+    applied: true
+
+  - id: 17
+    date: 2026-04-20
+    source: "session"
+    category: tooling
+    lesson: |
+      React's JSX rules require component references to be PascalCase; a
+      lowercase member expression like `<descriptor.component />` is
+      treated as an HTML element and breaks at runtime. When the component
+      comes from a registry lookup, alias it first:
+      `const ToolBody = descriptor.component; return <ToolBody … />`.
+      Wrapping the alias in an IIFE inside JSX keeps the scope local to
+      the branch that needs it. Likewise `LcarsPill` only accepts
+      `aria-label` among ARIA props — `role`, `aria-selected`, and any
+      other ARIA attributes must go on a wrapping `div`.
+    applied: true
+
+  - id: 18
+    date: 2026-04-20
+    source: "session"
+    category: tooling
+    lesson: |
+      pnpm v9 fails with EPERM during `install` when the workspace root
+      sits on the Windows-host-backed sandbox mount — it can create a
+      temp file but not `unlink` it, which pnpm does to probe for
+      cross-device links. Combined with lesson #2 (can't follow pnpm
+      symlinks), this means the Linux sandbox cannot install or verify
+      node packages at all. Delegate install + typecheck + test to the
+      Windows host; use the sandbox for file edits, Git, and static
+      review via sub-agents.
+    applied: true

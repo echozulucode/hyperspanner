@@ -1,0 +1,243 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { useWorkspaceStore } from './workspace';
+import { DEFAULT_WORKSPACE } from './presets';
+
+/**
+ * workspace store — unit tests covering Phase 3 deliverables:
+ *
+ *   - single-instance enforcement (openTool on an open id focuses + pulses)
+ *   - close reassigns activeByZone
+ *   - moveTool updates zone + activeByZone in both directions
+ *   - splitCenter / mergeCenter demote-and-restore splitSide
+ *   - toggleZone flips collapse
+ *   - applyPreset applies a valid preset, ignores unknown names
+ *   - resetLayout returns to default
+ *
+ * Tests run directly against the Zustand store via `getState()` and
+ * `setState(DEFAULT_WORKSPACE)` for isolation. No React rendering is
+ * involved, keeping the tests fast and decoupled from the DOM.
+ */
+
+beforeEach(() => {
+  // Reset the store between tests.
+  useWorkspaceStore.setState({ ...DEFAULT_WORKSPACE });
+});
+
+function snapshot() {
+  return useWorkspaceStore.getState();
+}
+
+describe('workspace.openTool', () => {
+  it('opens a new tool in the specified zone and makes it active', () => {
+    const { openTool } = snapshot();
+    openTool('json-validator', 'center');
+    const s = snapshot();
+    expect(s.open).toHaveLength(1);
+    expect(s.open[0]).toMatchObject({ id: 'json-validator', zone: 'center' });
+    expect(s.activeByZone.center).toBe('json-validator');
+    // Center is never collapsible; opening a tool there doesn't touch the
+    // collapse map. Bottom starts collapsed by default (see DEFAULT_COLLAPSED).
+    expect(s.collapsed.bottom).toBe(true);
+  });
+
+  it('defaults to the center zone when no zone is provided', () => {
+    snapshot().openTool('text-diff');
+    expect(snapshot().open[0].zone).toBe('center');
+  });
+
+  it('enforces single-instance: reopening focuses and triggers a pulse', () => {
+    const { openTool } = snapshot();
+    openTool('json-validator', 'center');
+    const firstPulse = snapshot().open[0].pulseId;
+    const firstCount = snapshot().pulseCounter;
+
+    openTool('json-validator', 'center');
+    const s = snapshot();
+    expect(s.open).toHaveLength(1);
+    expect(s.pulseCounter).toBeGreaterThan(firstCount);
+    expect(s.open[0].pulseId).not.toBe(firstPulse);
+  });
+
+  it('single-instance focus ignores the second zone argument (keeps original zone)', () => {
+    const { openTool } = snapshot();
+    openTool('json-validator', 'center');
+    openTool('json-validator', 'right');
+    const s = snapshot();
+    expect(s.open[0].zone).toBe('center');
+    // Focus should be re-applied to the original zone.
+    expect(s.activeByZone.center).toBe('json-validator');
+  });
+
+  it('assigns splitSide="a" when opening in a split center', () => {
+    const { openTool, splitCenter } = snapshot();
+    splitCenter('vertical');
+    openTool('json-validator', 'center');
+    expect(snapshot().open[0].splitSide).toBe('a');
+  });
+});
+
+describe('workspace.closeTool', () => {
+  it('removes the tool and clears its activeByZone entry', () => {
+    const { openTool, closeTool } = snapshot();
+    openTool('json-validator', 'center');
+    closeTool('json-validator');
+    const s = snapshot();
+    expect(s.open).toHaveLength(0);
+    expect(s.activeByZone.center).toBeNull();
+  });
+
+  it('falls back to another open tool in the same zone when closing the active one', () => {
+    const { openTool, closeTool } = snapshot();
+    openTool('json-validator', 'center');
+    openTool('yaml-validator', 'center');
+    expect(snapshot().activeByZone.center).toBe('yaml-validator');
+    closeTool('yaml-validator');
+    expect(snapshot().activeByZone.center).toBe('json-validator');
+  });
+
+  it('is a no-op when the tool is not open', () => {
+    const before = snapshot();
+    before.closeTool('missing');
+    const after = snapshot();
+    expect(after.open).toEqual(before.open);
+  });
+});
+
+describe('workspace.moveTool', () => {
+  it('moves a tool between zones and updates activeByZone in both', () => {
+    const { openTool, moveTool } = snapshot();
+    openTool('json-validator', 'center');
+    openTool('yaml-validator', 'center');
+    // Active in center is yaml-validator.
+    moveTool('yaml-validator', 'right');
+    const s = snapshot();
+    const moved = s.open.find((t) => t.id === 'yaml-validator');
+    expect(moved?.zone).toBe('right');
+    expect(s.activeByZone.center).toBe('json-validator');
+    expect(s.activeByZone.right).toBe('yaml-validator');
+    expect(s.collapsed.right).toBe(false);
+  });
+
+  it('assigns splitSide when moving into a split center', () => {
+    const { openTool, splitCenter, moveTool } = snapshot();
+    openTool('json-validator', 'right');
+    splitCenter('horizontal');
+    moveTool('json-validator', 'center', 'b');
+    const moved = snapshot().open[0];
+    expect(moved.zone).toBe('center');
+    expect(moved.splitSide).toBe('b');
+  });
+
+  it('is a no-op when target zone + splitSide are unchanged', () => {
+    const { openTool, moveTool } = snapshot();
+    openTool('json-validator', 'center');
+    const counter = snapshot().pulseCounter;
+    moveTool('json-validator', 'center');
+    expect(snapshot().pulseCounter).toBe(counter);
+  });
+});
+
+describe('workspace.splitCenter / mergeCenter', () => {
+  it('splitCenter assigns all current center tools to side a', () => {
+    const { openTool, splitCenter } = snapshot();
+    openTool('json-validator', 'center');
+    openTool('yaml-validator', 'center');
+    splitCenter('vertical');
+    const centerTools = snapshot().open.filter((t) => t.zone === 'center');
+    expect(centerTools.every((t) => t.splitSide === 'a')).toBe(true);
+    expect(snapshot().centerSplit).toBe('vertical');
+  });
+
+  it('splitCenter is idempotent for the same direction', () => {
+    const { splitCenter } = snapshot();
+    splitCenter('vertical');
+    splitCenter('vertical');
+    expect(snapshot().centerSplit).toBe('vertical');
+  });
+
+  it('mergeCenter clears splitSide on center tools and resets centerSplit', () => {
+    const { openTool, splitCenter, moveTool, mergeCenter } = snapshot();
+    openTool('json-validator', 'center');
+    splitCenter('horizontal');
+    openTool('yaml-validator', 'center');
+    moveTool('yaml-validator', 'center', 'b');
+    mergeCenter();
+    const s = snapshot();
+    const centerTools = s.open.filter((t) => t.zone === 'center');
+    expect(centerTools.every((t) => t.splitSide === undefined)).toBe(true);
+    expect(s.centerSplit).toBe('none');
+  });
+});
+
+describe('workspace.setActive / toggleZone', () => {
+  it('setActive only accepts an id that is actually in the zone', () => {
+    const { openTool, setActive } = snapshot();
+    openTool('json-validator', 'center');
+    setActive('right', 'json-validator'); // invalid — wrong zone
+    expect(snapshot().activeByZone.right).toBeNull();
+    setActive('center', 'json-validator');
+    expect(snapshot().activeByZone.center).toBe('json-validator');
+  });
+
+  it('setActive accepts null to clear a zone', () => {
+    const { openTool, setActive } = snapshot();
+    openTool('json-validator', 'center');
+    setActive('center', null);
+    expect(snapshot().activeByZone.center).toBeNull();
+  });
+
+  it('toggleZone flips collapse state', () => {
+    const { toggleZone } = snapshot();
+    expect(snapshot().collapsed.right).toBe(false);
+    toggleZone('right');
+    expect(snapshot().collapsed.right).toBe(true);
+    toggleZone('right');
+    expect(snapshot().collapsed.right).toBe(false);
+  });
+});
+
+describe('workspace.applyPreset / resetLayout', () => {
+  it('applyPreset applies a known preset and sets layoutPreset', () => {
+    const { applyPreset } = snapshot();
+    applyPreset('minimal-focus');
+    const s = snapshot();
+    expect(s.layoutPreset).toBe('minimal-focus');
+    expect(s.collapsed.left).toBe(true);
+    expect(s.collapsed.right).toBe(true);
+    expect(s.collapsed.bottom).toBe(true);
+  });
+
+  it('applyPreset is a no-op for unknown names', () => {
+    const { applyPreset } = snapshot();
+    const before = { ...snapshot() };
+    applyPreset('does-not-exist');
+    expect(snapshot().layoutPreset).toBe(before.layoutPreset);
+  });
+
+  it('applyPreset demotes side B to side A when leaving a split', () => {
+    const { openTool, splitCenter, moveTool, applyPreset } = snapshot();
+    openTool('json-validator', 'center');
+    splitCenter('horizontal');
+    openTool('yaml-validator', 'center');
+    moveTool('yaml-validator', 'center', 'b');
+    applyPreset('default'); // default: centerSplit='none'
+    const s = snapshot();
+    expect(s.centerSplit).toBe('none');
+    const centerTools = s.open.filter((t) => t.zone === 'center');
+    expect(centerTools.every((t) => t.splitSide === undefined)).toBe(true);
+  });
+
+  it('resetLayout returns to the default empty workspace', () => {
+    const { openTool, splitCenter, resetLayout } = snapshot();
+    openTool('json-validator', 'center');
+    openTool('hash-workbench', 'right');
+    splitCenter('vertical');
+    resetLayout();
+    const s = snapshot();
+    expect(s.open).toHaveLength(0);
+    expect(s.centerSplit).toBe('none');
+    expect(s.activeByZone.center).toBeNull();
+    expect(s.activeByZone.right).toBeNull();
+    expect(s.activeByZone.bottom).toBeNull();
+  });
+});

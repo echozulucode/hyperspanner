@@ -18,11 +18,12 @@ export const themes = {
 export type ThemeName = keyof typeof themes;
 
 /**
- * Structural theme shape — every variant conforms to this.
- * We use the classic theme as the canonical shape because
- * every other variant spreads from it.
+ * Structural theme shape — the union of every variant. Using a union
+ * (rather than a single variant's `typeof`) lets `name` stay as the
+ * full `ThemeName` literal union instead of collapsing to `"classic"`,
+ * which previously made `themes[themeName]` unassignable to `LcarsTheme`.
  */
-export type LcarsTheme = typeof classicTheme;
+export type LcarsTheme = (typeof themes)[ThemeName];
 
 export type ClassicTheme = typeof classicTheme;
 export type NemesisBlueTheme = typeof nemesisBlueTheme;

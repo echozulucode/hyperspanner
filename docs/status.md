@@ -1,16 +1,128 @@
 ---
 type: status
 updated: 2026-04-20
-current_phase: "2 — App shell and zone layout (complete; awaiting review)"
+current_phase: "3 — Workspace state (Zustand) (complete; typecheck hotfix applied)"
 blockers: []
 next_actions:
-  - "User review: run `pnpm install && pnpm typecheck && pnpm tauri:dev` on Windows host"
-  - "Inspect default route (AppShell) and `#/gallery` route (PrimitiveGallery)"
-  - "Exercise keyboard shortcuts: Cmd/Ctrl+B (Left), Cmd/Ctrl+J (Bottom), Cmd/Ctrl+Shift+E (Right)"
-  - "On approval, begin Phase 3: Zustand workspace store + real tab state + split handles"
+  - "Re-run `pnpm typecheck` — the LcarsTheme + CollapsibleZone + collapsed.center fixes should clear the last batch"
+  - "Run `pnpm test` to exercise the workspace + useTool unit suites"
+  - "`pnpm tauri:dev` — categories now start collapsed; expand one, click a tool, click it again to see the pulse"
+  - "Exercise the tab chevron menu: Move to … / Split H|V / Maximize / Close"
+  - "On approval, begin Phase 4: real tool registry + navigator categories + command palette"
 ---
 
 # Status Log
+
+## Session: 2026-04-20 (Phase 3 hotfix — typecheck + nav collapse)
+**Phase:** 3 — post-wrap fixes surfaced by `pnpm typecheck` on Windows.
+
+**Actions taken:**
+- `themes/index.ts`: `LcarsTheme` was `typeof classicTheme`, which pinned `name`
+  to the literal `"classic"` — so `themes[themeName]` returning a non-classic
+  variant was unassignable. Changed to `(typeof themes)[ThemeName]` (union of
+  all variants); `theme.name` is now the full `ThemeName` union.
+- `state/workspace.types.ts`: added `CollapsibleZone = Exclude<Zone, 'center'> | 'left'`.
+  Narrowed `toggleZone` and `setZoneCollapsed` signatures to `CollapsibleZone`
+  so `state.collapsed[zone]` type-checks against the three-key
+  `ZoneCollapseState`. `useShellShortcuts`'s `ShortcutZone` is already assignable.
+- `state/workspace.ts`: added `ensureUncollapsed(prev, zone)` helper that
+  short-circuits when `zone === 'center'`; replaced four
+  `{ ...state.collapsed, [zone]: false }` spreads (openTool existing/new,
+  focusTool, moveTool) with it, so opening/moving a tool in the center no
+  longer adds a stray `center: false` key to `collapsed`.
+- `state/workspace.test.ts`: removed the bogus `expect(s.collapsed.center).toBe(false)`
+  assertion; replaced with a `s.collapsed.bottom === true` check against
+  `DEFAULT_COLLAPSED`.
+- `shell/LeftNavigator.tsx`: categories now start fully collapsed
+  (`openCategories = {}` instead of `{ text: true, validation: true }`).
+  A non-empty filter query still auto-expands matches via the existing
+  `openCategories[cat.id] ?? Boolean(query)` fallback.
+
+**Verification performed:**
+- Re-delegated a static typecheck pass against the exact `pnpm typecheck`
+  error list. All four reported errors trace to fixed files; no other
+  `collapsed.center` references exist in the tree; no `any` escapes in
+  Phase 3 new files.
+
+**Outcome:** Typecheck errors addressed; host retry gate unchanged.
+
+**Blockers:** None.
+
+**Files changed this session:** 5 — `themes/index.ts`, `state/workspace.types.ts`,
+`state/workspace.ts`, `state/workspace.test.ts`, `shell/LeftNavigator.tsx`.
+
+---
+
+## Session: 2026-04-20 (Phase 3 wrap — workspace state milestone)
+**Phase:** 3 — Workspace state (Zustand) + managed docking model
+**Status entering session:** Phase 2 complete, AppShell shell rendered local zone state.
+
+**Actions taken:**
+- Added Zustand 5 + `useShallow` selectors. Authored `state/workspace.types.ts`,
+  `state/presets.ts` (6 built-in layouts), `state/workspace.ts` (full store with
+  openTool/closeTool/moveTool/splitCenter/mergeCenter/setActive/toggleZone/applyPreset/
+  resetLayout), and a `state/index.ts` barrel.
+- Implemented single-instance tool model: reopening an open id bumps a per-tool
+  `pulseId` + global `pulseCounter` instead of duplicating. `ZoneTabStrip`'s
+  `PulsingTab` runs a 520ms CSS keyframe on each bump.
+- Authored `state/useTool.ts` — a second Zustand store keyed by tool id for per-tool
+  runtime state. Exposes a typed `useTool<T>(id, defaults)` hook with partial-patch
+  and function-form `setState`. `setState` reads the live store snapshot at call
+  time so multiple sequential updates in a single `act()` batch correctly see each
+  other's results. `clearToolState(id)` is the escape hatch `closeTool` calls.
+- Authored `tools/registry.ts` (13 placeholder descriptors + `listToolsByCategory`),
+  and `tools/PlaceholderTool.tsx` as a generic body consuming `useTool`.
+- Built `shell/TabActionMenu.tsx` — per-tab dropdown (Focus / Move to … /
+  Split H|V / Maximize / Reset / Close) with keyboard navigation (arrows skip
+  disabled items, Home/End, Enter/Space dispatches, Escape closes) and
+  click-outside dismissal.
+- Built `shell/ZoneTabStrip.tsx` — generic tab strip used by all three zones,
+  with optional `filterSide` for center-split panes. Pulls actions directly
+  from the store; moved `role="tab"`/`aria-selected` to the wrapper div because
+  `LcarsPill` accepts only `aria-label`.
+- Rewrote `CenterZone`, `RightZone`, `BottomZone` to new signatures
+  `{ tools, activeTabId, split?, collapsed?, onToggle?, ... }`. Dynamic tool
+  body rendering uses IIFE + PascalCase alias (`const ToolBody = descriptor.component`)
+  to comply with React's lowercase-JSX rules.
+- Rewrote `shell/AppShell.tsx` to subscribe via `useShallow` selectors
+  (`s.open.filter(zone)` returns a new array, shallow-compared). Derives
+  `openToolIds` from the three subscribed arrays (no stale `.getState()`).
+  `onOpenTool` looks up each descriptor's `defaultZone` in the registry.
+- Collapsed `useZoneState` to `useShellShortcuts(onToggle)` — pure shortcut
+  registrar that delegates to the caller.
+- Rewrote `LeftNavigator` to consume the registry + new props
+  (`activeToolId`, `openToolIds`, `favoriteIds`, `onOpenTool`). Added
+  `.openDot` green indicator for currently-open tools.
+- Added Vitest + `@testing-library/react` + `jsdom`. Authored
+  `state/workspace.test.ts` (23 assertions across openTool single-instance,
+  closeTool activeByZone fallback, moveTool split-side assignment,
+  splitCenter demote-to-A, mergeCenter clear, applyPreset unknown+split demote,
+  resetLayout) and `state/useTool.test.ts` (defaults, partial patch,
+  function-form, reset, slot isolation, external clear).
+- Added root `test` script + per-package `test` / `test:watch` scripts.
+
+**Verification performed:**
+- Static code review (delegated) against strict-TS invariants, Zustand v5
+  selector patterns, React 19 hook rules, store/test behavioral contract.
+  Found and fixed one closure bug: `useTool.setState`'s function-form path
+  was reading `state` from the selector closure, so two `setState(p => …)`
+  calls batched in a single `act()` both saw the stale initial value. Fixed
+  to read `useToolStateStore.getState().byId[id]` synchronously.
+- Sandbox install still blocked by the pnpm mount EPERM; host-side
+  `pnpm install && pnpm typecheck && pnpm test` remains the review gate.
+
+**Outcome:** Phase 3 milestone reached — managed docking model is live, the
+shell routes through the Zustand store, and the store is covered by unit tests.
+
+**Blockers:** None.
+
+**Files changed this session:** ~20 writes across `apps/desktop/src/state/*`,
+`apps/desktop/src/tools/*`, `apps/desktop/src/shell/{AppShell, CenterZone,
+RightZone, BottomZone, LeftNavigator, TabActionMenu, ZoneTabStrip, useZoneState,
+index}`, `apps/desktop/vitest.config.ts`, `apps/desktop/package.json`, and the
+root `package.json` test script.
+
+---
 
 ## Session: 2026-04-20 (Phase 2 wrap — shell milestone)
 **Phase:** 2 — App shell and zone layout

@@ -16,7 +16,7 @@ phases:
     status: complete
   - id: 3
     name: "Workspace state (Zustand) + persistence"
-    status: pending
+    status: complete
   - id: 4
     name: "Tool registry + navigator"
     status: pending
@@ -41,7 +41,7 @@ phases:
   - id: 11
     name: "Testing / packaging / first release"
     status: pending
-current_phase: 3
+current_phase: 4
 ---
 
 # Plan: Hyperspanner
@@ -62,8 +62,14 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
 - **Phase 1 complete** — `@hyperspanner/lcars-ui` package published with 13 primitives
   plus tokens. `/primitive-gallery` route renders every primitive with a theme switcher.
   See `status.md` for the current review gate.
-- **Phase 2 next** — AppShell with top bar, left rail, and Center/Right/Bottom dock zones;
-  no floating windows; single-instance tool focus behavior.
+- **Phase 2 complete** — AppShell with TopRail, LeftNavigator and Center/Right/Bottom
+  dock zones; hash-based `#/gallery` route; no floating windows.
+- **Phase 3 complete** — Zustand `useWorkspaceStore` with openTool / closeTool / moveTool /
+  splitCenter / mergeCenter / setActive / toggleZone / applyPreset / resetLayout;
+  single-instance focus with pulse; `useTool<T>` per-tool runtime slot; ZoneTabStrip +
+  TabActionMenu wired through AppShell; Vitest + @testing-library/react unit tests.
+- **Phase 4 next** — real tool registry beyond the placeholder set; LeftNavigator-driven
+  discovery with category filters, favorites, and command palette.
 
 ## Decisions Made
 | Date | Decision | Rationale |

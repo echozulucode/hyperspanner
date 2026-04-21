@@ -41,3 +41,4 @@ coverage/
 playwright-report/
 test-results/
 /reference/
+_tmp*

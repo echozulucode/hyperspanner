@@ -1,135 +1,145 @@
 import type { FC, ReactNode } from 'react';
-import {
-  LcarsEmptyState,
-  LcarsPill,
-  LcarsZoneHeader,
-} from '@hyperspanner/lcars-ui';
+import { LcarsEmptyState, LcarsPill, LcarsZoneHeader } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
+import type { CenterSplit, OpenTool } from '../state';
+import { getTool } from '../tools';
+import { ZoneTabStrip } from './ZoneTabStrip';
 import styles from './CenterZone.module.css';
 
-export interface CenterTab {
-  id: string;
-  label: string;
-  pulse?: boolean;
-}
-
-export type CenterSplit = 'none' | 'horizontal' | 'vertical';
-
 export interface CenterZoneProps {
-  tabs?: CenterTab[];
-  activeTabId?: string | null;
-  onSelectTab?: (id: string) => void;
-  onCloseTab?: (id: string) => void;
-  split?: CenterSplit;
+  /** Tools currently docked in the center zone. */
+  tools: OpenTool[];
+  /** Active tab id for the center zone. */
+  activeTabId: string | null;
+  split: CenterSplit;
   onOpenSampleTool?: () => void;
-  children?: ReactNode;
 }
 
 /**
  * CenterZone — primary work surface.
- * Phase 2 renders a tab strip and a placeholder empty state. The workspace store
- * (Phase 3) feeds the real tab list and active content via `children`.
+ *
+ * Phase 3 wiring:
+ *   - tab strip fed by the workspace store (via props from AppShell)
+ *   - split panes rendered when `split !== 'none'`, each with its own strip
+ *     filtered to `splitSide: 'a' | 'b'`
+ *   - empty-state when no tools are docked
+ *   - active tool's registered component is rendered in the content area
  */
 export const CenterZone: FC<CenterZoneProps> = ({
-  tabs = [],
+  tools,
   activeTabId,
-  onSelectTab,
-  onCloseTab,
-  split = 'none',
+  split,
   onOpenSampleTool,
-  children,
 }) => {
   const { theme } = useTheme();
-  const hasTabs = tabs.length > 0;
+  const activeTool = tools.find((t) => t.id === activeTabId) ?? null;
+  const activeDescriptor = activeTool ? getTool(activeTool.id) : null;
+  const hasTabs = tools.length > 0;
 
-  const emptyState = (
-    <LcarsEmptyState
-      eyebrow="CENTER ZONE · CTR-00"
-      title="No active tool"
-      description="Open a tool from the navigator to begin. The command palette (⌘K) is the fastest path."
-      icon={<span aria-hidden>◉</span>}
-      action={
-        <LcarsPill color={theme.colors.orange} onClick={onOpenSampleTool}>
-          OPEN SAMPLE
-        </LcarsPill>
-      }
-    />
-  );
-
-  const contentBody = (
-    <div className={`${styles.content} ${hasTabs ? '' : styles.contentEmpty}`}>
-      {hasTabs ? (
-        children ?? emptyState
-      ) : (
-        emptyState
-      )}
-    </div>
-  );
+  const renderTool = (tool: OpenTool | null): ReactNode => {
+    if (!tool) {
+      return (
+        <LcarsEmptyState
+          eyebrow="CENTER · CTR-00"
+          title="No active tool"
+          description="Open a tool from the navigator to begin. The command palette (⌘K) is the fastest path."
+          icon={<span aria-hidden>◉</span>}
+          action={
+            <LcarsPill color={theme.colors.orange} onClick={onOpenSampleTool}>
+              OPEN SAMPLE
+            </LcarsPill>
+          }
+        />
+      );
+    }
+    const descriptor = getTool(tool.id);
+    if (!descriptor) {
+      return (
+        <div className={styles.missing}>
+          <p>Unknown tool: {tool.id}</p>
+        </div>
+      );
+    }
+    const ToolBody = descriptor.component;
+    return <ToolBody toolId={tool.id} />;
+  };
 
   return (
     <section className={styles.zone} aria-label="Center work surface">
       <LcarsZoneHeader
         eyebrow="CTR-00"
         title={
-          hasTabs
-            ? tabs.find((t) => t.id === activeTabId)?.label ?? 'SELECT A TAB'
-            : 'WORK SURFACE'
+          activeDescriptor?.name?.toUpperCase() ??
+          (hasTabs ? 'SELECT A TAB' : 'WORK SURFACE')
         }
         indicatorColor={hasTabs ? theme.colors.green : undefined}
       />
 
-      <div
-        className={styles.tabStrip}
-        role="tablist"
-        aria-orientation="horizontal"
-      >
-        {hasTabs ? (
-          tabs.map((tab) => (
-            <LcarsPill
-              key={tab.id}
-              size="small"
-              rounded="both"
-              color={
-                tab.id === activeTabId
-                  ? theme.colors.orange
-                  : theme.colors.africanViolet
-              }
-              active={tab.id === activeTabId}
-              onClick={() => onSelectTab?.(tab.id)}
-              aria-label={`${tab.label}${onCloseTab ? ' — middle-click to close' : ''}`}
-            >
-              {tab.label}
-              {onCloseTab && tab.id === activeTabId && (
-                <span
-                  aria-hidden
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseTab(tab.id);
-                  }}
-                  style={{ marginLeft: '0.5rem', opacity: 0.6 }}
-                >
-                  ×
-                </span>
-              )}
-            </LcarsPill>
-          ))
-        ) : (
-          <span className={styles.tabStripEmpty}>TABS · 0</span>
-        )}
-      </div>
-
       {split === 'none' ? (
-        contentBody
+        <>
+          <ZoneTabStrip zone="center" tools={tools} activeId={activeTabId} />
+          <div
+            className={`${styles.content} ${hasTabs ? '' : styles.contentEmpty}`}
+          >
+            {renderTool(activeTool)}
+          </div>
+        </>
       ) : (
         <div
           className={`${styles.splitRoot} ${
             split === 'vertical' ? styles.splitVertical : styles.splitHorizontal
           }`}
         >
-          <div className={styles.splitPane}>Pane A — Phase 3 wires splits</div>
-          <div className={styles.splitPane}>Pane B</div>
+          <SplitPane
+            tools={tools}
+            activeTabId={activeTabId}
+            side="a"
+            renderTool={renderTool}
+          />
+          <SplitPane
+            tools={tools}
+            activeTabId={activeTabId}
+            side="b"
+            renderTool={renderTool}
+          />
         </div>
       )}
     </section>
+  );
+};
+
+interface SplitPaneProps {
+  tools: OpenTool[];
+  activeTabId: string | null;
+  side: 'a' | 'b';
+  renderTool: (tool: OpenTool | null) => ReactNode;
+}
+
+const SplitPane: FC<SplitPaneProps> = ({ tools, activeTabId, side, renderTool }) => {
+  const sideTools = tools.filter((t) => t.splitSide === side);
+  const activeOnSide =
+    sideTools.find((t) => t.id === activeTabId) ??
+    sideTools[sideTools.length - 1] ??
+    null;
+  return (
+    <div className={styles.splitPane}>
+      <ZoneTabStrip
+        zone="center"
+        tools={tools}
+        activeId={activeTabId}
+        filterSide={side}
+      />
+      <div
+        className={`${styles.content} ${sideTools.length === 0 ? styles.contentEmpty : ''}`}
+      >
+        {sideTools.length === 0 ? (
+          <div className={styles.splitEmpty}>
+            <span>SIDE {side.toUpperCase()} · EMPTY</span>
+          </div>
+        ) : (
+          renderTool(activeOnSide)
+        )}
+      </div>
+    </div>
   );
 };

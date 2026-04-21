@@ -1,12 +1,14 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { FC } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { TopRail } from './TopRail';
 import { LeftNavigator } from './LeftNavigator';
 import { CenterZone } from './CenterZone';
-import type { CenterTab } from './CenterZone';
 import { RightZone } from './RightZone';
 import { BottomZone } from './BottomZone';
-import { useZoneState } from './useZoneState';
+import { useShellShortcuts } from './useZoneState';
+import { useWorkspaceStore } from '../state';
+import { getTool } from '../tools';
 import styles from './AppShell.module.css';
 
 export interface AppShellProps {
@@ -15,81 +17,76 @@ export interface AppShellProps {
 }
 
 /**
- * AppShell — five-zone grid composition.
+ * AppShell — five-zone grid composition, wired to the workspace store.
  *
- *   ┌─────────────────────────────────────────┐
- *   │ top rail                                │
- *   ├────────┬─────────────────────┬──────────┤
- *   │  left  │      center         │  right   │
- *   │  nav   │                     │          │
- *   │        ├─────────────────────┤          │
- *   │        │      bottom         │          │
- *   └────────┴─────────────────────┴──────────┘
+ * Phase 3 replaced Phase 2's local tab state with the Zustand `useWorkspaceStore`.
+ * The store drives:
+ *   - which tools are open and in which zones (`open: OpenTool[]`)
+ *   - which tab is active per zone (`activeByZone`)
+ *   - center split mode (`centerSplit`)
+ *   - zone collapse state (`collapsed`)
+ *   - active preset (`layoutPreset`)
  *
- * Zone collapse is driven by CSS variables (`--shell-*-width`, `--shell-*-height`).
- * The left navigator always renders so its rail-elbow persists; the right and
- * bottom zones collapse to 0 via the grid template.
- *
- * Phase 2 wires local state for a handful of tabs so CenterZone is reviewable.
- * Phase 3 migrates tab state into the Zustand workspace store.
+ * Keyboard shortcuts (⌘B / ⌘J / ⌘⇧E) toggle the matching zone via the store.
+ * The Left navigator calls `openTool(id)` to open tools in their default zone.
  */
 export const AppShell: FC<AppShellProps> = ({ onOpenGallery }) => {
-  const { open, toggle, reset } = useZoneState();
+  const collapsed = useWorkspaceStore(useShallow((s) => s.collapsed));
+  const centerSplit = useWorkspaceStore((s) => s.centerSplit);
 
-  const [tabs, setTabs] = useState<CenterTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const centerTools = useWorkspaceStore(
+    useShallow((s) => s.open.filter((t) => t.zone === 'center')),
+  );
+  const rightTools = useWorkspaceStore(
+    useShallow((s) => s.open.filter((t) => t.zone === 'right')),
+  );
+  const bottomTools = useWorkspaceStore(
+    useShallow((s) => s.open.filter((t) => t.zone === 'bottom')),
+  );
 
-  const openSampleTool = useCallback(() => {
-    const id = 'sample-json-validator';
-    setTabs((prev) => {
-      if (prev.some((t) => t.id === id)) return prev;
-      return [...prev, { id, label: 'JSON Validator' }];
-    });
-    setActiveTabId(id);
-  }, []);
+  const centerActive = useWorkspaceStore((s) => s.activeByZone.center);
+  const rightActive = useWorkspaceStore((s) => s.activeByZone.right);
+  const bottomActive = useWorkspaceStore((s) => s.activeByZone.bottom);
 
-  const handleSelectTab = useCallback((id: string) => {
-    setActiveTabId(id);
-  }, []);
+  const openTool = useWorkspaceStore((s) => s.openTool);
+  const toggleZone = useWorkspaceStore((s) => s.toggleZone);
+  const resetLayout = useWorkspaceStore((s) => s.resetLayout);
 
-  const handleCloseTab = useCallback(
-    (id: string) => {
-      setTabs((prev) => {
-        const next = prev.filter((t) => t.id !== id);
-        if (activeTabId === id) {
-          setActiveTabId(next.length ? next[next.length - 1].id : null);
-        }
-        return next;
-      });
+  useShellShortcuts(useCallback((zone) => toggleZone(zone), [toggleZone]));
+
+  const openToolIds = useMemo<ReadonlySet<string>>(
+    () =>
+      new Set<string>([
+        ...centerTools.map((t) => t.id),
+        ...rightTools.map((t) => t.id),
+        ...bottomTools.map((t) => t.id),
+      ]),
+    [centerTools, rightTools, bottomTools],
+  );
+
+  const handleOpenTool = useCallback(
+    (toolId: string) => {
+      const descriptor = getTool(toolId);
+      openTool(toolId, descriptor?.defaultZone);
     },
-    [activeTabId],
+    [openTool],
   );
 
-  const handleOpenTool = useCallback((toolId: string) => {
-    const label = toolLabelFor(toolId);
-    setTabs((prev) => {
-      if (prev.some((t) => t.id === toolId)) return prev;
-      return [...prev, { id: toolId, label }];
-    });
-    setActiveTabId(toolId);
-  }, []);
+  const handleOpenSample = useCallback(() => {
+    const descriptor = getTool('json-validator');
+    if (descriptor) openTool(descriptor.id, descriptor.defaultZone);
+  }, [openTool]);
 
-  const handleResetLayout = useCallback(() => {
-    reset();
-    setTabs([]);
-    setActiveTabId(null);
-  }, [reset]);
-
-  const activeTool = useMemo(
-    () => tabs.find((t) => t.id === activeTabId) ?? null,
-    [tabs, activeTabId],
-  );
+  const activeCenterDescriptor = useMemo(() => {
+    if (!centerActive) return null;
+    return getTool(centerActive);
+  }, [centerActive]);
 
   const gridClasses = [
     styles.shell,
-    !open.left && styles.leftClosed,
-    !open.right && styles.rightClosed,
-    !open.bottom && styles.bottomClosed,
+    collapsed.left && styles.leftClosed,
+    collapsed.right && styles.rightClosed,
+    collapsed.bottom && styles.bottomClosed,
   ]
     .filter(Boolean)
     .join(' ');
@@ -98,8 +95,8 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery }) => {
     <div className={gridClasses}>
       <div className={styles.top}>
         <TopRail
-          activeToolTitle={activeTool?.label}
-          onResetLayout={handleResetLayout}
+          activeToolTitle={activeCenterDescriptor?.name}
+          onResetLayout={resetLayout}
           onOpenPalette={() => {
             /* Phase 5 wires command palette */
           }}
@@ -108,13 +105,17 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery }) => {
       </div>
 
       <div className={styles.nav}>
-        {open.left ? (
-          <LeftNavigator activeToolId={activeTabId ?? undefined} onOpenTool={handleOpenTool} />
+        {!collapsed.left ? (
+          <LeftNavigator
+            activeToolId={centerActive ?? rightActive ?? bottomActive ?? null}
+            openToolIds={openToolIds}
+            onOpenTool={handleOpenTool}
+          />
         ) : (
           <button
             type="button"
             className={styles.navRestoreButton}
-            onClick={() => toggle('left')}
+            onClick={() => toggleZone('left')}
             aria-label="Expand navigator (Cmd/Ctrl+B)"
           >
             ⟩
@@ -124,44 +125,30 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery }) => {
 
       <div className={styles.center}>
         <CenterZone
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSelectTab={handleSelectTab}
-          onCloseTab={handleCloseTab}
-          onOpenSampleTool={openSampleTool}
+          tools={centerTools}
+          activeTabId={centerActive}
+          split={centerSplit}
+          onOpenSampleTool={handleOpenSample}
         />
       </div>
 
       <div className={styles.right}>
-        <RightZone collapsed={!open.right} onToggle={() => toggle('right')} />
+        <RightZone
+          collapsed={collapsed.right}
+          onToggle={() => toggleZone('right')}
+          tools={rightTools}
+          activeTabId={rightActive}
+        />
       </div>
 
       <div className={styles.bottom}>
-        <BottomZone collapsed={!open.bottom} onToggle={() => toggle('bottom')} />
+        <BottomZone
+          collapsed={collapsed.bottom}
+          onToggle={() => toggleZone('bottom')}
+          tools={bottomTools}
+          activeTabId={bottomActive}
+        />
       </div>
     </div>
   );
 };
-
-/**
- * Translate a nav-tool id to a human label. Matches the placeholder registry in
- * LeftNavigator; replaced by the real registry lookup in Phase 4.
- */
-function toolLabelFor(toolId: string): string {
-  const map: Record<string, string> = {
-    'text-diff': 'Text Diff',
-    'case-transform': 'Case Transform',
-    'whitespace-clean': 'Whitespace Clean',
-    'json-validator': 'JSON Validator',
-    'yaml-validator': 'YAML Validator',
-    'regex-tester': 'Regex Tester',
-    'hash-workbench': 'Hash Workbench',
-    'base64-pad': 'Base64 Pad',
-    'url-codec': 'URL Codec',
-    'hex-inspector': 'Hex Inspector',
-    'protobuf-decode': 'Protobuf Decode',
-    'cidr-calc': 'CIDR Calculator',
-    'tls-inspector': 'TLS Inspector',
-  };
-  return map[toolId] ?? toolId;
-}

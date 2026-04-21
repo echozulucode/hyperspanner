@@ -1,30 +1,39 @@
-import type { FC, ReactNode } from 'react';
+import type { FC } from 'react';
 import { LcarsEmptyState, LcarsPill, LcarsZoneHeader } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
+import type { OpenTool } from '../state';
+import { getTool } from '../tools';
+import { ZoneTabStrip } from './ZoneTabStrip';
 import styles from './RightZone.module.css';
 
 export interface RightZoneProps {
-  /** Collapsed state — when true, pane is hidden by AppShell grid. */
   collapsed?: boolean;
-  /** Called when the header toggle pill is clicked. */
   onToggle?: () => void;
-  /** Title shown in the zone header. Defaults to "INSPECTOR". */
+  /** Tools currently docked in the right zone. */
+  tools: OpenTool[];
+  activeTabId: string | null;
   title?: string;
-  /** Optional content — when omitted, an empty state is rendered. */
-  children?: ReactNode;
 }
 
 /**
  * RightZone — auxiliary surface for tool-contextual inspectors, diffs, or metadata.
- * Phase 2 renders a placeholder empty state. Phase 3+ will dock tool-specific panels.
+ *
+ * Phase 3 wiring:
+ *   - tab strip for tools docked to this zone (typically 0-2)
+ *   - empty-state when nothing is docked
+ *   - the active tool's registered component is rendered in the body
  */
 export const RightZone: FC<RightZoneProps> = ({
   collapsed = false,
   onToggle,
-  title = 'INSPECTOR',
-  children,
+  tools,
+  activeTabId,
+  title,
 }) => {
   const { theme } = useTheme();
+  const activeTool = tools.find((t) => t.id === activeTabId) ?? null;
+  const activeDescriptor = activeTool ? getTool(activeTool.id) : null;
+  const computedTitle = title ?? activeDescriptor?.name?.toUpperCase() ?? 'INSPECTOR';
 
   return (
     <aside
@@ -34,8 +43,8 @@ export const RightZone: FC<RightZoneProps> = ({
     >
       <LcarsZoneHeader
         eyebrow="RGT-00"
-        title={title}
-        indicatorColor={theme.colors.bluey}
+        title={computedTitle}
+        indicatorColor={tools.length > 0 ? theme.colors.bluey : undefined}
         controls={
           <LcarsPill
             size="small"
@@ -49,14 +58,21 @@ export const RightZone: FC<RightZoneProps> = ({
         }
       />
 
-      <div className={styles.body}>
-        {children ?? (
+      <ZoneTabStrip zone="right" tools={tools} activeId={activeTabId} />
+
+      <div className={`${styles.body} ${tools.length === 0 ? styles.bodyEmpty : ''}`}>
+        {tools.length === 0 || !activeTool || !activeDescriptor ? (
           <LcarsEmptyState
             eyebrow="RGT-00"
             title="No inspector panel"
             description="Tools will dock context, diffs, and metadata here once opened."
             icon={<span aria-hidden>◇</span>}
           />
+        ) : (
+          (() => {
+            const ToolBody = activeDescriptor.component;
+            return <ToolBody toolId={activeTool.id} />;
+          })()
         )}
       </div>
     </aside>

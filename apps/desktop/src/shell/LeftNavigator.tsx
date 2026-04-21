@@ -2,84 +2,62 @@ import { useMemo, useState } from 'react';
 import type { FC } from 'react';
 import { LcarsPill, LcarsSearchField } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
+import { listToolsByCategory, type ToolCategory, type ToolDescriptor } from '../tools';
 import styles from './LeftNavigator.module.css';
 
-interface NavTool {
-  id: string;
-  label: string;
-}
-
-interface NavCategory {
-  id: string;
-  label: string;
-  tools: NavTool[];
-}
-
 export interface LeftNavigatorProps {
-  activeToolId?: string;
+  /** Id of the tool currently visible to the user (active in its zone). */
+  activeToolId?: string | null;
+  /** Ids of every open tool — shown with an "open" indicator in the tree. */
+  openToolIds?: ReadonlySet<string>;
+  /** Pinned favorite tool ids. Defaults to a small built-in set for Phase 3. */
+  favoriteIds?: readonly string[];
   onOpenTool?: (toolId: string) => void;
 }
 
-// Placeholder registry until Phase 4 lands the real one.
-const CATEGORIES: NavCategory[] = [
-  {
-    id: 'text',
-    label: 'Text & Format',
-    tools: [
-      { id: 'text-diff', label: 'Text Diff' },
-      { id: 'case-transform', label: 'Case Transform' },
-      { id: 'whitespace-clean', label: 'Whitespace Clean' },
-    ],
-  },
-  {
-    id: 'validation',
-    label: 'Validation',
-    tools: [
-      { id: 'json-validator', label: 'JSON Validator' },
-      { id: 'yaml-validator', label: 'YAML Validator' },
-      { id: 'regex-tester', label: 'Regex Tester' },
-    ],
-  },
-  {
-    id: 'data',
-    label: 'Data & Encoding',
-    tools: [
-      { id: 'hash-workbench', label: 'Hash Workbench' },
-      { id: 'base64-pad', label: 'Base64 Pad' },
-      { id: 'url-codec', label: 'URL Codec' },
-    ],
-  },
-  {
-    id: 'binary',
-    label: 'Binary',
-    tools: [
-      { id: 'hex-inspector', label: 'Hex Inspector' },
-      { id: 'protobuf-decode', label: 'Protobuf Decode' },
-    ],
-  },
-  {
-    id: 'network',
-    label: 'Network',
-    tools: [
-      { id: 'cidr-calc', label: 'CIDR Calculator' },
-      { id: 'tls-inspector', label: 'TLS Inspector' },
-    ],
-  },
-];
+interface NavCategory {
+  id: ToolCategory;
+  label: string;
+  tools: ToolDescriptor[];
+}
 
-const FAVORITES: NavTool[] = [
-  { id: 'json-validator', label: 'JSON Validator' },
-  { id: 'hash-workbench', label: 'Hash Workbench' },
-];
+const CATEGORY_LABELS: Record<ToolCategory, string> = {
+  text: 'Text & Format',
+  validation: 'Validation',
+  data: 'Data & Encoding',
+  binary: 'Binary',
+  network: 'Network',
+  utilities: 'Utilities',
+};
 
-export const LeftNavigator: FC<LeftNavigatorProps> = ({ activeToolId, onOpenTool }) => {
+const DEFAULT_FAVORITES: readonly string[] = ['json-validator', 'hash-workbench'];
+
+export const LeftNavigator: FC<LeftNavigatorProps> = ({
+  activeToolId,
+  openToolIds,
+  favoriteIds = DEFAULT_FAVORITES,
+  onOpenTool,
+}) => {
   const { theme } = useTheme();
-
   const [query, setQuery] = useState('');
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
-    text: true,
-    validation: true,
-  });
+  // Categories start fully collapsed; an active filter query auto-expands matches.
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  const byCategory = useMemo(() => listToolsByCategory(), []);
+
+  const categories: NavCategory[] = useMemo(
+    () =>
+      (Object.keys(CATEGORY_LABELS) as ToolCategory[])
+        .map((id) => ({
+          id,
+          label: CATEGORY_LABELS[id],
+          tools: byCategory[id],
+        }))
+        .filter((cat) => cat.tools.length > 0),
+    [byCategory],
+  );
 
   const toggleCategory = (id: string) => {
     setOpenCategories((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -87,15 +65,27 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({ activeToolId, onOpenTool
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return CATEGORIES;
-    return CATEGORIES.map((cat) => ({
-      ...cat,
-      tools: cat.tools.filter(
-        (t) =>
-          t.label.toLowerCase().includes(needle) || t.id.toLowerCase().includes(needle),
-      ),
-    })).filter((cat) => cat.tools.length > 0);
-  }, [query]);
+    if (!needle) return categories;
+    return categories
+      .map((cat) => ({
+        ...cat,
+        tools: cat.tools.filter(
+          (t) =>
+            t.name.toLowerCase().includes(needle) ||
+            t.id.toLowerCase().includes(needle) ||
+            t.description.toLowerCase().includes(needle),
+        ),
+      }))
+      .filter((cat) => cat.tools.length > 0);
+  }, [query, categories]);
+
+  const favorites = useMemo(() => {
+    return favoriteIds
+      .map((id) => Object.values(byCategory).flat().find((t) => t.id === id))
+      .filter((t): t is ToolDescriptor => Boolean(t));
+  }, [favoriteIds, byCategory]);
+
+  const isOpen = (id: string) => openToolIds?.has(id) ?? false;
 
   return (
     <nav className={styles.nav} aria-label="Tool navigator">
@@ -118,10 +108,10 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({ activeToolId, onOpenTool
 
       <div className={styles.sectionHeader}>
         <span>Favorites</span>
-        <span className={styles.sectionCount}>{FAVORITES.length}</span>
+        <span className={styles.sectionCount}>{favorites.length}</span>
       </div>
       <div className={styles.pillList}>
-        {FAVORITES.map((tool) => (
+        {favorites.map((tool) => (
           <div key={tool.id} className={styles.pillListRow}>
             <LcarsPill
               size="small"
@@ -129,9 +119,12 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({ activeToolId, onOpenTool
               color={theme.colors.butterscotch}
               active={tool.id === activeToolId}
               onClick={() => onOpenTool?.(tool.id)}
-              aria-label={tool.label}
+              aria-label={tool.name}
             >
-              <span>{tool.label}</span>
+              <span>{tool.name}</span>
+              {isOpen(tool.id) && (
+                <span className={styles.openDot} aria-hidden="true" />
+              )}
             </LcarsPill>
           </div>
         ))}
@@ -143,16 +136,16 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({ activeToolId, onOpenTool
       </div>
       <div className={styles.accordion}>
         {filtered.map((cat) => {
-          const isOpen = openCategories[cat.id] ?? Boolean(query);
+          const expanded = openCategories[cat.id] ?? Boolean(query);
           return (
             <div
               key={cat.id}
-              className={`${styles.accordionItem} ${isOpen ? styles.accordionOpen : ''}`}
+              className={`${styles.accordionItem} ${expanded ? styles.accordionOpen : ''}`}
             >
               <button
                 type="button"
                 className={styles.accordionHeader}
-                aria-expanded={isOpen}
+                aria-expanded={expanded}
                 aria-controls={`nav-cat-${cat.id}`}
                 onClick={() => toggleCategory(cat.id)}
               >
@@ -161,7 +154,7 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({ activeToolId, onOpenTool
                   ›
                 </span>
               </button>
-              {isOpen && (
+              {expanded && (
                 <div id={`nav-cat-${cat.id}`} className={styles.accordionItems}>
                   {cat.tools.map((tool) => (
                     <div key={tool.id} className={styles.pillListRow}>
@@ -171,9 +164,12 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({ activeToolId, onOpenTool
                         color={theme.colors.africanViolet}
                         active={tool.id === activeToolId}
                         onClick={() => onOpenTool?.(tool.id)}
-                        aria-label={tool.label}
+                        aria-label={tool.name}
                       >
-                        <span>{tool.label}</span>
+                        <span>{tool.name}</span>
+                        {isOpen(tool.id) && (
+                          <span className={styles.openDot} aria-hidden="true" />
+                        )}
                       </LcarsPill>
                     </div>
                   ))}

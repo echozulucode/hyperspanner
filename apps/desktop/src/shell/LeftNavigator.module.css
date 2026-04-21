@@ -76,6 +76,18 @@
   padding: 0 0.5rem;
 }
 
+.openDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 0.5rem;
+  border-radius: 100vmax;
+  background-color: var(--lcars-color-green, #66a97a);
+  box-shadow: 0 0 6px rgba(102, 169, 122, 0.65);
+  flex: 0 0 auto;
+  align-self: center;
+}
+
 .pillListRow {
   display: flex;
   align-items: stretch;
