@@ -4,12 +4,14 @@ import {
   LcarsBar,
   LcarsChip,
   LcarsCommandBar,
+  LcarsDataCascade,
   LcarsEmptyState,
   LcarsPanel,
   LcarsPill,
   LcarsRail,
   LcarsSearchField,
   LcarsSplitHandle,
+  LcarsStandardLayout,
   LcarsTabs,
   LcarsTelemetryLabel,
   LcarsZoneHeader,
@@ -255,6 +257,143 @@ export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
                 />
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Full LCARS frame demo */}
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>LcarsStandardLayout</h2>
+          <span className={styles.sectionNote}>
+            Canonical two-row frame · rails + elbows + bars
+          </span>
+        </header>
+        <div className={styles.layoutFrame}>
+          <LcarsStandardLayout
+            trim={false}
+            title="STANDARD LAYOUT"
+            stardate="STARDATE 79847.2"
+            topRailColor={theme.colors.bluey}
+            bottomRailColor={theme.colors.red}
+            cascade={
+              <LcarsDataCascade
+                columns={8}
+                rows={6}
+                color={theme.colors.orange}
+              />
+            }
+            navigation={
+              <>
+                <LcarsPill
+                  size="small"
+                  color={theme.colors.orange}
+                  variant="navigation"
+                  active
+                >
+                  01 PRIMARY
+                </LcarsPill>
+                <LcarsPill
+                  size="small"
+                  color={theme.colors.africanViolet}
+                  variant="navigation"
+                >
+                  02 SECONDARY
+                </LcarsPill>
+                <LcarsPill
+                  size="small"
+                  color={theme.colors.butterscotch}
+                  variant="navigation"
+                >
+                  03 DIAG
+                </LcarsPill>
+              </>
+            }
+            topPanels={
+              <>
+                <LcarsPanel size={1} number="04" label="OPS" />
+                <LcarsPanel
+                  size={8}
+                  number="05"
+                  label="NAV"
+                  color={theme.colors.africanViolet}
+                />
+              </>
+            }
+            bottomPanels={
+              <>
+                <LcarsPanel
+                  size="flex"
+                  number="06"
+                  label="POWER"
+                  color={theme.colors.butterscotch}
+                />
+                <LcarsPanel
+                  size="flex"
+                  number="07"
+                  label="SHIELDS"
+                  color={theme.colors.red}
+                />
+                <LcarsPanel
+                  size="flex"
+                  number="08"
+                  label="COMMS"
+                  color={theme.colors.bluey}
+                  seamless
+                />
+              </>
+            }
+          >
+            <div className={styles.layoutFrameBody}>
+              <LcarsZoneHeader
+                eyebrow="MAIN"
+                title="MAIN VIEWER"
+                indicatorColor={theme.colors.green}
+              />
+              <p className={styles.layoutFrameText}>
+                The standard layout composes the rounded rails, diagonal elbows,
+                banner, data cascade, navigation pills and both framing bars into
+                a single primitive. Rail panels divide evenly via{' '}
+                <code>size="flex"</code>.
+              </p>
+            </div>
+          </LcarsStandardLayout>
+        </div>
+      </section>
+
+      {/* Data cascade */}
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>LcarsDataCascade</h2>
+          <span className={styles.sectionNote}>
+            Animated numeric readout · theme-reskinnable
+          </span>
+        </header>
+        <div className={styles.cascadeRow}>
+          <div className={styles.cascadeTile}>
+            <div className={styles.cascadeLabel}>ORANGE · 10 × 7</div>
+            <LcarsDataCascade
+              columns={10}
+              rows={7}
+              color={theme.colors.orange}
+            />
+          </div>
+          <div className={styles.cascadeTile}>
+            <div className={styles.cascadeLabel}>VIOLET · 14 × 9</div>
+            <LcarsDataCascade
+              columns={14}
+              rows={9}
+              color={theme.colors.africanViolet}
+            />
+          </div>
+          <div className={styles.cascadeTile}>
+            <div className={styles.cascadeLabel}>FROZEN · 8 × 5</div>
+            <LcarsDataCascade
+              columns={8}
+              rows={5}
+              color={theme.colors.bluey}
+              animated={false}
+            />
           </div>
         </div>
       </section>

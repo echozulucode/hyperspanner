@@ -10,8 +10,16 @@ export interface LcarsPanelProps {
   color?: string;
   /** Explicit height (overrides size). */
   height?: string;
-  /** Fixed-ratio size variant; mirrors the reference panelNumber slots. */
-  size?: 1 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  /**
+   * Fixed-ratio size variant; mirrors the reference panelNumber slots.
+   * `'flex'` makes the panel participate in equal-height division of a
+   * flex column — use this for rails with a variable number of panels.
+   */
+  size?: 1 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 'flex';
+  /** Drop the bottom seam; useful for the last panel in a rail. */
+  seamless?: boolean;
+  /** Render as the active / selected rail button. */
+  active?: boolean;
   onClick?: () => void;
   children?: ReactNode;
   className?: string;
@@ -28,6 +36,8 @@ export const LcarsPanel: FC<LcarsPanelProps> = ({
   color,
   height,
   size,
+  seamless = false,
+  active = false,
   onClick,
   children,
   className = '',
@@ -55,6 +65,8 @@ export const LcarsPanel: FC<LcarsPanelProps> = ({
   const classNames = [
     styles.panel,
     sizeClass,
+    seamless && styles.seamless,
+    active && styles.active,
     isClickable && styles.clickable,
     className,
   ]

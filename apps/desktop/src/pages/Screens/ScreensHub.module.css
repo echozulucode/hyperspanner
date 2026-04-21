@@ -1,0 +1,112 @@
+.page {
+  min-height: 100vh;
+  width: 100vw;
+  background-color: var(--lcars-color-background, #0a0a0f);
+  color: var(--lcars-color-text, #eae4d6);
+  padding: 2rem;
+  overflow-y: auto;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Barlow Condensed', sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lcars-color-orange, #f80);
+}
+
+.subtitle {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  opacity: 0.7;
+  max-width: 64ch;
+  line-height: 1.5;
+}
+
+.navCluster {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 2px solid var(--lcars-color-african-violet, #8a7aa8);
+  border-radius: 14px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease, transform 140ms ease,
+    border-color 140ms ease;
+}
+
+.card:hover:not(:disabled),
+.card:focus-visible:not(:disabled) {
+  background-color: rgba(216, 132, 99, 0.08);
+  border-color: var(--lcars-color-orange, #f80);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.cardDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.cardEyebrow {
+  font-size: 0.65rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--lcars-color-butterscotch, #f96);
+  font-weight: 700;
+}
+
+.cardTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cardSummary {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  line-height: 1.4;
+}
+
+.cardStatus {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lcars-color-bluey, #89f);
+  font-weight: 700;
+}
+
+.cardDisabled .cardStatus {
+  color: rgba(255, 255, 255, 0.55);
+}

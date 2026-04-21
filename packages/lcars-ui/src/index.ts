@@ -2,10 +2,6 @@
  * @hyperspanner/lcars-ui
  *
  * Primitive components and design tokens for the Hyperspanner shell.
- * Phase 1 exports: structural primitives that the AppShell (Phase 2)
- * and tools (Phase 6) compose. Data-visualization primitives
- * (LcarsTable, LcarsSparkline, LcarsGauge, LcarsChart, LcarsDataCascade)
- * are deferred to Phase 6 where their consumers are built.
  */
 
 export * from './tokens';
@@ -62,3 +58,9 @@ export type {
   LcarsTelemetryLabelProps,
   TelemetrySize,
 } from './primitives/LcarsTelemetryLabel';
+
+export { LcarsStandardLayout } from './primitives/LcarsStandardLayout';
+export type { LcarsStandardLayoutProps } from './primitives/LcarsStandardLayout';
+
+export { LcarsDataCascade } from './primitives/LcarsDataCascade';
+export type { LcarsDataCascadeProps } from './primitives/LcarsDataCascade';

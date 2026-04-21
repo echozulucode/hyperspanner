@@ -1,0 +1,124 @@
+/**
+ * LcarsDataCascade — animated numeric column fill.
+ * Ported from the reference lcars-example; keyframe timing preserved
+ * so the cascade reads as a ported asset rather than a re-interp.
+ */
+
+.wrapper {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+  height: calc(var(--dc-row-height, 1rem) * 9);
+  overflow: hidden;
+  padding-right: 0.5rem;
+  padding-left: clamp(20px, 3vw, 50px);
+  column-gap: 0.5rem;
+}
+
+.column {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 1px;
+  text-align: right;
+  font-size: var(--lcars-font-size-data-cascade, 0.85rem);
+  line-height: 1;
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  color: black;
+}
+
+.row {
+  height: var(--dc-row-height, calc(0.875rem + 0.125rem));
+}
+
+@keyframes dataGroup1 {
+  0%, 3.99% { color: black; }
+  4%, 45.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  46%, 49.99% { color: var(--lcars-color-text-light, #fff); }
+  50%, 63.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  64%, 67.99% { color: var(--lcars-color-text-light, #fff); }
+  68%, 100% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+}
+
+@keyframes dataGroup1a {
+  0%, 4.99% { color: black; }
+  5%, 45.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  46%, 49.99% { color: var(--lcars-color-text-light, #fff); }
+  50%, 63.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  64%, 67.99% { color: var(--lcars-color-text-light, #fff); }
+  68%, 100% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+}
+
+@keyframes dataGroup2 {
+  0%, 12.99% { color: black; }
+  13%, 49.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  50%, 53.99% { color: var(--lcars-color-text-light, #fff); }
+  54%, 67.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  68%, 71.99% { color: var(--lcars-color-text-light, #fff); }
+  72%, 100% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+}
+
+@keyframes dataGroup2b {
+  0%, 14.99% { color: black; }
+  15%, 49.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  50%, 53.99% { color: var(--lcars-color-text-light, #fff); }
+  54%, 67.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  68%, 71.99% { color: var(--lcars-color-text-light, #fff); }
+  72%, 81.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  82%, 100% { color: var(--lcars-color-text-light, #fff); }
+}
+
+@keyframes dataGroup3 {
+  0%, 26.99% { color: black; }
+  27%, 40.99% { color: var(--lcars-color-text-light, #fff); }
+  41%, 53.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  54%, 57.99% { color: var(--lcars-color-text-light, #fff); }
+  58%, 71.99% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+  72%, 75.99% { color: var(--lcars-color-text-light, #fff); }
+  76%, 100% { color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977)); }
+}
+
+.row1 { animation: dataGroup1 6000ms ease 200ms infinite; }
+.row2 { animation: dataGroup1a 6000ms ease 200ms infinite; }
+.row3 { animation: dataGroup2 6000ms ease 200ms infinite; }
+.row4 { animation: dataGroup2b 6000ms ease 200ms infinite; }
+.row5,
+.row6,
+.row7 {
+  animation: dataGroup3 6000ms ease 200ms infinite;
+}
+
+.frozen .row1,
+.frozen .row2,
+.frozen .row3,
+.frozen .row4 {
+  animation: none;
+  color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977));
+}
+
+.frozen .row5,
+.frozen .row6,
+.frozen .row7 {
+  animation: none;
+  color: var(--lcars-color-text-light, #fff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row1,
+  .row2,
+  .row3,
+  .row4,
+  .row5,
+  .row6,
+  .row7 {
+    animation: none;
+    color: var(--data-cascade-color, var(--lcars-color-orange, #ef8977));
+  }
+}
+
+@media (max-width: 780px) {
+  .wrapper {
+    display: none;
+  }
+}
