@@ -1,15 +1,59 @@
 ---
 type: status
 updated: 2026-04-20
-current_phase: "2 — App shell and zone layout"
+current_phase: "2 — App shell and zone layout (complete; awaiting review)"
 blockers: []
 next_actions:
-  - "User review: run `pnpm install && pnpm typecheck && pnpm tauri:dev` on Windows host to inspect /primitive-gallery"
-  - "Apply `lcars-interface-designer` authenticity checklist against gallery screenshot"
-  - "On approval, begin Phase 2: AppShell (top bar, left rail, Center/Right/Bottom dock zones)"
+  - "User review: run `pnpm install && pnpm typecheck && pnpm tauri:dev` on Windows host"
+  - "Inspect default route (AppShell) and `#/gallery` route (PrimitiveGallery)"
+  - "Exercise keyboard shortcuts: Cmd/Ctrl+B (Left), Cmd/Ctrl+J (Bottom), Cmd/Ctrl+Shift+E (Right)"
+  - "On approval, begin Phase 3: Zustand workspace store + real tab state + split handles"
 ---
 
 # Status Log
+
+## Session: 2026-04-20 (Phase 2 wrap — shell milestone)
+**Phase:** 2 — App shell and zone layout
+**Status entering session:** Phase 1 complete, `/primitive-gallery` awaiting user review.
+
+**Actions taken:**
+- Built `useZoneState` hook — left/right/bottom open state, keyboard shortcuts
+  (Cmd/Ctrl+B left, Cmd/Ctrl+J bottom, Cmd/Ctrl+Shift+E right), ignores typing targets.
+- Built `TopRail` — brand band + tool-title band + right-side controls
+  (⌘K palette placeholder, theme cycler, RESET, GALLERY dev affordance).
+- Built `LeftNavigator` — wordmark header, search field, Favorites section, accordion
+  over 5 placeholder categories (text / validation / data / binary / network). Elbow-cap
+  top & bottom via styled divs. Collapses to 64px icon column ≤950px.
+- Built `CenterZone` — tab strip with close affordance on active tab, empty state with
+  "OPEN SAMPLE" action, split-pane placeholder (Phase 3 wires real splits).
+- Built `RightZone` and `BottomZone` — collapsible panes with `LcarsZoneHeader`,
+  toggle pill, `LcarsEmptyState` placeholder.
+- Built `AppShell` — CSS Grid composition of all five zones
+  (`top / nav center right / nav bottom right`). Collapse driven by conditional
+  state classes that mutate `grid-template-columns`/`rows`. Local state for tabs
+  (migrates to Zustand in Phase 3). Left-pane "restore" orange elbow when collapsed.
+- Built `useHashRoute` — minimal `hashchange` listener + navigate helper.
+- Rewrote `App.tsx` to route `#/gallery` → `PrimitiveGallery` (with `onBack` pill),
+  default → `AppShell` (with `onOpenGallery` wired to the TopRail GALLERY pill).
+- Extended `PrimitiveGallery` with `onBack` prop + `← SHELL` pill in its top bar.
+- Added `apps/desktop/src/shell/index.ts` barrel.
+
+**Verification performed:**
+- Static code review (delegated) against `verbatimModuleSyntax`, `erasableSyntaxOnly`,
+  primitive prop shapes, CSS Module class coverage, React hook deps, ARIA. Clean.
+- Sandbox typecheck still unavailable (pnpm symlink limitation); host-side verification
+  pending user.
+
+**Outcome:** Phase 2 milestone reached — runnable five-zone shell ready for review.
+
+**Blockers:** None.
+
+**Files changed this session:** 13 writes across `apps/desktop/src/shell/{AppShell,
+TopRail, LeftNavigator, CenterZone, RightZone, BottomZone, useZoneState, index}`,
+`apps/desktop/src/hooks/useHashRoute.ts`, `apps/desktop/src/App.tsx`, and the
+`PrimitiveGallery.tsx` / `index.ts` updates.
+
+---
 
 ## Session: 2026-04-20 (Phase 1 wrap)
 **Phase:** 1 — Design tokens + lcars-ui primitive package

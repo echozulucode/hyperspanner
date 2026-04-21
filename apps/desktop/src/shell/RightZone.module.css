@@ -1,0 +1,24 @@
+.zone {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  gap: var(--lcars-spacing-panel-border, 0.25rem);
+  background-color: rgba(255, 255, 255, 0.01);
+  transition: opacity 180ms ease;
+}
+
+.zoneCollapsed {
+  display: none;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

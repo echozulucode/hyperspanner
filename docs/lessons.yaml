@@ -95,3 +95,57 @@ lessons:
       LCARS grammar (shapes, layout, typography) while changing the color register.
       Classic variant still ships for theme switching.
     applied: true
+
+  - id: 9
+    date: 2026-04-20
+    source: "decision"
+    category: architecture
+    lesson: |
+      Shell zones are composed by CSS Grid in `AppShell`, with collapse driven by
+      state classes that mutate `grid-template-columns` / `grid-template-rows`
+      rather than by unmounting the zone components. This keeps layout transitions
+      cheap (no re-mount, no re-layout thrash from a sibling tree) and lets the
+      LCARS chrome animate width/height smoothly. Zone components still render an
+      internal `aria-hidden` state so assistive tech reflects the collapse.
+    applied: true
+
+  - id: 10
+    date: 2026-04-20
+    source: "decision"
+    category: architecture
+    lesson: |
+      Zone open/closed state lives in a local `useZoneState` hook for Phase 2, not
+      yet in the Zustand workspace store. The hook exposes the same shape
+      (`open`, `toggle`, `setOpen`, `reset`) the store will expose later, so
+      Phase 3's swap is a one-line refactor inside `AppShell` and LeftNavigator.
+      Keyboard shortcuts live with the hook to keep the shortcut map colocated
+      with the state it mutates.
+    applied: true
+
+  - id: 11
+    date: 2026-04-20
+    source: "decision"
+    category: architecture
+    lesson: |
+      Routing for Phase 2 is a hand-rolled `useHashRoute` hook, not react-router.
+      The shell only needs two destinations (shell vs gallery), and the gallery
+      is a dev affordance — a full router would add build weight for nothing.
+      Swap-in point for a real router is `App.tsx`; every consumer uses the
+      returned `[route, navigate]` tuple, matching `useState`'s shape, so the
+      replacement is mechanical.
+    applied: true
+
+  - id: 12
+    date: 2026-04-20
+    source: "session"
+    category: ux
+    lesson: |
+      When the Left navigator collapses, the shell still needs a visible handle
+      to reopen it or the pane becomes unreachable without the keyboard shortcut.
+      The closed-state affordance is a single orange elbow-capped button that
+      fills the `nav` grid area at `--shell-nav-closed-width` (44px). This
+      preserves LCARS grammar — the color-blocked elbow — while keeping the
+      collapsed state at a clickable width. Right and Bottom collapse to 0 because
+      their toggle pills live on the zone header which remains visible in the
+      expanded state, so there's a round-trip affordance elsewhere.
+    applied: true

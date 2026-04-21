@@ -65,7 +65,12 @@ const tabs: LcarsTab[] = [
   },
 ];
 
-export const PrimitiveGallery = () => {
+export interface PrimitiveGalleryProps {
+  /** Called when the "Back to Shell" affordance is invoked. */
+  onBack?: () => void;
+}
+
+export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
   const { theme, themeName, setTheme } = useTheme();
 
   const [query, setQuery] = useState('');
@@ -107,6 +112,17 @@ export const PrimitiveGallery = () => {
         </div>
 
         <div className={styles.themeSwitch}>
+          {onBack && (
+            <LcarsPill
+              size="small"
+              rounded="both"
+              color={theme.colors.bluey}
+              onClick={onBack}
+              aria-label="Return to application shell"
+            >
+              ← SHELL
+            </LcarsPill>
+          )}
           <span className={styles.themeLabel}>Theme</span>
           {themeOrder.map((name) => (
             <LcarsPill

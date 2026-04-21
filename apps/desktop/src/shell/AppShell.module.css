@@ -1,0 +1,178 @@
+/*
+ * AppShell grid — five zones in a 3×3 layout.
+ *
+ *   grid-template-areas:
+ *     "top    top    top"
+ *     "nav    center right"
+ *     "nav    bottom right"
+ *
+ * Collapse is driven by mutating the grid-template-columns/rows via state classes.
+ */
+
+.shell {
+  display: grid;
+  grid-template-columns:
+    var(--shell-nav-width, 264px)
+    1fr
+    var(--shell-right-width, 320px);
+  grid-template-rows:
+    var(--shell-top-height, 48px)
+    1fr
+    var(--shell-bottom-height, 240px);
+  grid-template-areas:
+    'top    top    top'
+    'nav    center right'
+    'nav    bottom right';
+  height: 100vh;
+  width: 100vw;
+  min-height: 0;
+  min-width: 0;
+  gap: var(--lcars-spacing-panel-border, 0.25rem);
+  padding: var(--lcars-spacing-panel-border, 0.25rem);
+  background-color: black;
+  overflow: hidden;
+}
+
+.top {
+  grid-area: top;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.nav {
+  grid-area: nav;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  background-color: var(--lcars-color-background, #0a0a0f);
+}
+
+.navRestoreButton {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  background-color: var(--lcars-color-orange);
+  color: black;
+  font-weight: bold;
+  font-size: 1.25rem;
+  letter-spacing: 0.12em;
+  border: none;
+  border-top-right-radius: 128px;
+  border-bottom-right-radius: 128px;
+  cursor: pointer;
+  transition: filter 140ms ease;
+}
+
+.navRestoreButton:hover {
+  filter: brightness(1.1);
+}
+
+.navRestoreButton:focus-visible {
+  outline: 2px solid var(--lcars-color-almond-creme, #fff);
+  outline-offset: -2px;
+}
+
+.center {
+  grid-area: center;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.right {
+  grid-area: right;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.bottom {
+  grid-area: bottom;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Collapsed states — collapse the relevant track.
+ * We keep the Left track visible at a reduced width when collapsed so the
+ * restore affordance remains clickable; Right and Bottom collapse to 0 and
+ * the grid area becomes a zero-size slot. */
+
+.leftClosed {
+  grid-template-columns:
+    var(--shell-nav-closed-width, 44px)
+    1fr
+    var(--shell-right-width, 320px);
+}
+
+.rightClosed {
+  grid-template-columns:
+    var(--shell-nav-width, 264px)
+    1fr
+    0;
+}
+
+.leftClosed.rightClosed {
+  grid-template-columns:
+    var(--shell-nav-closed-width, 44px)
+    1fr
+    0;
+}
+
+.bottomClosed {
+  grid-template-rows:
+    var(--shell-top-height, 48px)
+    1fr
+    0;
+}
+
+/* Responsive breakpoints — shell compresses at narrower widths. */
+
+@media (max-width: 1100px) {
+  .shell {
+    --shell-right-width: 260px;
+    --shell-nav-width: 220px;
+  }
+}
+
+@media (max-width: 950px) {
+  .shell {
+    --shell-nav-width: 64px;
+    --shell-right-width: 220px;
+  }
+}
+
+@media (max-width: 750px) {
+  .shell {
+    grid-template-areas:
+      'top    top'
+      'nav    center'
+      'nav    bottom';
+    grid-template-columns:
+      var(--shell-nav-width, 64px)
+      1fr;
+  }
+
+  .shell .right {
+    display: none;
+  }
+
+  .rightClosed {
+    grid-template-columns:
+      var(--shell-nav-width, 64px)
+      1fr;
+  }
+
+  .leftClosed.rightClosed,
+  .leftClosed {
+    grid-template-columns:
+      var(--shell-nav-closed-width, 44px)
+      1fr;
+  }
+}

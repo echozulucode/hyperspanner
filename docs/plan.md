@@ -13,7 +13,7 @@ phases:
     status: complete
   - id: 2
     name: "App shell and zone layout"
-    status: pending
+    status: complete
   - id: 3
     name: "Workspace state (Zustand) + persistence"
     status: pending
@@ -41,7 +41,7 @@ phases:
   - id: 11
     name: "Testing / packaging / first release"
     status: pending
-current_phase: 2
+current_phase: 3
 ---
 
 # Plan: Hyperspanner

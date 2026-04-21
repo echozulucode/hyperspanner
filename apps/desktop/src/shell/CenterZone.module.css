@@ -1,0 +1,71 @@
+.zone {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background-color: transparent;
+  gap: var(--lcars-spacing-panel-border, 0.25rem);
+}
+
+.tabStrip {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.25rem 0.5rem;
+  border-bottom: var(--lcars-spacing-bar-border, 0.25rem solid black);
+  background-color: rgba(255, 255, 255, 0.02);
+  overflow-x: auto;
+  min-height: 40px;
+}
+
+.tabStripEmpty {
+  opacity: 0.6;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.5rem 1rem;
+  color: var(--lcars-color-text, #eae4d6);
+}
+
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background-color: rgba(255, 255, 255, 0.015);
+  padding: 1.25rem;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.contentEmpty {
+  align-items: center;
+  justify-content: center;
+}
+
+.splitRoot {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  min-height: 0;
+}
+
+.splitVertical {
+  flex-direction: row;
+}
+
+.splitHorizontal {
+  flex-direction: column;
+}
+
+.splitPane {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.02);
+  padding: 1rem;
+}

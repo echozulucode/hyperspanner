@@ -1,0 +1,85 @@
+.rail {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
+  gap: 0.25rem;
+  height: var(--shell-top-rail-height, 40px);
+  min-height: 40px;
+  background-color: transparent;
+}
+
+.left {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.middle {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.right {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.brandBand {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  background-color: var(--lcars-color-orange);
+  color: var(--lcars-color-text-dark, #000);
+  border-top-right-radius: 100vmax;
+  border-bottom-right-radius: 100vmax;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 0.85rem;
+  min-width: 180px;
+  flex: 0 0 auto;
+}
+
+.toolTitleBand {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0 0.9rem;
+  background-color: var(--lcars-color-african-violet);
+  color: var(--lcars-color-text-dark, #000);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 0;
+}
+
+.toolTitleEmpty {
+  background-color: rgba(138, 122, 168, 0.35);
+  color: var(--lcars-color-text, #eae4d6);
+  font-weight: normal;
+  opacity: 0.75;
+}
+
+.eyebrow {
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  font-weight: bold;
+  opacity: 0.6;
+}
+
+.controls {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+}
