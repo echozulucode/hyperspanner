@@ -1,17 +1,108 @@
 ---
 type: status
-updated: 2026-04-20
-current_phase: "3 — Workspace state (Zustand) (complete; drag-to-split + two bug fixes + LCARS plan)"
+updated: 2026-04-21
+current_phase: "plan-006 in flight — LcarsStandardLayout rail/elbow/bar continuation DONE (both rows verified)"
 blockers: []
 next_actions:
-  - "`pnpm tauri:dev` — drag should now work end-to-end thanks to `dragDropEnabled: false` in tauri.conf.json"
-  - "Click the ⋮ on any tab — menu now portals to document.body, escapes the tab strip's `overflow-x: auto` clip, and has a TAB ACTIONS header to make its purpose explicit"
-  - "Review docs/plan-005-lcars-polish.md — 6-step plan to make the shell actually read as LCARS (structural elbow, segmented bar, two-block rail)"
-  - "On approval of plan-005, begin execution of Step 1 (tokens) then Step 2 (LcarsElbow primitive)"
+  - "Resume plan-006 T5–T6: build remaining de-risk screens S2–S7"
+  - "Then plan-006 T4: graduate remaining primitives to @hyperspanner/lcars-ui"
+  - "Then plan-005: apply LCARS polish to AppShell LeftNav + TopRail"
   - "After LCARS polish lands, begin Phase 4: real tool registry + navigator categories + command palette"
 ---
 
 # Status Log
+
+## Session: 2026-04-21 (LcarsStandardLayout rail→elbow→bar continuation — final round)
+**Phase:** plan-006 T3 — de-risk HomeAutomation screen.
+
+**Context entering session:**
+Twelve rounds of iteration on the rail-curve-to-horizontal-bar join in
+`LcarsStandardLayout`. Earlier attempts to use `::before`/`::after` pseudos
+with `z-index: -1` (as the reference does) were brittle across embedding
+contexts (DerisScreen / PrimitiveGallery / AppShell). Two separate
+stacking-context fix rounds failed to make the elbow render reliably.
+Responsive scaling of bar-height and rail-radius caused further breakage
+because the elbow primitive is a fixed 60×60 quarter-circle. After the
+round 10/11 fixes the BOTTOM rail was correct but the TOP rail's bar +
+elbow were still invisible on HomeAutomation.
+
+**Actions this session:**
+- **Diagnosis.** Read `LcarsStandardLayout.tsx` + `.module.css`,
+  `HomeAutomationScreen.tsx`, `LcarsDataCascade.module.css`,
+  `LcarsPanel.module.css`. Confirmed the top row's `.rightFrameTop` children
+  (banner + bannerRow[cascade 9rem + nav pills] + spacer + 28px bar +
+  absolutely-positioned elbow) have a significant intrinsic height. The top
+  `.wrap` had no explicit `flex`, inheriting the default `flex-shrink: 1`;
+  its `overflow: hidden` then clipped whatever got squeezed out. Because
+  the bar + elbow are the LAST children of `rightFrameTop`, they are the
+  first things clipped under compression. The bottom row worked only
+  because its bar is the FIRST child of `rightFrame` — under compression
+  `main` shrinks, not the bar.
+- **Fix.** Added `flex-shrink: 0` to `.wrap` in
+  `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css`.
+  CSS specificity keeps `.wrap.gap` (two classes) with `flex: 1 1 auto` for
+  the bottom row — the bottom still grows/shrinks; only the top is pinned
+  to its intrinsic height. If the viewport is ever smaller than the total
+  content, `main`'s `overflow-y: auto` absorbs the deficit instead of the
+  top rails silently disappearing.
+
+**Verification performed:**
+- Walked the flex math manually: with `flex-shrink: 0` on `.wrap` and
+  `flex: 1 1 auto` on `.wrap.gap`, wrap1 reserves its full content height
+  regardless of wrap2 pressure. Specificity checked — `.wrap.gap` has
+  higher specificity than `.wrap`, so the shorthand's `flex-shrink: 1`
+  wins for the bottom row.
+- Traced the clipping symptom back to the exact CSS responsible: no other
+  ancestor of `rightFrameTop` has `overflow: hidden`, so `.wrap` was the
+  only possible clip site.
+
+**Outcome:** Structural fix confirmed in browser — both top and bottom
+rails on HomeAutomation now render the full rail → elbow → bar
+continuation. Task #46 closed. Twelve-round debugging saga ends.
+
+**Files changed this session:** 1 — `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css`.
+
+**Blockers:** None.
+
+---
+
+## Session: 2026-04-21 (LcarsStandardLayout rail→elbow→bar — rounds 10 & 11)
+**Phase:** plan-006 T3 — de-risk HomeAutomation screen.
+
+**Actions:**
+- **Round 10: concrete-div elbows.** Eliminated the reference's pseudo-element
+  + `z-index: -1` approach entirely. Replaced with two absolutely-positioned
+  `.elbowTop` / `.elbowBottom` divs inside `rightFrameTop` / `rightFrame`,
+  each painted by a single radial-gradient:
+  `radial-gradient(circle 60px at <corner>, transparent 59.5px, <rail-color> 60px)`.
+  Inside the 60px disc: transparent. Outside: rail color. The result is
+  the quarter-crescent shape directly — no z-index, no stacking contexts,
+  no propagation-to-ancestor trickery. The elbow paints in the normal
+  positioned layer of its containing stacking context, always visible
+  against whatever sits below it in the DOM. The 1px overlap with the
+  bar's top edge closes subpixel seams under zoom; `syncFirstSegmentColor`
+  guarantees the bar's first segment matches the rail color so the overlap
+  is invisible.
+- **Round 11: fixed geometry.** User reported the black gap between rail
+  and bar changed on resize, and the top bar disappeared at some widths.
+  Removed responsive overrides for `--lcars-spacing-bar-height`
+  (was 28→24→20→16→10px across breakpoints) and
+  `--lcars-spacing-radius-top/bottom` (was 160→130→100→80→40px) in
+  `apps/desktop/src/styles/global.css`. Collapsed `.leftFrameTop.hasChildren` /
+  `.leftFrame.hasChildren` padding to a single constant
+  `calc(160px + 1.25rem)`. Added `flex-shrink: 0` to
+  `LcarsBar.module.css .barPanel` so a flex-column ancestor with a tall
+  banner can't collapse the bar to 0. Only `--lcars-spacing-left-frame-width`
+  remains responsive — it's the one dimension that actually needs to give
+  up real estate on narrow viewports.
+
+**Outcome:** Bottom row renders correctly after these two rounds. Top row
+fix completed in the following session (see above).
+
+**Files changed:** 4 — `LcarsStandardLayout.module.css`, `LcarsStandardLayout.tsx`,
+`LcarsBar.module.css`, `global.css`.
+
+---
 
 ## Session: 2026-04-20 (Phase 3 polish #2 — drag bug + tab menu bug + LCARS plan)
 **Phase:** 3 — three user reports triggered this pass.

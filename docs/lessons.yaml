@@ -241,3 +241,86 @@ lessons:
       Windows host; use the sandbox for file edits, Git, and static
       review via sub-agents.
     applied: true
+
+  - id: 19
+    date: 2026-04-21
+    source: "session"
+    category: architecture
+    lesson: |
+      For LCARS elbow corners, prefer concrete absolutely-positioned divs
+      with a radial-gradient background over pseudo-elements with `z-index: -1`
+      that propagate to an ancestor stacking context. The pseudo approach
+      (used by the LCARS-24.2 reference) depends on every ancestor between
+      the element and the intended paint layer NOT being a stacking-context
+      creator. That invariant breaks the moment the layout is embedded
+      in another context (DerisScreen, PrimitiveGallery, AppShell), and
+      fixing it requires auditing every ancestor for `isolation: isolate`,
+      `position + z-index`, `transform`, `opacity < 1`, `filter`, etc.
+      The concrete-div approach sidesteps stacking entirely:
+      `radial-gradient(circle 60px at <corner>, transparent 59.5px, <color> 60px)`
+      draws the quarter-crescent directly. Inside the 60px disc: transparent
+      (so the page background shows through). Outside: rail color. The
+      div paints in its normal positioned layer — always visible, no
+      z-index gymnastics. Overlap the elbow onto the bar by 1px to close
+      subpixel seams under zoom, and sync the bar's first-segment color
+      to the rail color so the overlap is invisible.
+    applied: true
+
+  - id: 20
+    date: 2026-04-21
+    source: "session"
+    category: architecture
+    lesson: |
+      Don't scale the bar-height or rail-corner-radius responsively when
+      the elbow quarter-circle is a fixed 60×60 primitive. The reference
+      LCARS-24.2 stylesheet shrinks the bar (28→10px) and radius (160→40px)
+      across breakpoints, but our elbow geometry is baked at 60px —
+      shrinking the bar while the elbow stays 60px makes the curve
+      disproportionate to the bar it joins, and the hand-off reads as
+      broken ("missing bar" at narrow widths). The signature LCARS curve
+      is recognizable precisely because its proportions are consistent.
+      Only responsively shrink `--lcars-spacing-left-frame-width`; that's
+      the one dimension that genuinely needs to give up real estate on
+      small screens.
+    applied: true
+
+  - id: 21
+    date: 2026-04-21
+    source: "session"
+    category: layout
+    lesson: |
+      In a two-row flex-column container where the second row has
+      `flex: 1 1 auto` and the first row has no explicit `flex`, the first
+      row inherits `flex-shrink: 1` and can be silently compressed by
+      pressure from below. If that row also has `overflow: hidden`,
+      children that push past its shrunken height simply disappear.
+      Worst-case victim: the LAST flex-child in the DOM order, since
+      content overflows at the bottom. In LcarsStandardLayout this was
+      exactly the top `topBar + elbow` pair — silently clipped while the
+      bottom row's bar (which was the FIRST child of its right column)
+      stayed visible because compression squeezed `main` instead. Fix:
+      `flex-shrink: 0` on the top `.wrap`, keeping `.wrap.gap` (higher
+      specificity) with `flex: 1 1 auto` so the bottom row still absorbs
+      remaining space. Rule of thumb: if a flex container's row has
+      `overflow: hidden` and can't shed content, it must also have
+      `flex-shrink: 0`, or pressure from another row will clip it.
+    applied: true
+
+  - id: 22
+    date: 2026-04-21
+    source: "session"
+    category: layout
+    lesson: |
+      Child order inside a flex-column matters for graceful degradation
+      when the column can be compressed. Place the most load-bearing
+      decorative element (here: the horizontal framing bar) FIRST or
+      adjacent to a naturally-scrollable child — not last in a list that
+      ends with a fixed-height decorative element. The bottom row of
+      LcarsStandardLayout rendered correctly through twelve rounds of
+      debugging because its bar is first and `main` (overflow-y: auto)
+      absorbs compression; the top row broke because its bar was last
+      after a tall cascade + nav, so the bar was the first to get
+      clipped by `overflow: hidden`. Graceful-degradation principle:
+      order children so the first things clipped are things users
+      can scroll or resize around, not structural chrome.
+    applied: true

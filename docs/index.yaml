@@ -9,6 +9,14 @@ docs:
     type: plan
     status: active
     note: "Authoritative phased implementation plan. 12 phases."
+  - file: docs/plan-005-lcars-polish.md
+    type: plan
+    status: active
+    note: "Six-step LCARS-24.2 fidelity pass for AppShell chrome (TopRail, LeftNavigator)."
+  - file: docs/plan-006-derisk-screens-and-gallery.md
+    type: plan
+    status: active
+    note: "De-risk screens (S1–S7) + primitive gallery + graduation to lcars-ui."
   - file: docs/plan.md
     type: plan
     status: active
