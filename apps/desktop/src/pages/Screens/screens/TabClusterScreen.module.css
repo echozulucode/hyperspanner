@@ -1,0 +1,16 @@
+/* TabClusterScreen — layout glue only. */
+
+.section {
+  margin-top: 1.5rem;
+}
+
+.sectionHeading {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--lcars-color-text, rgba(0, 0, 0, 0.8));
+  margin: 0 0 0.75rem 0;
+  padding: 0;
+}

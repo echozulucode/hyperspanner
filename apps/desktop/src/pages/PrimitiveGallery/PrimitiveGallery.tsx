@@ -6,14 +6,18 @@ import {
   LcarsCommandBar,
   LcarsDataCascade,
   LcarsEmptyState,
+  LcarsEventLog,
   LcarsPanel,
   LcarsPill,
   LcarsRail,
   LcarsSearchField,
   LcarsSplitHandle,
   LcarsStandardLayout,
+  LcarsTabCluster,
+  LcarsTabPill,
   LcarsTabs,
   LcarsTelemetryLabel,
+  LcarsWireframeInset,
   LcarsZoneHeader,
   lcarsColor,
   type LcarsTab,
@@ -83,6 +87,7 @@ export const PrimitiveGallery = ({
   const [query, setQuery] = useState('');
   const [activeTool, setActiveTool] = useState<string>('json-pad');
   const [splitPx, setSplitPx] = useState(320);
+  const [demoTabId, setDemoTabId] = useState<string>('sensors');
 
   const framingSegments = useMemo(
     () => [
@@ -559,6 +564,109 @@ export const PrimitiveGallery = ({
             filled
             background={theme.colors.green}
           />
+        </div>
+      </section>
+
+      {/* Tab cluster */}
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>LcarsTabCluster + LcarsTabPill</h2>
+          <span className={styles.sectionNote}>
+            Tab row · active shows almond-creme with color stripe
+          </span>
+        </header>
+        <LcarsTabCluster>
+          <LcarsTabPill
+            label="SENSORS"
+            color={theme.colors.butterscotch}
+            active={demoTabId === 'sensors'}
+            onClick={() => setDemoTabId('sensors')}
+          />
+          <LcarsTabPill
+            label="GAUGES"
+            color={theme.colors.africanViolet}
+            active={demoTabId === 'gauges'}
+            onClick={() => setDemoTabId('gauges')}
+          />
+          <LcarsTabPill
+            label="WEATHER"
+            color={theme.colors.butterscotch}
+            active={demoTabId === 'weather'}
+            onClick={() => setDemoTabId('weather')}
+          />
+          <LcarsTabPill
+            label="ALERTS"
+            color={theme.colors.red}
+            active={demoTabId === 'alerts'}
+            onClick={() => setDemoTabId('alerts')}
+          />
+          <LcarsTabPill
+            label="NAV"
+            color={theme.colors.bluey}
+            active={demoTabId === 'nav'}
+            onClick={() => setDemoTabId('nav')}
+          />
+        </LcarsTabCluster>
+      </section>
+
+      {/* Event log */}
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>LcarsEventLog</h2>
+          <span className={styles.sectionNote}>
+            Compressed uppercase readout · severity colors code column
+          </span>
+        </header>
+        <div style={{ maxWidth: '36rem' }}>
+          <LcarsEventLog
+            heading="EVENT LOG"
+            items={[
+              { code: '04:12:07', text: '2 ALARM ZONES TRIGGERED', severity: 'critical' },
+              { code: '23:58:41', text: '14.3 kWh USED YESTERDAY' },
+              { code: 'MONTH', text: '1.3 TB DATA USED THIS MONTH', severity: 'alert' },
+              { code: '02:40:12', text: 'GARAGE DOOR CLOSED · NORMAL' },
+              { code: '21:15:00', text: 'LIVING ROOM HVAC · 72°F HOLD' },
+            ]}
+          />
+        </div>
+      </section>
+
+      {/* Wireframe inset */}
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>LcarsWireframeInset</h2>
+          <span className={styles.sectionNote}>
+            Notched frame · corner brackets · hosts SVG/canvas content
+          </span>
+        </header>
+        <div style={{ maxWidth: '28rem', minHeight: '14rem' }}>
+          <LcarsWireframeInset
+            title="SENSOR GRID"
+            code="SEC-04-B"
+            footerLeft="RANGE 0-1000m"
+            footerRight="SCAN 04"
+          >
+            <svg
+              viewBox="0 0 200 120"
+              preserveAspectRatio="xMidYMid meet"
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+              aria-label="Demo sensor grid"
+            >
+              <g stroke={theme.colors.butterscotch} strokeWidth="0.5" fill="none" opacity="0.45">
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                  <line key={`v${i}`} x1={20 + i * 18} y1="10" x2={20 + i * 18} y2="110" />
+                ))}
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <line key={`h${i}`} x1="20" y1={10 + i * 20} x2="200" y2={10 + i * 20} />
+                ))}
+              </g>
+              <circle cx="100" cy="60" r="28" stroke={theme.colors.orange} strokeWidth="1" fill="none" />
+              <circle cx="100" cy="60" r="14" stroke={theme.colors.orange} strokeWidth="1" fill="none" opacity="0.6" />
+              <circle cx="100" cy="60" r="3" fill={theme.colors.red} />
+              <circle cx="140" cy="40" r="2" fill={theme.colors.bluey} />
+              <circle cx="64" cy="88" r="2" fill={theme.colors.bluey} />
+            </svg>
+          </LcarsWireframeInset>
         </div>
       </section>
 

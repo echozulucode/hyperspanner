@@ -1,63 +1,11 @@
 /*
- * HomeAutomationScreen — content-area styles only.
+ * HomeAutomationScreen — layout glue only.
  * The rails, elbows, banner, and framing bars come from the
- * LcarsStandardLayout primitive; this file only styles what lives
- * inside the main content slot.
+ * LcarsStandardLayout primitive. Tab pills, event log, and wireframe
+ * inset styles are now in their respective lcars-ui primitives.
  */
 
-/* ─── Tab cluster ──────────────────────────────────────────────────── */
-
-.tabCluster {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-  padding-top: 0.25rem;
-  padding-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.tabPill {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.55rem 2rem;
-  border: 0;
-  border-radius: 100vmax;
-  color: var(--lcars-color-text-dark, #000);
-  font-family: inherit;
-  font-weight: 700;
-  font-size: 0.95rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  min-width: 10rem;
-  transition: filter 140ms ease;
-}
-
-.tabPill:hover {
-  filter: brightness(115%);
-}
-
-.tabPill:active {
-  filter: brightness(85%);
-}
-
-.tabPill:focus-visible {
-  outline: 2px solid var(--lcars-color-almond-creme, #d7a99a);
-  outline-offset: 2px;
-}
-
-.tabPillActive {
-  /* Swap to the canonical almond-creme highlight instead of a shrinking
-   * black ring — reads as "selected" without looking truncated. The
-   * left-edge stripe uses --tab-pill-color (the pill's original color)
-   * so the button still telegraphs which tab it is. */
-  background-color: var(--lcars-color-almond-creme, #d7a99a) !important;
-  color: var(--lcars-color-text-dark, #000);
-  box-shadow: inset 0.45rem 0 0 var(--tab-pill-color, currentColor);
-}
-
-/* ─── Content row: log + trajectory ────────────────────────────────── */
+/* ─── Content row layout ──────────────────────────────────────────── */
 
 .contentRow {
   display: grid;
@@ -73,151 +21,11 @@
   }
 }
 
-/* ─── Event log ────────────────────────────────────────────────────── */
-
-.eventLog {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-width: 0;
-}
-
-.eventLogHeading {
-  margin: 0;
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  color: var(--lcars-color-butterscotch, #f1af5c);
-  text-transform: uppercase;
-  border-bottom: 1px solid rgba(241, 175, 92, 0.35);
-  padding-bottom: 0.35rem;
-}
-
-.eventLogList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-  color: var(--lcars-color-text, #eae4d6);
-  text-transform: uppercase;
-}
-
-.eventLogList li {
-  display: grid;
-  grid-template-columns: 6.5rem 1fr;
-  gap: 0.75rem;
-  align-items: baseline;
-  padding: 0.35rem 0;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
-}
-
-.eventLogList li:last-child {
-  border-bottom: none;
-}
-
-.eventLogCode {
-  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-  color: var(--lcars-color-orange, #ef8977);
-  letter-spacing: 0.08em;
-  font-size: 0.8rem;
-}
-
-/* ─── Trajectory frame ─────────────────────────────────────────────── */
-
-.trajectoryFrame {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  /* The frame is built from 4 corner brackets + a subtle fill.
-   * We use a bordered box with clipped corners to read as a proper
-   * tactical readout rather than a generic card. */
-  background-color: rgba(241, 175, 92, 0.035);
-  border: 1px solid rgba(241, 175, 92, 0.5);
-  /* Notched top-right + bottom-left corners, classic CRT-panel feel. */
-  clip-path: polygon(
-    0 0,
-    calc(100% - 14px) 0,
-    100% 14px,
-    100% 100%,
-    14px 100%,
-    0 calc(100% - 14px)
-  );
-}
-
-.trajectoryFrame::before,
-.trajectoryFrame::after {
-  content: '';
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--lcars-color-butterscotch, #f1af5c);
-  pointer-events: none;
-}
-
-.trajectoryFrame::before {
-  top: 8px;
-  left: 8px;
-  border-right: none;
-  border-bottom: none;
-}
-
-.trajectoryFrame::after {
-  bottom: 8px;
-  right: 8px;
-  border-left: none;
-  border-top: none;
-}
-
-.trajectoryHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 0.6rem 1rem 0.45rem 1rem;
-  border-bottom: 1px solid rgba(241, 175, 92, 0.3);
-  font-size: 0.8rem;
-  letter-spacing: 0.24em;
-  color: var(--lcars-color-butterscotch, #f1af5c);
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.trajectoryCode {
-  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-  color: var(--lcars-color-text, #eae4d6);
-  letter-spacing: 0.1em;
-  font-weight: 600;
-}
-
-.trajectoryBody {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 0.5rem 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* ─── SVG sizing (screen-specific) ─────────────────────────────────── */
 
 .trajectorySvg {
   width: 100%;
   height: auto;
   max-height: 100%;
   display: block;
-}
-
-.trajectoryFooter {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.45rem 1rem 0.6rem 1rem;
-  border-top: 1px solid rgba(241, 175, 92, 0.3);
-  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-  font-size: 0.75rem;
-  letter-spacing: 0.14em;
-  color: var(--lcars-color-text, #eae4d6);
-  opacity: 0.8;
 }

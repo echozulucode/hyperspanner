@@ -1,0 +1,13 @@
+/* RailElbowScreen — minimal layout glue for elbow + rail pressure test */
+
+.contentPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  text-align: center;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  color: var(--lcars-color-orange, #ef8977);
+  opacity: 0.7;
+}

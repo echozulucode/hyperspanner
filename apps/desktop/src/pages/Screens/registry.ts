@@ -1,5 +1,11 @@
 import type { FC } from 'react';
 import { HomeAutomationScreen } from './screens/HomeAutomationScreen';
+import { RailElbowScreen } from './screens/RailElbowScreen';
+import { SegmentedTopScreen } from './screens/SegmentedTopScreen';
+import { PanelButtonStackScreen } from './screens/PanelButtonStackScreen';
+import { TabClusterScreen } from './screens/TabClusterScreen';
+import { TrajectoryInsetScreen } from './screens/TrajectoryInsetScreen';
+import { EventLogScreen } from './screens/EventLogScreen';
 
 /**
  * De-risk screen registry — a single source of truth for:
@@ -43,36 +49,42 @@ export const SCREENS: readonly ScreenEntry[] = [
     title: 'Rail + Elbow',
     summary:
       'Left rail + diagonal elbow corner at the join with a stub top bar. Primitive pressure test — no content, just structure.',
+    Component: RailElbowScreen,
   },
   {
     id: 'segmented-top',
     title: 'Segmented Top Bar',
     summary:
       'Full-width LcarsBar at canonical proportions (brand / elbow cap / title / state / controls). Verifies seam thickness and segment widths.',
+    Component: SegmentedTopScreen,
   },
   {
     id: 'panel-button-stack',
     title: 'Panel Button Stack',
     summary:
       'Vertical LIGHTS / CAMERAS / ENERGY pattern. Flat rectangular buttons with right-anchored labels — distinct from pills.',
+    Component: PanelButtonStackScreen,
   },
   {
     id: 'tab-cluster',
     title: 'Tab Cluster',
     summary:
       'Row of pill tabs (SENSORS / GUAGES / WEATHER). Active tab orange, others african-violet, black seams between.',
+    Component: TabClusterScreen,
   },
   {
     id: 'trajectory-inset',
     title: 'Trajectory Inset',
     summary:
       'Bordered mini-panel with SVG wireframe, right-aligned data code, and a data-cascade footer.',
+    Component: TrajectoryInsetScreen,
   },
   {
     id: 'event-log',
     title: 'Event Log',
     summary:
       'Full-bleed compressed-uppercase text readout. Typography pressure test for Barlow Condensed at LCARS sizes.',
+    Component: EventLogScreen,
   },
 ];
 

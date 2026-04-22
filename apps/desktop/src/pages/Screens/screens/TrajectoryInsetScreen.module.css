@@ -1,0 +1,31 @@
+/* TrajectoryInsetScreen — layout glue only. */
+
+.gridTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: stretch;
+  margin-top: 1.5rem;
+}
+
+.gridBottom {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: stretch;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 1100px) {
+  .gridTop {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* SVG sizing for insets */
+.insetSvg {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  display: block;
+}

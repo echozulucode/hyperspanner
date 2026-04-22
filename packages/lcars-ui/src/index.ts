@@ -64,3 +64,12 @@ export type { LcarsStandardLayoutProps } from './primitives/LcarsStandardLayout'
 
 export { LcarsDataCascade } from './primitives/LcarsDataCascade';
 export type { LcarsDataCascadeProps } from './primitives/LcarsDataCascade';
+
+export { LcarsTabCluster, LcarsTabPill } from './primitives/LcarsTabCluster';
+export type { LcarsTabClusterProps, LcarsTabPillProps } from './primitives/LcarsTabCluster';
+
+export { LcarsEventLog } from './primitives/LcarsEventLog';
+export type { LcarsEventLogProps, LcarsEventLogItem } from './primitives/LcarsEventLog';
+
+export { LcarsWireframeInset } from './primitives/LcarsWireframeInset';
+export type { LcarsWireframeInsetProps } from './primitives/LcarsWireframeInset';

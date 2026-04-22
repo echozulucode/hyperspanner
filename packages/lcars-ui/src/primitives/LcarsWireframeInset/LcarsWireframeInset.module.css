@@ -1,0 +1,87 @@
+/* ─── Wireframe inset frame ────────────────────────────────────────── */
+
+.frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* The frame is built from 4 corner brackets + a subtle fill.
+   * We use a bordered box with clipped corners to read as a proper
+   * tactical readout rather than a generic card. */
+  background-color: rgba(241, 175, 92, 0.035);
+  border: 1px solid rgba(241, 175, 92, 0.5);
+  /* Notched top-right + bottom-left corners, classic CRT-panel feel. */
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    14px 100%,
+    0 calc(100% - 14px)
+  );
+}
+
+.frame::before,
+.frame::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--lcars-color-butterscotch, #f1af5c);
+  pointer-events: none;
+}
+
+.frame::before {
+  top: 8px;
+  left: 8px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.frame::after {
+  bottom: 8px;
+  right: 8px;
+  border-left: none;
+  border-top: none;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.6rem 1rem 0.45rem 1rem;
+  border-bottom: 1px solid rgba(241, 175, 92, 0.3);
+  font-size: 0.8rem;
+  letter-spacing: 0.24em;
+  color: var(--lcars-color-butterscotch, #f1af5c);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.code {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  color: var(--lcars-color-text, #eae4d6);
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.45rem 1rem 0.6rem 1rem;
+  border-top: 1px solid rgba(241, 175, 92, 0.3);
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  color: var(--lcars-color-text, #eae4d6);
+  opacity: 0.8;
+}

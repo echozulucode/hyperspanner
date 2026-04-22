@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { CSSProperties, FC } from 'react';
+import type { FC } from 'react';
 import {
   LcarsDataCascade,
+  LcarsEventLog,
   LcarsPanel,
   LcarsPill,
   LcarsStandardLayout,
+  LcarsTabCluster,
+  LcarsTabPill,
+  LcarsWireframeInset,
   type LcarsBarSegment,
 } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -122,101 +126,54 @@ export const HomeAutomationScreen: FC = () => {
       trim={false}
     >
       {/* ─── Tab cluster ───────────────────────────────────────────── */}
-      <div className={styles.tabCluster}>
-        <TabPill
+      <LcarsTabCluster>
+        <LcarsTabPill
           label="SENSORS"
           color={theme.colors.butterscotch}
           active={activeTab === 'sensors'}
           onClick={() => setActiveTab('sensors')}
         />
-        <TabPill
+        <LcarsTabPill
           label="GAUGES"
           color={theme.colors.africanViolet}
           active={activeTab === 'gauges'}
           onClick={() => setActiveTab('gauges')}
         />
-        <TabPill
+        <LcarsTabPill
           label="WEATHER"
           color={theme.colors.butterscotch}
           active={activeTab === 'weather'}
           onClick={() => setActiveTab('weather')}
         />
-      </div>
+      </LcarsTabCluster>
 
       {/* ─── Content row: event log + trajectory frame ─────────────── */}
       <div className={styles.contentRow}>
-        <section className={styles.eventLog}>
-          <h2 className={styles.eventLogHeading}>EVENT LOG</h2>
-          <ol className={styles.eventLogList}>
-            <li>
-              <span className={styles.eventLogCode}>04:12:07</span>
-              2 ALARM ZONES TRIGGERED
-            </li>
-            <li>
-              <span className={styles.eventLogCode}>23:58:41</span>
-              14.3 kWh USED YESTERDAY
-            </li>
-            <li>
-              <span className={styles.eventLogCode}>MONTH</span>
-              1.3 TB DATA USED THIS MONTH
-            </li>
-            <li>
-              <span className={styles.eventLogCode}>02:40:12</span>
-              GARAGE DOOR CLOSED · NORMAL
-            </li>
-            <li>
-              <span className={styles.eventLogCode}>21:15:00</span>
-              LIVING ROOM HVAC · 72°F HOLD
-            </li>
-          </ol>
-        </section>
+        <LcarsEventLog
+          heading="EVENT LOG"
+          items={[
+            { code: '04:12:07', text: '2 ALARM ZONES TRIGGERED' },
+            { code: '23:58:41', text: '14.3 kWh USED YESTERDAY' },
+            { code: 'MONTH', text: '1.3 TB DATA USED THIS MONTH' },
+            { code: '02:40:12', text: 'GARAGE DOOR CLOSED · NORMAL' },
+            { code: '21:15:00', text: 'LIVING ROOM HVAC · 72°F HOLD' },
+          ]}
+        />
 
-        <aside className={styles.trajectoryFrame}>
-          <header className={styles.trajectoryHeader}>
-            <span>TRAJECTORY</span>
-            <span className={styles.trajectoryCode}>2374-02-1</span>
-          </header>
-          <div className={styles.trajectoryBody}>
-            <TrajectoryWireframe />
-          </div>
-          <footer className={styles.trajectoryFooter}>
-            <span>BEARING 127·32·04</span>
-            <span>WARP 8.2</span>
-          </footer>
-        </aside>
+        <LcarsWireframeInset
+          title="TRAJECTORY"
+          code="2374-02-1"
+          footerLeft="BEARING 127·32·04"
+          footerRight="WARP 8.2"
+        >
+          <TrajectoryWireframe />
+        </LcarsWireframeInset>
       </div>
     </LcarsStandardLayout>
   );
 };
 
 // ─── Subcomponents ────────────────────────────────────────────────────
-
-interface TabPillProps {
-  label: string;
-  color: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-const TabPill: FC<TabPillProps> = ({ label, color, active, onClick }) => {
-  // --tab-pill-color preserves the original color so the active state
-  // can still show it as a left-edge stripe even after we swap the
-  // background to the almond-creme highlight.
-  const style = {
-    backgroundColor: color,
-    '--tab-pill-color': color,
-  } as CSSProperties;
-  return (
-    <button
-      type="button"
-      className={`${styles.tabPill} ${active ? styles.tabPillActive : ''}`}
-      style={style}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-};
 
 /**
  * TrajectoryWireframe — a more considered Enterprise silhouette built
