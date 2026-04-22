@@ -57,7 +57,11 @@ body {
   background-color: var(--lcars-color-background, #0a0a0f);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* shell owns scrolling */
+  /* No blanket overflow hidden — each route owns its scrolling:
+   *  - AppShell locks itself to the viewport (overflow:hidden on .shell).
+   *  - PrimitiveGallery scrolls the page naturally.
+   *  - DerisScreen / LcarsStandardLayout lock to the viewport and
+   *    scroll only the main content area. */
 }
 
 /* Typography */
@@ -212,13 +216,22 @@ a:active {
   animation: pulse var(--lcars-animation-pulse, 2000ms) infinite;
 }
 
-/* Responsive scaling — preserved from LCARS-24.2 */
+/* Responsive scaling — tuned for Hyperspanner.
+ *
+ * The LCARS-24.2 reference shrinks the bar height (28→10px) and rail
+ * corner radius (160→40px) responsively. We keep those FIXED because
+ * our elbow primitive is a hard-coded 60×60 quarter-circle (per LCARS
+ * design constraint — the elbow curve is a signature shape that reads
+ * as "LCARS" precisely because its proportions are consistent). If the
+ * bar shrinks to 20px but the elbow stays 60px, the curve becomes
+ * disproportionate to the bar it joins and the hand-off looks broken
+ * (which is what produced the "missing bar" visual at narrow widths).
+ *
+ * Only the RAIL WIDTH scales responsively now — it's the one dimension
+ * that genuinely needs to give up real-estate on smaller screens. */
 @media (max-width: 1500px) {
   :root {
     --lcars-spacing-left-frame-width: 200px;
-    --lcars-spacing-radius-top: 0 0 0 130px;
-    --lcars-spacing-radius-bottom: 130px 0 0 0;
-    --lcars-spacing-bar-height: 24px;
   }
 }
 
@@ -229,9 +242,6 @@ a:active {
 
   :root {
     --lcars-spacing-left-frame-width: 180px;
-    --lcars-spacing-radius-top: 0 0 0 100px;
-    --lcars-spacing-radius-bottom: 100px 0 0 0;
-    --lcars-spacing-bar-height: 20px;
   }
 }
 
@@ -244,9 +254,6 @@ a:active {
 @media (max-width: 750px) {
   :root {
     --lcars-spacing-left-frame-width: 120px;
-    --lcars-spacing-radius-top: 0 0 0 80px;
-    --lcars-spacing-radius-bottom: 80px 0 0 0;
-    --lcars-spacing-bar-height: 16px;
   }
 }
 
@@ -254,8 +261,5 @@ a:active {
   :root {
     --lcars-spacing-left-frame-width: 62px;
     --lcars-spacing-left-frame-padding: 0.5rem;
-    --lcars-spacing-radius-top: 0 0 0 40px;
-    --lcars-spacing-radius-bottom: 40px 0 0 0;
-    --lcars-spacing-bar-height: 10px;
   }
 }

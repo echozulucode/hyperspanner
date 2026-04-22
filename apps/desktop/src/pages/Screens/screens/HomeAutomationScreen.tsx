@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 import {
   LcarsDataCascade,
   LcarsPanel,
@@ -33,12 +33,15 @@ export const HomeAutomationScreen: FC = () => {
   }, []);
 
   // Top rail (rounded bottom-left, flows into top bar).
-  // 3 panels share the column equally via size="flex".
+  // 3 panels share the column equally via size="flex". The LAST panel
+  // (ENERGY) color MUST match topRailColor so the decorative curve
+  // beneath it blends seamlessly.
+  const railEndColor = theme.colors.red;
   const topPanels = (
     <>
       <LcarsPanel
         size="flex"
-        color={theme.colors.red}
+        color={theme.colors.africanViolet}
         active={activeRail === 'lights'}
         onClick={() => setActiveRail('lights')}
       >
@@ -54,7 +57,7 @@ export const HomeAutomationScreen: FC = () => {
       </LcarsPanel>
       <LcarsPanel
         size="flex"
-        color={theme.colors.red}
+        color={railEndColor}
         seamless
         active={activeRail === 'energy'}
         onClick={() => setActiveRail('energy')}
@@ -76,16 +79,21 @@ export const HomeAutomationScreen: FC = () => {
     </>
   );
 
-  // Top rail = bluey (matches the blue block at the top-left of the
-  // reference image). Bottom rail = red so the footer pill row reads
-  // as part of the same frame.
-  const topRailColor = theme.colors.bluey;
+  // Rail colors MUST match the panel adjacent to the rail's decorative
+  // curve, so the curve blends into the last/first panel rather than
+  // flashing a third color. For the top rail the curve is at the BOTTOM
+  // (adjacent to the last panel, ENERGY). The bottom rail is empty on
+  // this screen, so its color is just decorative.
+  const topRailColor = railEndColor;
   const bottomRailColor = theme.colors.red;
 
   // Custom bar segments — picked to evoke the reference's "LCARS 105" /
-  // "HOME AUTOMATION" / stardate / LOGOUT segmented top bar.
+  // "HOME AUTOMATION" / stardate / LOGOUT segmented top bar. The FIRST
+  // segment color is the rail-continuation; LcarsStandardLayout will
+  // auto-rewrite it to match topRailColor / bottomRailColor, so the
+  // value here is essentially a placeholder that gets overwritten.
   const topBarSegments: LcarsBarSegment[] = [
-    { width: 140, color: theme.colors.bluey },
+    { width: 140, color: topRailColor },
     { width: 40, color: theme.colors.butterscotch },
     { widthPercent: 35, color: theme.colors.orange },
     { flex: true, color: theme.colors.africanViolet },
@@ -93,7 +101,7 @@ export const HomeAutomationScreen: FC = () => {
   ];
 
   const bottomBarSegments: LcarsBarSegment[] = [
-    { width: 140, color: theme.colors.red },
+    { width: 140, color: bottomRailColor },
     { width: 40, color: theme.colors.butterscotch },
     { widthPercent: 25, color: theme.colors.red, halfHeight: true },
     { flex: true, color: theme.colors.africanViolet },
@@ -191,11 +199,18 @@ interface TabPillProps {
 }
 
 const TabPill: FC<TabPillProps> = ({ label, color, active, onClick }) => {
+  // --tab-pill-color preserves the original color so the active state
+  // can still show it as a left-edge stripe even after we swap the
+  // background to the almond-creme highlight.
+  const style = {
+    backgroundColor: color,
+    '--tab-pill-color': color,
+  } as CSSProperties;
   return (
     <button
       type="button"
       className={`${styles.tabPill} ${active ? styles.tabPillActive : ''}`}
-      style={{ backgroundColor: color }}
+      style={style}
       onClick={onClick}
     >
       {label}

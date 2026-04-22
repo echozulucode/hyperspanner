@@ -48,8 +48,13 @@
 }
 
 .tabPillActive {
-  box-shadow: inset 0 0 0 0.2rem black, inset 0 0 0 0.35rem currentColor;
-  filter: brightness(115%);
+  /* Swap to the canonical almond-creme highlight instead of a shrinking
+   * black ring — reads as "selected" without looking truncated. The
+   * left-edge stripe uses --tab-pill-color (the pill's original color)
+   * so the button still telegraphs which tab it is. */
+  background-color: var(--lcars-color-almond-creme, #d7a99a) !important;
+  color: var(--lcars-color-text-dark, #000);
+  box-shadow: inset 0.45rem 0 0 var(--tab-pill-color, currentColor);
 }
 
 /* ─── Content row: log + trajectory ────────────────────────────────── */

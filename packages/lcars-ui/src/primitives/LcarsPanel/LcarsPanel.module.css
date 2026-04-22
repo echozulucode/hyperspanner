@@ -81,11 +81,18 @@
   border-bottom: none;
 }
 
-/* Active state — slight brighten + subtle inner ring, matching LCARS
- * visual convention of "active button = hot". */
+/* Active state — swap the panel fill for the canonical LCARS "hot"
+ * highlight (almond-creme) with dark text and a subtle left-edge stripe
+ * in the original panel color so it still reads as the same button.
+ * No shrinking black outline. */
 .active {
-  filter: brightness(118%);
-  box-shadow: inset 0 0 0 0.25rem black, inset 0 0 0 0.5rem var(--panel-color, var(--lcars-color-red));
+  background-color: var(--lcars-color-almond-creme, #d7a99a);
+  color: var(--lcars-color-text-dark, #000);
+  box-shadow: inset 0.45rem 0 0 var(--panel-color, var(--lcars-color-red));
+}
+
+.active:hover {
+  filter: brightness(108%);
 }
 
 .labelSmall {

@@ -1,6 +1,12 @@
 .barPanel {
   display: flex;
   height: var(--lcars-spacing-bar-height, 28px);
+  /* Never let a flex-column ancestor (like .rightFrameTop with a tall
+   * banner/nav) shrink the bar — it must stay at its full height so the
+   * 60×60 elbow always meets a matching 28px strip. Without this, a
+   * too-tall banner can collapse the bar to 0 and the curve appears to
+   * dangle in space. */
+  flex-shrink: 0;
   gap: 0;
 }
 

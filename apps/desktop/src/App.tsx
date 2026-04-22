@@ -19,7 +19,12 @@ export const App = () => {
   const [route, navigate] = useHashRoute();
 
   if (route === 'gallery') {
-    return <PrimitiveGallery onBack={() => navigate('/')} />;
+    return (
+      <PrimitiveGallery
+        onBack={() => navigate('/')}
+        onOpenScreens={() => navigate('/screens')}
+      />
+    );
   }
 
   if (route === 'screens') {
@@ -42,5 +47,10 @@ export const App = () => {
     );
   }
 
-  return <AppShell onOpenGallery={() => navigate('/gallery')} />;
+  return (
+    <AppShell
+      onOpenGallery={() => navigate('/gallery')}
+      onOpenScreens={() => navigate('/screens')}
+    />
+  );
 };

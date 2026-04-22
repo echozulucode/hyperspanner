@@ -14,6 +14,8 @@ import styles from './AppShell.module.css';
 export interface AppShellProps {
   /** Navigate to the primitive gallery (dev affordance on the top rail). */
   onOpenGallery?: () => void;
+  /** Navigate to the de-risk screens hub (dev affordance on the top rail). */
+  onOpenScreens?: () => void;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface AppShellProps {
  * Keyboard shortcuts (⌘B / ⌘J / ⌘⇧E) toggle the matching zone via the store.
  * The Left navigator calls `openTool(id)` to open tools in their default zone.
  */
-export const AppShell: FC<AppShellProps> = ({ onOpenGallery }) => {
+export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) => {
   const collapsed = useWorkspaceStore(useShallow((s) => s.collapsed));
   const centerSplit = useWorkspaceStore((s) => s.centerSplit);
 
@@ -101,6 +103,7 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery }) => {
             /* Phase 5 wires command palette */
           }}
           onOpenGallery={onOpenGallery}
+          onOpenScreens={onOpenScreens}
         />
       </div>
 

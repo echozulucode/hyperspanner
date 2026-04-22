@@ -136,14 +136,27 @@
 }
 
 .layoutFrame {
-  /* Give the embedded LcarsStandardLayout a bounded canvas so its rails,
-   * elbows and bars all scale naturally inside the gallery page. */
+  /* Bounded canvas for the embedded LcarsStandardLayout.
+   *
+   * Needs two things for the elbow pseudos to render correctly:
+   *   1. Solid black background (not translucent). The pseudos paint with
+   *      z-index:-1 at this element's stacking-context negative layer, so
+   *      this bg becomes the backdrop they sit on.
+   *   2. `isolation: isolate` — makes this the local stacking context that
+   *      HOSTS those negative-z pseudos. Without it the pseudos propagate
+   *      all the way up to the root SC, where every intermediate block
+   *      descendant (including this element's own bg) paints OVER them and
+   *      the elbow curves vanish. With isolation, painting order inside
+   *      this SC becomes: (1) this bg black, (2) pseudos at z:-1,
+   *      (3) in-flow blocks — so the curves are visible between the
+   *      black fill and the rail/bar. */
   height: 520px;
   max-height: 70vh;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: #000;
   overflow: hidden;
   border-radius: 4px;
+  isolation: isolate;
 }
 
 .layoutFrameBody {

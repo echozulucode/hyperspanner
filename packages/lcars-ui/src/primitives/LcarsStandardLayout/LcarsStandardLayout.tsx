@@ -55,6 +55,18 @@ const DEFAULT_BOTTOM: LcarsBarSegment[] = [
 ];
 
 /**
+ * Replace the first segment's color with `railColor` (if provided).
+ * Pure — returns a new array, doesn't mutate the caller's segments.
+ */
+function syncFirstSegmentColor(
+  segments: LcarsBarSegment[],
+  railColor: string | undefined,
+): LcarsBarSegment[] {
+  if (!railColor || segments.length === 0) return segments;
+  return [{ ...segments[0], color: railColor }, ...segments.slice(1)];
+}
+
+/**
  * LcarsStandardLayout — canonical two-row LCARS frame.
  *
  * Composes:
@@ -92,8 +104,15 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
       : {}),
   };
 
-  const topBar = topBarSegments ?? DEFAULT_TOP;
-  const botBar = bottomBarSegments ?? DEFAULT_BOTTOM;
+  // LCARS grammar: the rail, the elbow quarter-circle, and the FIRST
+  // segment of the adjacent bar form a single continuous visual shape.
+  // If a consumer overrides the rail color (e.g. to match the last rail
+  // panel), the first bar segment must follow — otherwise you see a
+  // colored "arch" where the elbow's quarter-circle meets a differently
+  // colored bar segment. Sync them here so the consumer can just set
+  // `topRailColor` / `bottomRailColor` and not worry about it.
+  const topBar = syncFirstSegmentColor(topBarSegments ?? DEFAULT_TOP, topRailColor);
+  const botBar = syncFirstSegmentColor(bottomBarSegments ?? DEFAULT_BOTTOM, bottomRailColor);
 
   const bannerText =
     title != null ? (
@@ -108,7 +127,11 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
       {trim && <div className={styles.headtrim} aria-hidden="true" />}
 
       <div className={styles.wrap}>
-        <div className={styles.leftFrameTop}>{topPanels}</div>
+        <div
+          className={`${styles.leftFrameTop} ${topPanels ? styles.hasChildren : ''}`}
+        >
+          {topPanels}
+        </div>
         <div className={styles.rightFrameTop}>
           {bannerText !== null && <LcarsBanner size="large">{bannerText}</LcarsBanner>}
 
@@ -120,6 +143,11 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
           <div className={styles.spacer} />
 
           <LcarsBar segments={topBar} className={styles.topBarSlot} />
+
+          {/* Concrete-div elbow corner. Absolutely positioned over the
+           * rail→bar join; its radial-gradient background draws the
+           * rail-colored quarter-crescent. See CSS comment on .elbowTop. */}
+          <div className={styles.elbowTop} aria-hidden="true" />
         </div>
       </div>
 
@@ -133,6 +161,8 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
           <LcarsBar segments={botBar} />
           <main className={styles.main}>{children}</main>
           {footer}
+          {/* Concrete-div elbow corner — mirror of the top elbow, flipped. */}
+          <div className={styles.elbowBottom} aria-hidden="true" />
         </div>
       </div>
 
@@ -140,4 +170,3 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
     </div>
   );
 };
-

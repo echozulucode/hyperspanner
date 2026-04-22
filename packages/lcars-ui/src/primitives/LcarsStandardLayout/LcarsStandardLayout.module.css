@@ -13,19 +13,36 @@
  *   │  top-left corner       │ │  (elbow bends into botBar)  │
  *   └────────────────────────┘ └──────────────────────────────┘
  *
- * Rails flow into the bars via 60×60 elbows. The elbows are built from
- * TWO absolutely-positioned squares on rightFrame*:
- *   ::before → diagonal-gradient (rail color 50% / black 50%)
- *   ::after  → solid black with a 60px rounded corner
- * The overlap creates the curved hand-off that's the LCARS signature.
+ * Rails flow into the bars via 60×60 concrete-div elbows. Each elbow is
+ * a single absolutely-positioned div whose `background` is a radial
+ * gradient centered on the "hinge" corner (opposite corner from the
+ * rail/bar join). Inside the disc it's transparent; outside it's the
+ * rail color — producing the quarter-crescent shape that continues the
+ * rail's vertical stroke into the bar's horizontal stroke.
+ *
+ * Why concrete divs and NOT pseudo elements with z-index:-1 (as in the
+ * reference): the negative-z + propagate-to-ancestor-SC approach is
+ * brittle across our embedding contexts (DerisScreen / PrimitiveGallery
+ * / AppShell) and two separate stacking-context fix rounds failed to
+ * make it render reliably. Concrete divs with a transparent-inside
+ * gradient avoid z-index entirely — the elbow paints in normal
+ * positioned order (layer 6 of its SC), always visible against whatever
+ * is below it in the DOM.
  */
 
 .container {
   padding-top: 10px;
   padding-left: 5px;
-  background-color: black;
-  min-height: 100vh;
+  /* No background. The parent (DerisScreen.host / AppShell / PrimitiveGallery's
+   * layoutFrame) supplies the black backdrop that shows through the
+   * elbow's transparent disc area. Anything painted here would hide
+   * that black cutout, breaking the LCARS aesthetic. */
+  height: 100%;
+  min-height: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .wrap {
@@ -35,6 +52,25 @@
   padding-left: 5px;
   padding-right: 15px;
   overflow: hidden;
+  width: 100%;
+  /* Pin the TOP row to its intrinsic (content) height. Without this,
+   * wrap1 inherits flex-shrink:1 (default) and can get squeezed by
+   * pressure from the bottom row's `flex: 1 1 auto`. When that happens,
+   * rightFrameTop's tail children — the 28px topBar and the 60×60
+   * elbow — get pushed past wrap1's overflow:hidden clip and disappear,
+   * exactly the "missing top frame rails" symptom. With flex-shrink:0
+   * the top row always reserves banner+bannerRow+spacer+bar+elbow
+   * height; the bottom row absorbs any deficit via its own main-scroll.
+   * .wrap.gap below re-enables shrink for the bottom row via higher
+   * specificity (two classes vs one). */
+  flex-shrink: 0;
+}
+
+/* The second .wrap (bottom row) takes the remaining vertical space so
+ * the main content can scroll within it. */
+.wrap.gap {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* ── LEFT COLUMN (rails) ────────────────────────────────────────────── */
@@ -54,6 +90,17 @@
   justify-content: flex-start;
 }
 
+/* When the top rail holds panels, reserve decorative space at its BOTTOM
+ * so the rail's rounded bottom-left corner (radius-top) remains visible
+ * below the panels — matches the reference's leftFrameTop look.
+ * Padding must exceed the corner radius so panels stay clear of the
+ * curve, plus a breathing margin so the last panel doesn't visually
+ * touch the curve. Values mirror the responsive radius tokens in
+ * global.css with an extra ~1.25rem of breathing room. */
+.leftFrameTop.hasChildren {
+  padding-bottom: calc(160px + 1.25rem);
+}
+
 .leftFrame {
   width: var(--lcars-spacing-left-frame-width, 240px);
   display: flex;
@@ -69,12 +116,15 @@
   background-color: var(--lcars-layout-left-bottom-color, var(--lcars-color-red, #ef8977));
   border-radius: var(--lcars-spacing-radius-bottom, 160px 0 0 0);
   transition: width 0.5s;
+  min-height: 0; /* allow vertical flex to shrink */
 }
 
-/* When caller supplies bottom-rail children, null out the decorative
- * padding so stacked panels fill the full column height. */
+/* When the bottom rail holds panels, keep some decorative padding at the
+ * TOP so the rail's rounded top-left corner (radius-bottom) shows above
+ * the panels. No bottom padding — panels can reach the baseboard.
+ * Padding must exceed the corner radius by a breathing margin. */
 .leftFrame.hasChildren {
-  padding-top: 0;
+  padding-top: calc(160px + 1.25rem);
   padding-bottom: 0;
 }
 
@@ -90,92 +140,77 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  position: relative;
-  min-height: 400px;
+  position: relative; /* containing block for .elbowTop */
+  /* No fixed min-height — let the top pane size to its content so nav pills
+   * and the top-bar slot are never clipped. The main content below is what
+   * scrolls. */
+  min-height: 0;
 }
 
 /* Elbow corner — TOP.
- * ::before is the diagonal "bite" that connects the rail to the bar.
- * ::after is a solid black square with a 60px rounded corner that
- * overlays the sharp corner of the rail+bar join.
- * Both sit behind the bar (z-index: -1) and against the left edge of
- * the right column. */
-.rightFrameTop::before {
-  content: '';
-  display: block;
+ *
+ * A 60×60 absolutely-positioned div whose background is a radial gradient
+ * centered at the TOP-RIGHT corner with radius 60px:
+ *   - Inside the disc (< 60px from top-right): transparent.
+ *   - Outside the disc (>= 60px from top-right): rail color.
+ * That produces the quarter-crescent that hugs the LEFT edge (continuing
+ * the rail downward) and the BOTTOM edge (continuing the bar rightward),
+ * curving inward via the arc to close the shape.
+ *
+ * The `bottom` offset is `bar-height - 1px` so the elbow's bottom edge
+ * overlaps the bar's top edge by 1px — closes any subpixel zoom seam
+ * without visual artifact (the elbow's bottom edge is rail-color along
+ * its full 60px width; syncFirstSegmentColor guarantees the bar's first
+ * segment is rail-color, so the 1px of rail-color painted over bar's
+ * top edge is indistinguishable from the bar beneath it).
+ *
+ * No z-index / no stacking-context gymnastics. Paints in the normal
+ * positioned layer of its containing stacking context (which is either
+ * .host or .layoutFrame higher up). Main / bar / banner in the same
+ * flow paint at lower layers — the elbow sits cleanly on top of them
+ * in the 1px overlap and is transparent everywhere else, so main's
+ * text (which starts at padding-left >= 20px) never collides with the
+ * rail-colored crescent. */
+.elbowTop {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--lcars-spacing-bar-height, 28px) - 1px);
   width: 60px;
   height: 60px;
-  background: linear-gradient(
-    to top right,
-    var(--lcars-layout-left-top-color, var(--lcars-color-bluey, #9fb5d7)) 50%,
-    black 50%
+  background: radial-gradient(
+    circle 60px at top right,
+    transparent 59.5px,
+    var(--lcars-layout-left-top-color, var(--lcars-color-bluey, #9fb5d7)) 60px
   );
-  position: absolute;
-  left: 0;
-  bottom: var(--lcars-spacing-bar-height, 28px);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.rightFrameTop::after {
-  content: '';
-  display: block;
-  width: 60px;
-  height: 60px;
-  background-color: black;
-  border-radius: var(--lcars-spacing-radius-content-top, 0 0 0 60px);
-  position: absolute;
-  left: 0;
-  bottom: var(--lcars-spacing-bar-height, 28px);
-  z-index: 1;
   pointer-events: none;
 }
 
 .rightFrame {
   flex: 1;
-  position: relative;
+  position: relative; /* containing block for .elbowBottom */
   display: flex;
   flex-direction: column;
+  min-height: 0; /* crucial — lets .main bound itself and scroll */
+  min-width: 0;
 }
 
-/* Elbow corner — BOTTOM. Mirror of the top elbow, flipped vertically. */
-.rightFrame::before {
-  content: '';
-  display: block;
+/* Elbow corner — BOTTOM. Mirror of the top elbow, flipped vertically.
+ * Radial gradient centered at the BOTTOM-RIGHT corner with radius 60px:
+ * crescent hugs the LEFT edge (continuing the rail upward) and the TOP
+ * edge (continuing the bar rightward). Same 1px overlap rule and same
+ * rail-color-first-segment invariant make the overlap invisible. */
+.elbowBottom {
+  position: absolute;
+  left: 0;
+  top: calc(var(--lcars-spacing-bar-height, 28px) - 1px);
   width: 60px;
   height: 60px;
-  background: linear-gradient(
-    to bottom right,
-    var(--lcars-layout-left-bottom-color, var(--lcars-color-red, #ef8977)) 50%,
-    black 50%
+  background: radial-gradient(
+    circle 60px at bottom right,
+    transparent 59.5px,
+    var(--lcars-layout-left-bottom-color, var(--lcars-color-red, #d44d3c)) 60px
   );
-  position: absolute;
-  left: 0;
-  top: var(--lcars-spacing-bar-height, 28px);
-  z-index: 0;
   pointer-events: none;
-}
-
-.rightFrame::after {
-  content: '';
-  display: block;
-  width: 60px;
-  height: 60px;
-  background-color: black;
-  border-radius: var(--lcars-spacing-radius-content-bottom, 60px 0 0 0);
-  position: absolute;
-  left: 0;
-  top: var(--lcars-spacing-bar-height, 28px);
-  z-index: 1;
-  pointer-events: none;
-}
-
-/* Content stacks on top of the elbow pseudo-elements. Give them a
- * higher z-index so user content + the bar sit in front. */
-.rightFrameTop > *,
-.rightFrame > * {
-  position: relative;
-  z-index: 2;
 }
 
 /* ── BANNER ROW CONTENTS ────────────────────────────────────────────── */
@@ -200,7 +235,9 @@
   justify-content: flex-end;
   column-gap: 0.5rem;
   row-gap: 0.65rem;
-  max-width: calc(var(--nav-width, 240px) * 2 + 1rem);
+  /* Allow the nav to use the full available width of the banner row so
+   * pills wrap cleanly instead of getting clipped on narrow viewports. */
+  max-width: 100%;
 }
 
 @media (max-width: 1500px) {
@@ -227,6 +264,16 @@
   }
 }
 
+/* On very narrow viewports there may not be room for a second nav pill
+ * even after wrapping; hide trailing pills so the primary one (e.g.
+ * STATUS) is never half-clipped. The user can still reach them by
+ * widening the window. */
+@media (max-width: 700px) {
+  .navigation > *:nth-child(n + 2) {
+    display: none;
+  }
+}
+
 .spacer {
   flex: 1;
   min-height: 20px;
@@ -246,6 +293,11 @@
   flex: 1 1 auto;
   min-height: 0;
   color: var(--lcars-color-text, #eae4d6);
+  /* Scroll the main content independently so the rails, elbows, and
+   * framing bars stay locked to the viewport. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 .main > *:first-child {
@@ -258,6 +310,13 @@
 
 /* ── RESPONSIVE TAIL ────────────────────────────────────────────────── */
 
+/* Rail corner radius is fixed at 160px across all viewports (see the
+ * note in apps/desktop/src/styles/global.css), so the decorative padding
+ * above/below panels is a single constant (160px + 1.25rem breathing
+ * room, defined inline in .leftFrameTop.hasChildren / .leftFrame.hasChildren).
+ *
+ * The only thing we still adjust responsively is .wrap's side padding
+ * on very narrow viewports, so the rails don't crowd the window edge. */
 @media (max-width: 525px) {
   .wrap {
     padding-left: 0;

@@ -15,6 +15,8 @@ export interface TopRailProps {
   onOpenPalette?: () => void;
   /** Called when the gallery (dev) affordance is invoked. */
   onOpenGallery?: () => void;
+  /** Called when the screens-hub (dev) affordance is invoked. */
+  onOpenScreens?: () => void;
 }
 
 const themeOrder: ThemeName[] = ['picard-modern', 'classic', 'nemesis-blue', 'lower-decks'];
@@ -25,6 +27,7 @@ export const TopRail: FC<TopRailProps> = ({
   onResetLayout,
   onOpenPalette,
   onOpenGallery,
+  onOpenScreens,
 }) => {
   const { themeName, setTheme, theme } = useTheme();
 
@@ -80,12 +83,21 @@ export const TopRail: FC<TopRailProps> = ({
           </LcarsPill>
           <LcarsPill
             size="small"
-            rounded="right"
+            rounded="none"
             color={theme.colors.orange}
             onClick={onOpenGallery}
             aria-label="Open primitive gallery"
           >
             GALLERY
+          </LcarsPill>
+          <LcarsPill
+            size="small"
+            rounded="right"
+            color={theme.colors.red}
+            onClick={onOpenScreens}
+            aria-label="Open de-risk screens hub"
+          >
+            SCREENS
           </LcarsPill>
         </div>
       </div>

@@ -70,9 +70,14 @@ const tabs: LcarsTab[] = [
 export interface PrimitiveGalleryProps {
   /** Called when the "Back to Shell" affordance is invoked. */
   onBack?: () => void;
+  /** Called when the "Screens Hub" affordance is invoked. */
+  onOpenScreens?: () => void;
 }
 
-export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
+export const PrimitiveGallery = ({
+  onBack,
+  onOpenScreens,
+}: PrimitiveGalleryProps = {}) => {
   const { theme, themeName, setTheme } = useTheme();
 
   const [query, setQuery] = useState('');
@@ -117,12 +122,23 @@ export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
           {onBack && (
             <LcarsPill
               size="small"
-              rounded="both"
+              rounded="left"
               color={theme.colors.bluey}
               onClick={onBack}
               aria-label="Return to application shell"
             >
               ← SHELL
+            </LcarsPill>
+          )}
+          {onOpenScreens && (
+            <LcarsPill
+              size="small"
+              rounded="right"
+              color={theme.colors.red}
+              onClick={onOpenScreens}
+              aria-label="Open de-risk screens hub"
+            >
+              SCREENS →
             </LcarsPill>
           )}
           <span className={styles.themeLabel}>Theme</span>
@@ -274,8 +290,12 @@ export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
             trim={false}
             title="STANDARD LAYOUT"
             stardate="STARDATE 79847.2"
-            topRailColor={theme.colors.bluey}
-            bottomRailColor={theme.colors.red}
+            /* Rail color MUST match the panel adjacent to the decorative
+             * curve so the curve blends in seamlessly: top-rail curve
+             * sits below the LAST top panel (NAV, violet); bottom-rail
+             * curve sits above the FIRST bottom panel (POWER, violet). */
+            topRailColor={theme.colors.africanViolet}
+            bottomRailColor={theme.colors.africanViolet}
             cascade={
               <LcarsDataCascade
                 columns={8}
@@ -311,7 +331,12 @@ export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
             }
             topPanels={
               <>
-                <LcarsPanel size={1} number="04" label="OPS" />
+                <LcarsPanel
+                  size={1}
+                  number="04"
+                  label="OPS"
+                  color={theme.colors.bluey}
+                />
                 <LcarsPanel
                   size={8}
                   number="05"
@@ -322,11 +347,13 @@ export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
             }
             bottomPanels={
               <>
+                {/* First panel color matches bottomRailColor so the
+                 * top-left curve of the bottom rail blends with POWER. */}
                 <LcarsPanel
                   size="flex"
                   number="06"
                   label="POWER"
-                  color={theme.colors.butterscotch}
+                  color={theme.colors.africanViolet}
                 />
                 <LcarsPanel
                   size="flex"
@@ -338,7 +365,7 @@ export const PrimitiveGallery = ({ onBack }: PrimitiveGalleryProps = {}) => {
                   size="flex"
                   number="08"
                   label="COMMS"
-                  color={theme.colors.bluey}
+                  color={theme.colors.butterscotch}
                   seamless
                 />
               </>

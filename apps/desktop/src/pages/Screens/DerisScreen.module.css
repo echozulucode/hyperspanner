@@ -1,9 +1,28 @@
 .host {
   position: relative;
-  min-height: 100vh;
+  /* Lock to viewport so LcarsStandardLayout's internal flex column can
+   * size and its main content can scroll independently. */
+  height: 100vh;
   width: 100vw;
   background-color: black;
   color: var(--lcars-color-text, #eae4d6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Host the LcarsStandardLayout's elbow pseudos. The pseudos use
+   * z-index:-1 and propagate up to the nearest ancestor stacking context
+   * to paint at its negative-z layer — which is the ONLY layer that sits
+   * above a stacking context's own background but below its in-flow block
+   * descendants. Without isolation here, the pseudos would escape all the
+   * way to the root SC where every intermediate block bg (including this
+   * host's black) would paint over them and the elbow curves would
+   * disappear. */
+  isolation: isolate;
+}
+
+.host > *:first-child {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .fallback {
