@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { LcarsEmptyState, LcarsPill, LcarsZoneHeader } from '@hyperspanner/lcars-ui';
+import { LcarsEmptyState, LcarsPill } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
 import type { CenterSplit, OpenTool, SplitSide } from '../state';
 import { useWorkspaceStore } from '../state';
@@ -96,19 +96,13 @@ export const CenterZone: FC<CenterZoneProps> = ({
       );
     }
     const ToolBody = descriptor.component;
-    return <ToolBody toolId={tool.id} />;
+    return <ToolBody toolId={tool.id} zone="center" />;
   };
 
   return (
     <section className={styles.zone} aria-label="Center work surface">
-      <LcarsZoneHeader
-        eyebrow="CTR-00"
-        title={
-          activeDescriptor?.name?.toUpperCase() ??
-          (hasTabs ? 'SELECT A TAB' : 'WORK SURFACE')
-        }
-        indicatorColor={hasTabs ? theme.colors.green : undefined}
-      />
+      {/* Zone header removed — the layout's banner + LcarsChip already
+       * surface the active tool; repeating it here was redundant chrome. */}
 
       {split === 'none' ? (
         <>

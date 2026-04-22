@@ -10,6 +10,42 @@
   overflow: auto;
 }
 
+/* Compact form used by the inspector (right) and console (bottom) docks.
+ * Tight padding, small gap, no prose — designed to fit the narrow right
+ * column at its minimum responsive width (220px) without horizontal
+ * scroll, and the short bottom panel (~200px usable height) without
+ * vertical scroll. `overflow: hidden` closes any last residual scroll
+ * seam; if future content truly needs more room, it should move back
+ * to center rather than reintroduce scrollbars here. */
+.bodyCompact {
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  overflow: hidden;
+}
+
+.headerCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.titleCompact {
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: var(--lcars-color-orange, #d88463);
+  margin: 0;
+  /* Truncate rather than wrap — narrow pane can't afford multi-line titles. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actionCompact {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
 .header {
   display: flex;
   align-items: flex-start;

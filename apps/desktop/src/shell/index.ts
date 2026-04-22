@@ -24,3 +24,5 @@ export type { TabActionMenuProps } from './TabActionMenu';
 
 export { useShellShortcuts } from './useZoneState';
 export type { ShortcutZone } from './useZoneState';
+
+export { TopRailStatus, CascadeStatus } from './ToolStatusPanels';

@@ -3,7 +3,7 @@ import { LcarsEmptyState, LcarsPill, LcarsZoneHeader } from '@hyperspanner/lcars
 import { useTheme } from '../contexts/ThemeContext';
 import type { OpenTool } from '../state';
 import { useWorkspaceStore } from '../state';
-import { getTool } from '../tools';
+import { getTool, toolAcceptsZone } from '../tools';
 import { ZoneTabStrip } from './ZoneTabStrip';
 import { PaneDropTarget } from './PaneDropTarget';
 import styles from './BottomZone.module.css';
@@ -75,13 +75,17 @@ export const BottomZone: FC<BottomZoneProps> = ({
         ) : (
           (() => {
             const ToolBody = activeDescriptor.component;
-            return <ToolBody toolId={activeTool.id} />;
+            return <ToolBody toolId={activeTool.id} zone="bottom" />;
           })()
         )}
         <PaneDropTarget
           variant="zone-only"
           label="CONSOLE"
-          onDrop={(_region, toolId) => moveTool(toolId, 'bottom')}
+          onDrop={(_region, toolId) => {
+            if (!toolAcceptsZone(toolId, 'bottom')) return;
+            moveTool(toolId, 'bottom');
+          }}
+          canAccept={(toolId) => toolAcceptsZone(toolId, 'bottom')}
         />
       </div>
     </section>

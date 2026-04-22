@@ -3,7 +3,7 @@ import { LcarsEmptyState, LcarsPill, LcarsZoneHeader } from '@hyperspanner/lcars
 import { useTheme } from '../contexts/ThemeContext';
 import type { OpenTool } from '../state';
 import { useWorkspaceStore } from '../state';
-import { getTool } from '../tools';
+import { getTool, toolAcceptsZone } from '../tools';
 import { ZoneTabStrip } from './ZoneTabStrip';
 import { PaneDropTarget } from './PaneDropTarget';
 import styles from './RightZone.module.css';
@@ -76,13 +76,19 @@ export const RightZone: FC<RightZoneProps> = ({
         ) : (
           (() => {
             const ToolBody = activeDescriptor.component;
-            return <ToolBody toolId={activeTool.id} />;
+            return <ToolBody toolId={activeTool.id} zone="right" />;
           })()
         )}
         <PaneDropTarget
           variant="zone-only"
           label="INSPECTOR"
-          onDrop={(_region, toolId) => moveTool(toolId, 'right')}
+          onDrop={(_region, toolId) => {
+            // moveTool is also called here; guard again in case a stale
+            // drag bypassed the canAccept gate (e.g. no id-carrier MIME).
+            if (!toolAcceptsZone(toolId, 'right')) return;
+            moveTool(toolId, 'right');
+          }}
+          canAccept={(toolId) => toolAcceptsZone(toolId, 'right')}
         />
       </div>
     </aside>

@@ -1,0 +1,67 @@
+/*
+ * ToolStatusPanels — subdued telemetry strips for the layout primitive's
+ * topPanels (rail) and cascade (banner) slots. Styling goals:
+ *   - low visual weight (0.65 opacity, no chip fills) so they sit behind
+ *     the nav pills and active tool content in the reading hierarchy
+ *   - vertical alignment matches the rail's right-anchored rhythm
+ *     (topPanels) and the banner row's right-aligned pill strip
+ *     (cascade)
+ *   - entries collapse gracefully when the viewport narrows — the
+ *     cascade wraps; the rail hides secondary entries at very narrow
+ *     widths so it never bleeds into the rail's curved bottom corner
+ */
+
+.railStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  padding: 0.75rem 0.75rem 0.25rem;
+  opacity: 0.72;
+}
+
+.railEntry {
+  /* A rail entry must fit inside the rail width — the primitive pins
+   * leftFrameTop to `--lcars-spacing-left-frame-width` (240px). A single
+   * telemetry label at size="small" is ~140px; this clamp stops the
+   * label from overflowing if a consumer bumps font-size. */
+  max-width: calc(var(--lcars-spacing-left-frame-width, 240px) - 1.5rem);
+}
+
+/* Narrow viewport — hide anything past the first two entries so the
+ * rail's curved bottom corner still has breathing room. */
+@media (max-width: 950px) {
+  .railStack > *:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+.cascade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem 0.5rem;
+  /* Sits in the bannerRow's cascadeSlot; that slot is flex-none and the
+   * banner row is right-justified, so the cascade grows from the LEFT of
+   * the navigation pills. Right-align the entries so the rightmost entry
+   * touches the nav gap cleanly. */
+  padding: 0.2rem 0.4rem;
+  opacity: 0.72;
+}
+
+.cascadeEntry {
+  /* Telemetry labels are already compact at size="small"; this just
+   * guarantees they don't stretch when the flex container has extra
+   * horizontal space. */
+  flex: 0 0 auto;
+}
+
+/* On narrow viewports, hide the per-zone counters (C/R/B) — they're the
+ * least useful entries and removing them keeps the cascade to a single
+ * line next to the nav pills instead of wrapping onto a second row. */
+@media (max-width: 1100px) {
+  .cascade > *:nth-child(n + 4) {
+    display: none;
+  }
+}

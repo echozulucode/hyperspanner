@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from 'react';
-import type { FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { LcarsPill, LcarsStandardLayout } from '@hyperspanner/lcars-ui';
+import { LcarsChip, LcarsPill, LcarsStandardLayout } from '@hyperspanner/lcars-ui';
 import { LeftNavigator } from './LeftNavigator';
 import { CenterZone } from './CenterZone';
 import { RightZone } from './RightZone';
 import { BottomZone } from './BottomZone';
+import { CascadeStatus, TopRailStatus } from './ToolStatusPanels';
 import { useShellShortcuts } from './useZoneState';
 import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
@@ -168,10 +169,52 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
 
   const activeTitle = activeCenterDescriptor?.name?.toUpperCase();
 
+  // Active-tool marker rendered inline with the banner. Using LcarsChip
+  // (size small, secondary variant) mirrors the "LcarsBanner · LcarsChip"
+  // composition in the primitive gallery. undefined when no center tool
+  // is active, so the primitive skips the titleRow wrapper entirely.
+  const titleChip = activeTitle ? (
+    <LcarsChip size="small" variant="secondary">
+      {activeTitle}
+    </LcarsChip>
+  ) : undefined;
+
+  // Layout-primitive overrides.
+  //   --lcars-layout-top-spacer-min: 10px — compact floor for the spacer
+  //      above the topBar (the default 20px re-inflates the row beyond
+  //      what we want for the rapid-switcher chrome).
+  //   --lcars-layout-top-spacer-flex: 1 (default) — the spacer KEEPS its
+  //      grow so the topBar stays welded to the bottom of the row when
+  //      the rail side happens to be a few pixels taller; we don't want
+  //      a floating bar with empty space beneath it.
+  //   --lcars-layout-top-bar-margin: 0.5rem — keeps a hair of breathing
+  //      space above the topBar without reintroducing the old gap.
+  //   --lcars-layout-nav-gap-x/y: 0.2rem — tight pill cluster; the default
+  //      gaps (0.5rem / 0.65rem) felt too airy for a rapid switcher.
+  //   --lcars-layout-top-rail-radius / panel-padding — the canonical
+  //      160px corner radius with 160px+1.25rem bottom padding made the
+  //      leftFrameTop ~240px tall (curve + TopRailStatus panels), which
+  //      overran the now-compact rightFrameTop and left the segments
+  //      floating mid-row. Shrinking to a 50px curve with 50px+0.75rem
+  //      padding lets the rail match the compact top's height while
+  //      keeping a visible rounded corner; the bar/elbow weld stays
+  //      aligned because the elbow is an independent 60×60 primitive.
+  const layoutStyle: CSSProperties = {
+    '--lcars-layout-top-spacer-min': '10px',
+    '--lcars-layout-top-bar-margin': '0.5rem',
+    '--lcars-layout-nav-gap-x': '0.2rem',
+    '--lcars-layout-nav-gap-y': '0.3rem',
+    '--lcars-layout-top-rail-radius': '0 0 0 50px',
+    '--lcars-layout-top-rail-panel-padding': 'calc(50px + 0.75rem)',
+  } as CSSProperties;
+
   return (
     <LcarsStandardLayout
-      title={activeTitle ? `HYPERSPANNER · ${activeTitle}` : 'HYPERSPANNER'}
+      title="HYPERSPANNER"
+      titleChip={titleChip}
       navigation={navigation}
+      cascade={<CascadeStatus />}
+      topPanels={<TopRailStatus />}
       bottomPanels={
         <LeftNavigator
           activeToolId={centerActive ?? rightActive ?? bottomActive ?? null}
@@ -184,6 +227,7 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
       bottomRailColor={bottomRailColor}
       trim={false}
       className={styles.layoutRoot}
+      style={layoutStyle}
     >
       <div className={workspaceClasses}>
         <div className={styles.center}>

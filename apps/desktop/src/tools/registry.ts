@@ -28,10 +28,42 @@ export interface ToolDescriptor {
   name: string;
   category: ToolCategory;
   description: string;
+  /**
+   * Zone the tool opens into when launched from the navigator / palette.
+   * Must be a member of `supportedZones` (when that's set explicitly).
+   */
   defaultZone: Zone;
-  component: ComponentType<{ toolId: string }>;
+  /**
+   * Zones this tool can be docked into. Controls drag-drop acceptance in
+   * the inspector (right) and console (bottom). Omit to allow all zones
+   * — the permissive default lets small tools dock anywhere. Large tools
+   * that can't fit the inspector's narrow column should set this to
+   * `['center']` (and optionally `'bottom'`) to disallow that dock
+   * target; PaneDropTarget and moveTool both consult this list.
+   */
+  supportedZones?: Zone[];
+  /**
+   * The tool body. Receives the tool id plus the zone it is currently
+   * rendered in so responsive-to-dock layout decisions (compact form in
+   * the narrow inspector, full form in the center) can happen locally
+   * without plumbing extra context through every layer. Tools that don't
+   * care about zone can ignore the prop.
+   */
+  component: ComponentType<{ toolId: string; zone?: Zone }>;
 }
 
+/** All zones. Used as the permissive default for `supportedZones`. */
+export const ALL_ZONES: readonly Zone[] = ['center', 'right', 'bottom'] as const;
+
+/*
+ * `supportedZones` policy (rule of thumb):
+ *   - Side-by-side, two-column, or dense-tabular tools need horizontal
+ *     room and won't fit the inspector's narrow right column — mark them
+ *     as ['center'] and optionally 'bottom' for a wide but short pane.
+ *   - Small form / key-value tools (encoders, hashers, calculators) are
+ *     happy in any zone — omit `supportedZones` so the permissive
+ *     all-zones default kicks in.
+ */
 const entries: ToolDescriptor[] = [
   {
     id: 'text-diff',
@@ -39,6 +71,8 @@ const entries: ToolDescriptor[] = [
     category: 'text',
     description: 'Side-by-side diff with inline change highlighting.',
     defaultZone: 'center',
+    // Two-column diff — needs width; refuse the narrow inspector dock.
+    supportedZones: ['center', 'bottom'],
     component: PlaceholderTool,
   },
   {
@@ -63,6 +97,8 @@ const entries: ToolDescriptor[] = [
     category: 'validation',
     description: 'Parse, pretty-print, and validate JSON against schemas.',
     defaultZone: 'center',
+    // Pretty-printed JSON is tall; inspector column would force wrapping.
+    supportedZones: ['center', 'bottom'],
     component: PlaceholderTool,
   },
   {
@@ -71,6 +107,7 @@ const entries: ToolDescriptor[] = [
     category: 'validation',
     description: 'Parse YAML, surface errors, round-trip to JSON.',
     defaultZone: 'center',
+    supportedZones: ['center', 'bottom'],
     component: PlaceholderTool,
   },
   {
@@ -111,6 +148,9 @@ const entries: ToolDescriptor[] = [
     category: 'binary',
     description: 'Dense hex + ASCII viewer with offset navigation.',
     defaultZone: 'center',
+    // Dense hex rows ARE the format — any column narrower than 16 bytes
+    // of hex + ASCII breaks the layout.
+    supportedZones: ['center'],
     component: PlaceholderTool,
   },
   {
@@ -162,4 +202,19 @@ export function listToolsByCategory(): Record<ToolCategory, ToolDescriptor[]> {
     result[entry.category].push(entry);
   }
   return result;
+}
+
+/** Return the zones this tool accepts docks into. Falls back to ALL_ZONES. */
+export function getSupportedZones(descriptor: ToolDescriptor): readonly Zone[] {
+  return descriptor.supportedZones ?? ALL_ZONES;
+}
+
+/** Can this tool id be docked into `zone`? True for unknown ids (defensive
+ *  — an unknown id is going to fail later via the missing-descriptor path
+ *  anyway, and silently refusing drops on it would be confusing during
+ *  dev when the registry is still in flux). */
+export function toolAcceptsZone(toolId: string, zone: Zone): boolean {
+  const descriptor = byId.get(toolId);
+  if (!descriptor) return true;
+  return getSupportedZones(descriptor).includes(zone);
 }

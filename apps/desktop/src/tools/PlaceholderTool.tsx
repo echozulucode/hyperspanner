@@ -1,11 +1,15 @@
 import type { FC } from 'react';
 import { LcarsChip, LcarsTelemetryLabel } from '@hyperspanner/lcars-ui';
+import type { Zone } from '../state';
 import { useTool } from '../state/useTool';
 import { getTool } from './registry';
 import styles from './PlaceholderTool.module.css';
 
 export interface PlaceholderToolProps {
   toolId: string;
+  /** The zone this instance is rendered in. When 'right' or 'bottom'
+   *  the tool renders a compact form that fits without scrollbars. */
+  zone?: Zone;
 }
 
 interface PlaceholderState {
@@ -24,7 +28,7 @@ interface PlaceholderState {
  *
  * Phase 6 replaces instances of this component with the real tool UIs.
  */
-export const PlaceholderTool: FC<PlaceholderToolProps> = ({ toolId }) => {
+export const PlaceholderTool: FC<PlaceholderToolProps> = ({ toolId, zone }) => {
   const descriptor = getTool(toolId);
   const { state, setState, reset } = useTool<PlaceholderState>(toolId, {
     counter: 0,
@@ -34,6 +38,59 @@ export const PlaceholderTool: FC<PlaceholderToolProps> = ({ toolId }) => {
   const increment = () => {
     setState((prev) => ({ counter: prev.counter + 1, lastEdited: Date.now() }));
   };
+
+  // The inspector's narrow column can't fit the center-pane form's
+  // description, inline chip, medium telemetry pills, and two action
+  // buttons without causing scrollbars. When docked there (or in the
+  // short bottom console), we render a condensed form: compact header,
+  // small-size telemetry, a single bump action, no prose. Same data,
+  // same affordances, fits the pane. Center keeps the full form.
+  const isCompact = zone === 'right' || zone === 'bottom';
+
+  if (isCompact) {
+    return (
+      <div className={`${styles.body} ${styles.bodyCompact}`}>
+        <header className={styles.headerCompact}>
+          <div className={styles.eyebrow}>
+            {(zone ?? 'PANEL').toUpperCase()} · {toolId.toUpperCase()}
+          </div>
+          <h2 className={styles.titleCompact}>{descriptor?.name ?? toolId}</h2>
+        </header>
+
+        <div className={styles.telemetry}>
+          <LcarsTelemetryLabel
+            name="Counter"
+            value={String(state.counter)}
+            size="small"
+          />
+          <LcarsTelemetryLabel
+            name="Edited"
+            value={
+              state.lastEdited ? new Date(state.lastEdited).toLocaleTimeString() : '—'
+            }
+            size="small"
+          />
+        </div>
+
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={`${styles.action} ${styles.actionCompact}`}
+            onClick={increment}
+          >
+            + BUMP
+          </button>
+          <button
+            type="button"
+            className={`${styles.action} ${styles.actionSecondary} ${styles.actionCompact}`}
+            onClick={reset}
+          >
+            RESET
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.body}>

@@ -24,6 +24,15 @@ export interface PaneDropTargetProps {
   onDrop: (region: DropRegion, toolId: string) => void;
   /** Optional label shown on the center hit region (e.g. "INSPECTOR"). */
   label?: string;
+  /**
+   * Optional predicate consulted when a drag starts. If provided and it
+   * returns false for the incoming tool id, this drop target stays
+   * invisible for the duration of the drag — used by the inspector/
+   * console zones to refuse large tools whose `supportedZones` don't
+   * include that zone. Defensive default: if omitted, all tools are
+   * accepted (legacy behavior).
+   */
+  canAccept?: (toolId: string) => boolean;
 }
 
 /**
@@ -40,12 +49,19 @@ export const PaneDropTarget: FC<PaneDropTargetProps> = ({
   variant,
   onDrop,
   label,
+  canAccept,
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [hover, setHover] = useState<DropRegion | null>(null);
   // Ref to avoid listener races when dragend fires after the component
   // unmounts (e.g. during a layout transition).
   const aliveRef = useRef(true);
+  // Latest canAccept — stashed in a ref so the dragstart listener picks
+  // up the current predicate without re-registering on every render. The
+  // predicate is recreated each render in most consumers; without a ref,
+  // useEffect's [] deps would close over a stale copy.
+  const canAcceptRef = useRef(canAccept);
+  canAcceptRef.current = canAccept;
 
   useEffect(() => {
     aliveRef.current = true;
@@ -58,7 +74,29 @@ export const PaneDropTarget: FC<PaneDropTargetProps> = ({
         typeof (types as DOMStringList).contains === 'function'
           ? (types as DOMStringList).contains(TAB_MIME)
           : Array.from(types as unknown as Iterable<string>).includes(TAB_MIME);
-      if (hasMime) setDragActive(true);
+      if (!hasMime) return;
+      // dataTransfer.getData() is NOT available during dragstart in most
+      // browsers — the payload is only readable on drop. We gate the
+      // overlay on whether the drag could POSSIBLY be accepted here by
+      // reading a custom MIME that carries the tool id in its type
+      // suffix: `application/x-hyperspanner-tool;id=<toolId>`. If no
+      // canAccept predicate is installed, everything passes. See the
+      // ZoneTabStrip dragstart payload for the emitter side.
+      const predicate = canAcceptRef.current;
+      if (predicate) {
+        const typeList = Array.from(types as unknown as Iterable<string>);
+        // Look for `application/x-hyperspanner-tool;id=<id>` — the id
+        // after `id=` is the tool id. If absent, fall back to showing
+        // the target (defensive: older drag sources may not supply it).
+        const idCarrier = typeList.find((t) =>
+          t.startsWith(`${TAB_MIME};id=`),
+        );
+        if (idCarrier) {
+          const toolId = idCarrier.slice(`${TAB_MIME};id=`.length);
+          if (!predicate(toolId)) return;
+        }
+      }
+      setDragActive(true);
     };
     const onDragEndOrDrop = () => {
       if (!aliveRef.current) return;

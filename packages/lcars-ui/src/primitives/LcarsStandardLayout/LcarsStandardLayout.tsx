@@ -8,6 +8,15 @@ export interface LcarsStandardLayoutProps {
   title?: ReactNode;
   /** Stardate or sub-title appended after the title. */
   stardate?: string;
+  /**
+   * Optional secondary element rendered inline with the banner on the
+   * right-hand side, baseline-aligned with the banner text. Use this to
+   * surface a compact context marker (e.g. the active tool as an
+   * LcarsChip) without competing with the main title's scale. Matches
+   * the "LcarsBanner · LcarsChip" composition shown in the primitive
+   * gallery.
+   */
+  titleChip?: ReactNode;
 
   /** Stacked LcarsPanel children for the TOP rail (blue by default). */
   topPanels?: ReactNode;
@@ -80,6 +89,7 @@ function syncFirstSegmentColor(
 export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
   title,
   stardate,
+  titleChip,
   topPanels,
   bottomPanels,
   cascade,
@@ -133,7 +143,15 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
           {topPanels}
         </div>
         <div className={styles.rightFrameTop}>
-          {bannerText !== null && <LcarsBanner size="large">{bannerText}</LcarsBanner>}
+          {bannerText !== null &&
+            (titleChip ? (
+              <div className={styles.titleRow}>
+                <LcarsBanner size="large">{bannerText}</LcarsBanner>
+                <div className={styles.titleChip}>{titleChip}</div>
+              </div>
+            ) : (
+              <LcarsBanner size="large">{bannerText}</LcarsBanner>
+            ))}
 
           <div className={styles.bannerRow}>
             {cascade && <div className={styles.cascadeSlot}>{cascade}</div>}

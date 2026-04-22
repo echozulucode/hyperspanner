@@ -144,6 +144,15 @@ const PulsingTab: FC<PulsingTabProps> = ({
   const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer) return;
     event.dataTransfer.setData(TAB_MIME, toolId);
+    // Second payload under a decorated MIME that embeds the tool id in
+    // the TYPE. Browsers only expose the STRING VALUE of `dataTransfer`
+    // on drop (during dragstart/dragenter the value reads as empty), but
+    // the type LIST is visible throughout the drag. PaneDropTarget reads
+    // the id out of the type during dragstart to decide whether to show
+    // itself (supportedZones gating). Without this decoration, drop
+    // targets that refuse this tool's zone would still flash visible
+    // and only silently swallow the drop — confusing UX.
+    event.dataTransfer.setData(`${TAB_MIME};id=${toolId}`, toolId);
     // Text fallback so dropping on non-targets shows something sensible.
     event.dataTransfer.setData('text/plain', label);
     event.dataTransfer.effectAllowed = 'move';
