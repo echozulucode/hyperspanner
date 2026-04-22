@@ -1,56 +1,85 @@
+/*
+ * TopRail — LCARS-24.2 segmented grammar (plan-005 Step 3).
+ *
+ * The rail is a single horizontal flex row whose children are flat-edged
+ * colored segments. The `gap` between them paints the shell's black
+ * background through, giving the characteristic LCARS "seam" between
+ * segments. No child has rounded corners — that's reserved for pills
+ * at the far right end of the rail (LcarsPill's rounded="left"/"right").
+ *
+ * Height matches var(--shell-top-height) so the TopRail fills its grid
+ * slot exactly; the elbow below anchors to the same height (see
+ * AppShell.module.css). Do not change the height independently of the
+ * shell's top-height token — the elbow depends on it being consistent.
+ */
+
 .rail {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: stretch;
-  gap: 0.25rem;
-  height: var(--shell-top-rail-height, 40px);
-  min-height: 40px;
+  /* The 4px seams between segments. Matches --lcars-spacing-bar-border,
+   * the canonical LCARS seam. */
+  gap: var(--lcars-spacing-bar-border, 0.25rem);
+  height: var(--shell-top-height, 48px);
+  min-height: 0;
   background-color: transparent;
 }
 
-.left {
-  display: flex;
-  align-items: stretch;
-  gap: 0.25rem;
-}
-
-.middle {
-  display: flex;
-  align-items: stretch;
-  flex: 1;
-  min-width: 0;
-  gap: 0.25rem;
-}
-
-.right {
-  display: flex;
-  align-items: stretch;
-  gap: 0.25rem;
-}
-
+/*
+ * Brand — the first segment, sized to the nav column's width so its
+ * right edge aligns with the elbow below. Rail-color so the elbow
+ * welds seamlessly (lesson #22).
+ *
+ * `--shell-nav-width` is the same token the grid track uses; the brand
+ * width tracks it automatically. When nav collapses, the brand is
+ * hidden via .collapsed (set by AppShell via a class on .rail).
+ */
 .brandBand {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   padding: 0 1.25rem;
-  background-color: var(--lcars-color-orange);
+  width: var(--shell-nav-width, 240px);
+  flex: 0 0 auto;
+  background-color: var(--shell-rail-top-color, var(--lcars-color-orange));
   color: var(--lcars-color-text-dark, #000);
-  border-top-right-radius: 100vmax;
-  border-bottom-right-radius: 100vmax;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: bold;
   font-size: 0.85rem;
-  min-width: 180px;
-  flex: 0 0 auto;
+  border-radius: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/*
+ * Elbow cap — short rail-color strip that extends past the elbow's
+ * 60px horizontal reach. Gives the quarter-crescent somewhere to land:
+ * the elbow's top-right corner points into this segment, and both
+ * share rail color, so the curve appears to "emerge" out of a
+ * continuous band rather than terminate at a seam.
+ */
+.elbowCap {
+  flex: 0 0 auto;
+  width: calc(var(--shell-elbow-size, 60px) + 0.5rem);
+  background-color: var(--shell-rail-top-color, var(--lcars-color-orange));
+  border-radius: 0;
+}
+
+/*
+ * Active tool band — african-violet by default. Holds TOOL eyebrow +
+ * the active tool title. Flex:1 so it absorbs the available space in
+ * the middle of the rail. Text truncates via ellipsis when the rail
+ * is narrow (matching the old toolTitleBand behavior).
+ */
 .toolTitleBand {
-  flex: 1;
+  flex: 1 1 0%;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 0.5rem;
-  padding: 0 0.9rem;
+  padding: 0 1rem;
   background-color: var(--lcars-color-african-violet);
   color: var(--lcars-color-text-dark, #000);
   letter-spacing: 0.08em;
@@ -58,13 +87,17 @@
   font-weight: bold;
   font-size: 0.85rem;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   border-radius: 0;
 }
 
 .toolTitleEmpty {
+  /*
+   * Dimmed variant when no tool is active — keeps the chrome visually
+   * present (so the rhythm of segments is preserved) but signals "no
+   * content here" via reduced opacity and muted text. LCARS authentic
+   * rails always fill the grid; empty states tint the fill rather
+   * than delete the cell.
+   */
   background-color: rgba(138, 122, 168, 0.35);
   color: var(--lcars-color-text, #eae4d6);
   font-weight: normal;
@@ -76,10 +109,43 @@
   letter-spacing: 0.16em;
   font-weight: bold;
   opacity: 0.6;
+  flex: 0 0 auto;
 }
 
+.toolTitleText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Tail segment — butterscotch half-height block before the pill cluster.
+ * LCARS commonly uses a short half-height segment as a "visual comma"
+ * that separates informational regions from control regions. It's
+ * decorative (aria-hidden).
+ */
+.tailSegment {
+  flex: 0 0 auto;
+  width: 3.5rem;
+  align-self: center;
+  height: 50%;
+  background-color: var(--lcars-color-butterscotch, #f1a55a);
+  border-radius: 0;
+}
+
+/*
+ * Controls — pill cluster at the far right. Pills manage their own
+ * rounded corners (rounded="left" on the first, "right" on the last).
+ * The gap between pills matches the rail's seam gap for rhythm.
+ */
 .controls {
   display: flex;
-  align-items: stretch;
-  gap: 0.25rem;
+  /* Center pills vertically — small LcarsPills are 40px tall, the rail
+   * is --shell-top-height (48px), so pills sit centered with 4px of
+   * dark margin above/below. The bar segments stretch to full rail
+   * height via align-items:stretch on .rail (their default). */
+  align-items: center;
+  gap: var(--lcars-spacing-bar-border, 0.25rem);
+  flex: 0 0 auto;
 }

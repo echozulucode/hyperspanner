@@ -7,6 +7,12 @@
   gap: var(--lcars-spacing-panel-border, 0.25rem);
   background-color: rgba(255, 255, 255, 0.01);
   transition: opacity 180ms ease;
+  /* Minimal LCARS frame — a single rail-color accent on the LEFT edge
+   * (the inward-facing edge adjacent to the center work surface).
+   * Reads as "this panel docks alongside the center" without closing
+   * the frame on all sides (which would compete with the main rail's
+   * bigger rounded shoulder). 3px matches the other zones for rhythm. */
+  border-left: 3px solid var(--shell-zone-right-accent, var(--lcars-color-african-violet));
 }
 
 .zoneCollapsed {

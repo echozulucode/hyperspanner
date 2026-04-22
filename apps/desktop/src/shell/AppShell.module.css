@@ -1,129 +1,56 @@
 /*
- * AppShell grid — five zones in a 3×3 layout.
+ * AppShell — chrome is now supplied by LcarsStandardLayout. This module
+ * only styles the workspace grid that lives inside the layout primitive's
+ * main slot, plus the right/bottom restore affordances.
  *
- *   grid-template-areas:
- *     "top    top    top"
- *     "nav    center right"
- *     "nav    bottom right"
+ * Workspace grid:
+ *   ┌──────────────┬────────┐
+ *   │  center      │ right  │
+ *   ├──────────────┴────────┤
+ *   │  bottom               │
+ *   └───────────────────────┘
  *
- * Collapse is driven by mutating the grid-template-columns/rows via state classes.
+ * Collapse states shrink the right column or bottom row to a narrow stub
+ * so the restore affordance stays visible. The 1fr center cell reclaims
+ * the freed space automatically.
  */
 
-.shell {
+/* The layout primitive's .container is a flex column with .main scrolling
+ * its children. We don't want the primitive's main-padding to squeeze the
+ * workspace grid or its own scroll container to interfere with per-zone
+ * scrolling. Since the primitive doesn't expose the main element directly,
+ * we target it via the primitive's own class from this module.
+ *
+ * The primitive's CSS Modules hash its class names, so we can't target
+ * `.main` from outside. Instead: make the workspace grid fill :
+ * height 100%, and accept the built-in padding as a breathing margin.
+ * The main's overflow-y:auto won't trigger because our grid fits exactly.
+ */
+
+.layoutRoot {
+  /* Reserve a fixed viewport for the whole shell — the primitive's
+   * .container is height:100%, so the root it sits in must define the
+   * height. #root has height:100% too (from global.css), and body has
+   * height:100%, so this cascades up to the viewport naturally. No
+   * additional height work needed here. */
+}
+
+.workspace {
   display: grid;
-  grid-template-columns:
-    var(--shell-nav-width, 264px)
-    1fr
-    var(--shell-right-width, 320px);
-  grid-template-rows:
-    var(--shell-top-height, 48px)
-    1fr
-    var(--shell-bottom-height, 240px);
+  grid-template-columns: 1fr var(--ws-right-width, 320px);
+  grid-template-rows: 1fr var(--ws-bottom-height, 240px);
   grid-template-areas:
-    'top    top    top'
-    'nav    center right'
-    'nav    bottom right';
-  /* Collapsed stub widths — keep the restore affordance visible instead of
-     hiding the track entirely (lesson 12: collapsed panes need a handle). */
-  --shell-nav-closed-width: 44px;
-  --shell-right-closed-width: 40px;
-  --shell-bottom-closed-height: 32px;
-  height: 100vh;
-  width: 100vw;
-  min-height: 0;
-  min-width: 0;
+    'center right'
+    'bottom bottom';
+  --ws-right-closed-width: 40px;
+  --ws-bottom-closed-height: 32px;
   gap: var(--lcars-spacing-panel-border, 0.25rem);
-  padding: var(--lcars-spacing-panel-border, 0.25rem);
-  background-color: black;
-  overflow: hidden;
-}
-
-.top {
-  grid-area: top;
+  /* Fill the layout primitive's main slot exactly — main uses overflow-y:
+   * auto, and we want per-zone scrolling, not shell scrolling. */
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-}
-
-.nav {
-  grid-area: nav;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-  background-color: var(--lcars-color-background, #0a0a0f);
-}
-
-.navRestoreButton {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  background-color: var(--lcars-color-orange);
-  color: black;
-  font-weight: bold;
-  font-size: 1.25rem;
-  letter-spacing: 0.12em;
-  border: none;
-  border-top-right-radius: 128px;
-  border-bottom-right-radius: 128px;
-  cursor: pointer;
-  transition: filter 140ms ease;
-}
-
-.rightRestoreButton {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--lcars-color-african-violet);
-  color: black;
-  font-weight: bold;
-  font-size: 0.7rem;
-  letter-spacing: 0.24em;
-  border: none;
-  border-top-left-radius: 128px;
-  border-bottom-left-radius: 128px;
-  cursor: pointer;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  padding: 0.75rem 0;
-  transition: filter 140ms ease;
-}
-
-.bottomRestoreButton {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  background-color: var(--lcars-color-butterscotch, #f1a55a);
-  color: black;
-  font-weight: bold;
-  font-size: 0.7rem;
-  letter-spacing: 0.24em;
-  border: none;
-  border-top-left-radius: 128px;
-  border-top-right-radius: 128px;
-  cursor: pointer;
-  padding: 0 1.25rem;
-  transition: filter 140ms ease;
-}
-
-.navRestoreButton:hover,
-.rightRestoreButton:hover,
-.bottomRestoreButton:hover {
-  filter: brightness(1.1);
-}
-
-.navRestoreButton:focus-visible,
-.rightRestoreButton:focus-visible,
-.bottomRestoreButton:focus-visible {
-  outline: 2px solid var(--lcars-color-almond-creme, #fff);
-  outline-offset: -2px;
 }
 
 .center {
@@ -150,85 +77,111 @@
   align-items: stretch;
 }
 
-/* Collapsed states — collapse each track to a narrow stub so the restore
- * affordance inside that track remains visible and clickable. The 1fr
- * center track still reclaims the freed space. */
-
-.leftClosed {
-  grid-template-columns:
-    var(--shell-nav-closed-width, 44px)
-    1fr
-    var(--shell-right-width, 320px);
+/* Force each zone section to fill its grid cell along both axes. The
+ * zones set display:flex; flex-direction:column internally but don't
+ * claim flex-grow themselves — so as flex items of the grid-cell
+ * wrappers above, they'd otherwise size to content width. Stretch them
+ * explicitly here and guarantee min-0 so overflow propagates into
+ * per-zone scroll containers instead of overflowing the cell. */
+.center > *,
+.right > *,
+.bottom > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
 }
 
 .rightClosed {
-  grid-template-columns:
-    var(--shell-nav-width, 264px)
-    1fr
-    var(--shell-right-closed-width, 40px);
-}
-
-.leftClosed.rightClosed {
-  grid-template-columns:
-    var(--shell-nav-closed-width, 44px)
-    1fr
-    var(--shell-right-closed-width, 40px);
+  grid-template-columns: 1fr var(--ws-right-closed-width, 40px);
 }
 
 .bottomClosed {
-  grid-template-rows:
-    var(--shell-top-height, 48px)
-    1fr
-    var(--shell-bottom-closed-height, 32px);
+  grid-template-rows: 1fr var(--ws-bottom-closed-height, 32px);
 }
 
-/* Responsive breakpoints — shell compresses at narrower widths. */
+/* Right restore — vertical LCARS pill hugging the right edge. */
+.rightRestoreButton {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--lcars-color-african-violet);
+  color: black;
+  font-weight: bold;
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  border: none;
+  border-top-left-radius: 128px;
+  border-bottom-left-radius: 128px;
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  padding: 0.75rem 0;
+  transition: filter 140ms ease;
+}
+
+/* Bottom restore — horizontal LCARS pill across the bottom edge. */
+.bottomRestoreButton {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background-color: var(--lcars-color-butterscotch, #f1a55a);
+  color: black;
+  font-weight: bold;
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  border: none;
+  border-top-left-radius: 128px;
+  border-top-right-radius: 128px;
+  cursor: pointer;
+  padding: 0 1.25rem;
+  transition: filter 140ms ease;
+}
+
+.rightRestoreButton:hover,
+.bottomRestoreButton:hover {
+  filter: brightness(1.1);
+}
+
+.rightRestoreButton:focus-visible,
+.bottomRestoreButton:focus-visible {
+  outline: 2px solid var(--lcars-color-almond-creme, #fff);
+  outline-offset: -2px;
+}
+
+/* Responsive breakpoints — workspace tightens at narrower widths. */
 
 @media (max-width: 1100px) {
-  .shell {
-    --shell-right-width: 260px;
-    --shell-nav-width: 220px;
+  .workspace {
+    --ws-right-width: 260px;
   }
 }
 
 @media (max-width: 950px) {
-  .shell {
-    --shell-nav-width: 64px;
-    --shell-right-width: 220px;
+  .workspace {
+    --ws-right-width: 220px;
   }
 }
 
 @media (max-width: 750px) {
-  .shell {
+  .workspace {
     grid-template-areas:
-      'top    top'
-      'nav    center'
-      'nav    bottom';
-    grid-template-columns:
-      var(--shell-nav-width, 64px)
-      1fr;
+      'center'
+      'bottom';
+    grid-template-columns: 1fr;
   }
 
-  .shell .right {
+  .workspace .right {
     display: none;
   }
 
-  .shell {
-    grid-template-columns:
-      var(--shell-nav-width, 64px)
-      1fr;
-  }
-
   .rightClosed {
-    grid-template-columns:
-      var(--shell-nav-width, 64px)
-      1fr;
-  }
-
-  .leftClosed.rightClosed,
-  .leftClosed {
-    grid-template-columns:
-      var(--shell-nav-closed-width, 44px)
-      1fr;
+    grid-template-columns: 1fr;
   }
 }

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { FC } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { TopRail } from './TopRail';
+import { LcarsPill, LcarsStandardLayout } from '@hyperspanner/lcars-ui';
 import { LeftNavigator } from './LeftNavigator';
 import { CenterZone } from './CenterZone';
 import { RightZone } from './RightZone';
@@ -9,6 +9,8 @@ import { BottomZone } from './BottomZone';
 import { useShellShortcuts } from './useZoneState';
 import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
+import { useTheme } from '../contexts/ThemeContext';
+import type { ThemeName } from '../themes';
 import styles from './AppShell.module.css';
 
 export interface AppShellProps {
@@ -18,21 +20,29 @@ export interface AppShellProps {
   onOpenScreens?: () => void;
 }
 
+const themeOrder: ThemeName[] = ['picard-modern', 'classic', 'nemesis-blue', 'lower-decks'];
+
 /**
- * AppShell — five-zone grid composition, wired to the workspace store.
+ * AppShell — canonical LCARS two-row chrome.
  *
- * Phase 3 replaced Phase 2's local tab state with the Zustand `useWorkspaceStore`.
- * The store drives:
- *   - which tools are open and in which zones (`open: OpenTool[]`)
- *   - which tab is active per zone (`activeByZone`)
- *   - center split mode (`centerSplit`)
- *   - zone collapse state (`collapsed`)
- *   - active preset (`layoutPreset`)
+ * Switched from the old 3×3 grid to LcarsStandardLayout so the shell
+ * reads as the same "standard layout" grammar used by the de-risk screens:
+ *   - Top row: brand banner + nav pills + segmented top-framing bar,
+ *     welded via the primitive's quarter-circle elbow into a curved
+ *     decorative left rail.
+ *   - Bottom row: segmented bottom-framing bar above the main workspace,
+ *     welded via a mirror elbow into the tall left rail. The rail holds
+ *     the tool navigator (categories as LcarsPanels).
  *
- * Keyboard shortcuts (⌘B / ⌘J / ⌘⇧E) toggle the matching zone via the store.
- * The Left navigator calls `openTool(id)` to open tools in their default zone.
+ * The workspace itself (CenterZone + RightZone + BottomZone) lives inside
+ * the layout's `main` slot as a smaller CSS grid. Right / bottom zones
+ * can still collapse to a stub with a restore affordance; ⌘J and ⌘⇧E
+ * keyboard shortcuts are preserved. ⌘B still fires but has no visual
+ * effect in this iteration (the left rail is always visible).
  */
 export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) => {
+  const { theme, themeName, setTheme } = useTheme();
+
   const collapsed = useWorkspaceStore(useShallow((s) => s.collapsed));
   const centerSplit = useWorkspaceStore((s) => s.centerSplit);
 
@@ -84,96 +94,147 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
     return getTool(centerActive);
   }, [centerActive]);
 
-  const gridClasses = [
-    styles.shell,
-    collapsed.left && styles.leftClosed,
+  const cycleTheme = () => {
+    const idx = themeOrder.indexOf(themeName);
+    const next = themeOrder[(idx + 1) % themeOrder.length];
+    setTheme(next);
+  };
+
+  // Rail color hand-off — the bottom rail's quarter-circle lands on the
+  // FIRST panel in the bottomPanels stack. The LeftNavigator exports
+  // NAV_RAIL_COLOR so both sides stay in sync; see its module.
+  const topRailColor = theme.colors.orange;
+  const bottomRailColor = theme.colors.africanViolet;
+
+  const navigation = (
+    <>
+      <LcarsPill
+        size="small"
+        rounded="left"
+        color={theme.colors.bluey}
+        onClick={() => {
+          /* Phase 5 wires command palette */
+        }}
+        aria-label="Command palette"
+      >
+        ⌘K · PALETTE
+      </LcarsPill>
+      <LcarsPill
+        size="small"
+        rounded="none"
+        color={theme.colors.africanViolet}
+        onClick={cycleTheme}
+        aria-label={`Current theme ${themeName}. Click to cycle.`}
+      >
+        {themeName}
+      </LcarsPill>
+      <LcarsPill
+        size="small"
+        rounded="none"
+        color={theme.colors.butterscotch}
+        onClick={resetLayout}
+        aria-label="Reset layout"
+      >
+        RESET
+      </LcarsPill>
+      <LcarsPill
+        size="small"
+        rounded="none"
+        color={theme.colors.orange}
+        onClick={onOpenGallery}
+        aria-label="Open primitive gallery"
+      >
+        GALLERY
+      </LcarsPill>
+      <LcarsPill
+        size="small"
+        rounded="right"
+        color={theme.colors.red}
+        onClick={onOpenScreens}
+        aria-label="Open de-risk screens hub"
+      >
+        SCREENS
+      </LcarsPill>
+    </>
+  );
+
+  const workspaceClasses = [
+    styles.workspace,
     collapsed.right && styles.rightClosed,
     collapsed.bottom && styles.bottomClosed,
   ]
     .filter(Boolean)
     .join(' ');
 
+  const activeTitle = activeCenterDescriptor?.name?.toUpperCase();
+
   return (
-    <div className={gridClasses}>
-      <div className={styles.top}>
-        <TopRail
-          activeToolTitle={activeCenterDescriptor?.name}
-          onResetLayout={resetLayout}
-          onOpenPalette={() => {
-            /* Phase 5 wires command palette */
-          }}
-          onOpenGallery={onOpenGallery}
-          onOpenScreens={onOpenScreens}
+    <LcarsStandardLayout
+      title={activeTitle ? `HYPERSPANNER · ${activeTitle}` : 'HYPERSPANNER'}
+      navigation={navigation}
+      bottomPanels={
+        <LeftNavigator
+          activeToolId={centerActive ?? rightActive ?? bottomActive ?? null}
+          openToolIds={openToolIds}
+          onOpenTool={handleOpenTool}
+          railColor={bottomRailColor}
         />
-      </div>
-
-      <div className={styles.nav}>
-        {!collapsed.left ? (
-          <LeftNavigator
-            activeToolId={centerActive ?? rightActive ?? bottomActive ?? null}
-            openToolIds={openToolIds}
-            onOpenTool={handleOpenTool}
+      }
+      topRailColor={topRailColor}
+      bottomRailColor={bottomRailColor}
+      trim={false}
+      className={styles.layoutRoot}
+    >
+      <div className={workspaceClasses}>
+        <div className={styles.center}>
+          <CenterZone
+            tools={centerTools}
+            activeTabId={centerActive}
+            split={centerSplit}
+            onOpenSampleTool={handleOpenSample}
           />
-        ) : (
-          <button
-            type="button"
-            className={styles.navRestoreButton}
-            onClick={() => toggleZone('left')}
-            aria-label="Expand navigator (Cmd/Ctrl+B)"
-          >
-            ⟩
-          </button>
-        )}
-      </div>
+        </div>
 
-      <div className={styles.center}>
-        <CenterZone
-          tools={centerTools}
-          activeTabId={centerActive}
-          split={centerSplit}
-          onOpenSampleTool={handleOpenSample}
-        />
-      </div>
+        <div className={styles.right}>
+          {!collapsed.right ? (
+            <RightZone
+              collapsed={false}
+              onToggle={() => toggleZone('right')}
+              tools={rightTools}
+              activeTabId={rightActive}
+            />
+          ) : (
+            <button
+              type="button"
+              className={styles.rightRestoreButton}
+              onClick={() => toggleZone('right')}
+              aria-label="Expand inspector (Cmd/Ctrl+Shift+E)"
+            >
+              INSPECTOR
+            </button>
+          )}
+        </div>
 
-      <div className={styles.right}>
-        {!collapsed.right ? (
-          <RightZone
-            collapsed={false}
-            onToggle={() => toggleZone('right')}
-            tools={rightTools}
-            activeTabId={rightActive}
-          />
-        ) : (
-          <button
-            type="button"
-            className={styles.rightRestoreButton}
-            onClick={() => toggleZone('right')}
-            aria-label="Expand inspector (Cmd/Ctrl+Shift+E)"
-          >
-            INSPECTOR
-          </button>
-        )}
+        <div className={styles.bottom}>
+          {!collapsed.bottom ? (
+            <BottomZone
+              collapsed={false}
+              onToggle={() => toggleZone('bottom')}
+              tools={bottomTools}
+              activeTabId={bottomActive}
+            />
+          ) : (
+            <button
+              type="button"
+              className={styles.bottomRestoreButton}
+              onClick={() => toggleZone('bottom')}
+              aria-label="Expand console (Cmd/Ctrl+J)"
+            >
+              CONSOLE
+            </button>
+          )}
+        </div>
       </div>
-
-      <div className={styles.bottom}>
-        {!collapsed.bottom ? (
-          <BottomZone
-            collapsed={false}
-            onToggle={() => toggleZone('bottom')}
-            tools={bottomTools}
-            activeTabId={bottomActive}
-          />
-        ) : (
-          <button
-            type="button"
-            className={styles.bottomRestoreButton}
-            onClick={() => toggleZone('bottom')}
-            aria-label="Expand console (Cmd/Ctrl+J)"
-          >
-            CONSOLE
-          </button>
-        )}
-      </div>
-    </div>
+    </LcarsStandardLayout>
   );
 };

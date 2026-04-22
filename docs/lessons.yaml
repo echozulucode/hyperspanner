@@ -324,3 +324,128 @@ lessons:
       order children so the first things clipped are things users
       can scroll or resize around, not structural chrome.
     applied: true
+
+  - id: 23
+    date: 2026-04-22
+    source: "session"
+    category: architecture
+    lesson: |
+      When extracting a primitive from an in-place screen, split by
+      interactive leaf vs. wrapping container. LcarsTabCluster is a
+      thin flex wrapper; LcarsTabPill is the interactive leaf with
+      its own `active` state and CSS custom property for color. This
+      mirrors the `<Table>/<Tr>` or `<ul>/<li>` pattern: each primitive
+      stays single-purpose, callers compose the structure, and the
+      wrapper never grows a `tabs: T[]` prop that would fight with
+      per-pill customization. Rule of thumb: if a primitive would
+      otherwise need an `items` array whose entries each have their
+      own handlers and active state, split it into parent + child.
+    applied: true
+
+  - id: 24
+    date: 2026-04-22
+    source: "session"
+    category: architecture
+    lesson: |
+      `ReactNode`-typed slots (like `topPanels?: ReactNode`) in layout
+      primitives don't enforce their expected child shape — you can
+      pass a raw `<div>` and TypeScript stays quiet. But the
+      surrounding geometry (rail color sync, panel-grid layout,
+      curve-to-bar continuation) is designed for a specific child
+      type (LcarsPanel). When this goes wrong the failure mode is
+      visual, not compile-time: a misshapen rectangle appears where
+      the rail meets the bar. Two mitigations worth considering:
+      (a) doc-comment the slot prop with "expected children:
+      `LcarsPanel`", (b) if the constraint is hard, type the prop as
+      `ReactElement<LcarsPanelProps> | Array<ReactElement<LcarsPanelProps>>`
+      so callers get a type error instead of a visual bug. For now,
+      keep it ReactNode for flexibility but review subagent-generated
+      screens specifically for this slot.
+    applied: true
+
+  - id: 25
+    date: 2026-04-22
+    source: "session"
+    category: process
+    lesson: |
+      Parallel subagents can safely edit the same file if you brief
+      them with explicit ownership boundaries. For plan-006 T5/T6,
+      two subagents each added 3 imports + 3 `Component` fields to
+      `registry.ts` — 6 simultaneous edits to one file, zero
+      collisions. The coordination recipe: (1) list exactly which
+      entries each agent owns, (2) tell each agent to use `Edit` with
+      enough unique surrounding context that the old_string only
+      matches its owned entry, (3) explicitly forbid touching the
+      other agent's entries. This works because `Edit` is an
+      exact-text replace, not a structural merge — two edits to the
+      same file with non-overlapping `old_string` matches compose
+      cleanly. Reserve this pattern for when the shared file has
+      naturally parallel regions (like a registry of independent
+      entries); don't try it on files with cross-cutting concerns.
+    applied: true
+
+  - id: 26
+    date: 2026-04-22
+    source: "session"
+    category: process
+    lesson: |
+      De-risk screens should be multi-config pressure tests, not
+      single canonical usages. S5 TabClusterScreen shows 2-tab +
+      3-tab + 5-tab configurations with independent state per
+      cluster; S6 TrajectoryInsetScreen shows 3 different SVG body
+      contents; S7 EventLogScreen shows 3 different severity/density
+      configurations. This surfaces primitive-API ergonomics that a
+      single canonical usage hides — for example, whether
+      `activeTab` handling still reads clean when there's only 2
+      tabs, or whether the event-log grid layout copes with a
+      12-item dense readout next to a 5-item sparse one. The
+      existing canonical S1 (HomeAutomationScreen) remains the
+      reference image; S2–S7 earn their keep by pressure-testing
+      edges the canonical usage doesn't reach.
+    applied: true
+
+  - id: 27
+    date: 2026-04-22
+    source: "session"
+    category: architecture
+    lesson: |
+      When a layout state (collapsed, maximized, breakpoint)
+      affects multiple geometrically-linked consumers, reassign the
+      source-of-truth CSS custom property on the state class rather
+      than overriding each consumer individually. Plan-005 needed
+      the nav rail, the TopRail's brand band, and the shell-level
+      elbow gradient to all shrink in lockstep when nav collapses.
+      Instead of three override rules (`.leftClosed .nav { width:
+      44px } .leftClosed .brandBand { width: 44px } .leftClosed
+      .elbow { left: calc(... + 44px - 1px) }`), a single
+      `.leftClosed { --shell-nav-width: 44px }` propagates to every
+      consumer that reads the var — the grid track, brandBand, and
+      elbow's `left` calc all update automatically. This removes
+      duplication, eliminates "I forgot to update consumer N" bugs
+      when new consumers appear, and reads as a declarative state
+      override at the top of the cascade. The pattern is especially
+      valuable when some consumers are in sibling components that
+      don't even know about the state class.
+    applied: true
+
+  - id: 28
+    date: 2026-04-22
+    source: "session"
+    category: architecture
+    lesson: |
+      Radial-gradient elbows need the gradient center at the OPPOSITE
+      corner of where the transparent crescent should appear. For
+      AppShell's top-left L-frame (TopRail above, Nav to the left),
+      the elbow sits in the content area's top-left corner with the
+      crescent opening toward the bottom-right (into content). That
+      requires `radial-gradient(circle R at bottom right,
+      transparent R-0.5, rail-color R)` — the gradient center at
+      bottom-right produces a colored L hugging the top and left
+      edges (welding to TopRail's bottom and Nav's right) with a
+      transparent quarter-disc at bottom-right. Inverting this
+      (`at top left`) would put the colored L on the wrong edges
+      and the transparent disc pointing AWAY from content, which is
+      the opposite of what a "weld at the inside corner" needs.
+      Reasoning shortcut: point the gradient center at the corner
+      furthest from where you want the colored region to paint.
+    applied: true

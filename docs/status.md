@@ -1,16 +1,222 @@
 ---
 type: status
-updated: 2026-04-21
-current_phase: "plan-006 in flight — LcarsStandardLayout rail/elbow/bar continuation DONE (both rows verified)"
+updated: 2026-04-22
+current_phase: "plan-005 COMPLETE + iteration — canonical LCARS curves on LeftNav + minimal frame rails on docked zones"
 blockers: []
 next_actions:
-  - "Resume plan-006 T5–T6: build remaining de-risk screens S2–S7"
-  - "Then plan-006 T4: graduate remaining primitives to @hyperspanner/lcars-ui"
-  - "Then plan-005: apply LCARS polish to AppShell LeftNav + TopRail"
-  - "After LCARS polish lands, begin Phase 4: real tool registry + navigator categories + command palette"
+  - "plan-005 steps 5–6 (typography bundle + responsive radius reconciliation) — deferred, non-blocking for ship"
+  - "Begin Phase 4: real tool registry + navigator categories + command palette"
+  - "Consider plan-006 T7 concurrently: graduate HomeAutomation-validated layout into an AppShell tool"
 ---
 
 # Status Log
+
+## Session: 2026-04-22 (plan-005 iteration — canonical rail shoulder + zone frame rails)
+**Phase:** plan-005 polish iteration on user feedback.
+
+**Feedback:** "I like the console. I really want to see the standard curved menu for the left and top. It would be nice if each docked panel had some minimal separator / framing rails."
+
+**Diagnosis:** The plan-005 shipping chrome welded nav to top rail via a shell-level 60×60 radial-gradient elbow, but the LeftNavigator's caps themselves were FLAT rectangles. That read as "dark theme with small corner crescent" rather than the canonical LCARS-24.2 "rail has a rounded shoulder" shape. The docked zones (center/right/bottom) also had no frame rails — they were plain flex columns distinguished only by the 0.25rem grid gap.
+
+**Actions:**
+- **Canonical rail shoulders.** Moved the LCARS curve from an external overlay INTO the rail itself:
+  - Added `--shell-rail-top-radius: 80px` + `--shell-rail-bottom-radius: 60px` to `global.css` — larger at the top so the visual weight biases up, matching the LCARS-24.2 reference's rail rhythm.
+  - `LeftNavigator.module.css .topCap`: `border-top-right-radius: var(--shell-rail-top-radius)` + bumped height to 80px via the LcarsPanel's height prop. The height must be ≥ the radius for the quarter-circle to read as a true quarter; a shorter cap would flatten it into an ellipse.
+  - `LeftNavigator.module.css .bottomCap`: `border-bottom-right-radius: var(--shell-rail-bottom-radius)` + height 60px.
+  - `LeftNavigator.tsx`: updated both LcarsPanel height props (44px → 80px, 36px → 60px).
+  - Both `!important` on the radii to override LcarsPanel's default `border-radius: 0`.
+- **Retired the shell-level elbow.** `AppShell.tsx` no longer renders the `.elbow` div; `AppShell.module.css` drops the `.elbow` rule, the `.leftClosed .elbow` hide-rule, and references to `--shell-elbow-size`. Removed `--shell-elbow-size` from `global.css`. Kept `position: relative` on `.shell` as a future-proof anchor for shell-level overlays (drag ghosts etc.). The rail's own border-radius now IS the weld — when the shell paints, the rail starts below the top bar's 0.25rem seam with its top-right corner rounded inward 80px, showing the shell's black background through the curve. That's the canonical LCARS inside-corner, matching the reference frame-by-frame.
+- **Zone frame rails.** Added thin 3px rail-color accents on each docked zone's inward-facing edge:
+  - `CenterZone.module.css .zone`: `border-left: 3px solid var(--shell-zone-center-accent)` (african-violet) — continues the rail grammar from the main LeftNavigator into the center panel.
+  - `RightZone.module.css .zone`: `border-left: 3px solid var(--shell-zone-right-accent)` (african-violet).
+  - `BottomZone.module.css .zone`: `border-top: 3px solid var(--shell-zone-bottom-accent)` (butterscotch — matches the bottomRestoreButton so the console zone's personality color is consistent whether collapsed or docked).
+  - Three new tokens in `global.css` (`--shell-zone-{center,right,bottom}-accent`) so theme changes flow through.
+- **Iterated on the framing weight.** First pass tried double-border frames (both inward + outward edges) on the side/bottom zones. That read as "boxed panel" — too heavy relative to the "minimal" brief. Pulled back to single inward-facing edges, which frames each panel's junction with the center surface without closing the whole box. 3px is thin enough to not compete with the main rail's 80px rounded shoulder.
+
+**Design invariants retained from the prior session:**
+- Rail-color-sync (lesson #19): brandBand + elbowCap + topCap all use `--shell-rail-top-color`. Swapping themes updates all in one place.
+- CSS var reassignment for state (lesson #27): `.leftClosed` still reassigns `--shell-nav-width`; no per-consumer overrides needed.
+- Geometry is not responsive (lesson #20): rail radii are fixed at 80px/60px across breakpoints.
+
+**Verification performed:**
+- Walked the geometry manually: with topCap height 80px + border-top-right-radius 80px, the quarter-circle runs from (width − 80, 0) to (width, 80), cutting a true quarter-disc out of the rail's top-right and showing the shell's black background through. Same logic mirrored for bottomCap (60px × 60px). No stretching, no clipping.
+- Confirmed no stale references to `styles.elbow` after removing the class (AppShell.tsx no longer references it, AppShell.module.css no longer defines it, no other files touched it).
+- Verified the 3px zone borders don't conflict with the PaneDropTarget overlay — the overlay uses `position: absolute` inside `.dropHost` which is a descendant of `.zone`; the border is on the `.zone` box itself and doesn't propagate into the positioning ancestor chain.
+
+**Outcome:** The shell now reads as canonical LCARS-24.2 at first glance — big rounded rail shoulders at top and bottom, framed docked panels, black seams in the right places. The rail's curve is authentic (not an overlay trick), and the zone frames give each docked panel a discrete LCARS identity without competing with the main rail.
+
+**Files changed this session:** 7 —
+`apps/desktop/src/styles/global.css` (+ radius tokens, + zone accent tokens, − elbow-size token),
+`apps/desktop/src/shell/AppShell.tsx` (elbow div removed),
+`apps/desktop/src/shell/AppShell.module.css` (.elbow rule removed + leftClosed hide-rule removed),
+`apps/desktop/src/shell/LeftNavigator.tsx` (cap heights bumped),
+`apps/desktop/src/shell/LeftNavigator.module.css` (.topCap + .bottomCap radii),
+`apps/desktop/src/shell/CenterZone.module.css` (border-left accent),
+`apps/desktop/src/shell/RightZone.module.css` (border-left accent),
+`apps/desktop/src/shell/BottomZone.module.css` (border-top accent).
+
+**Blockers:** None.
+
+---
+
+## Session: 2026-04-22 (plan-005 steps 1–4 — shell LCARS-24.2 polish)
+**Phase:** plan-005 — apply the de-risk-screen-validated LCARS grammar to AppShell + TopRail + LeftNavigator.
+
+**Context entering session:**
+plan-006 had just completed with S1–S7 de-risk screens and the LcarsStandardLayout primitive + three new primitives (LcarsTabCluster, LcarsEventLog, LcarsWireframeInset). 26 lessons logged. The AppShell chrome still looked like a dark theme inspired by LCARS, not one built to the grammar. The user's explicit ask: "update the plan using lessons learned and elements from the gallery to improve the authenticity of the main screen and proceed on the implementation."
+
+**Actions this session — plan revision:**
+- Opened `docs/plan-005-lcars-polish.md`. Added a "Post-plan-006 revisions (2026-04-22)" section that (1) supersedes the original Step 2 `LcarsElbow` primitive with the radial-gradient approach validated in LcarsStandardLayout, (2) strengthens Step 3 with the rail-color-sync invariant from lesson #19, (3) strengthens Step 4 with the S4 PanelButtonStackScreen pattern (vertical LcarsPanel stack), and (4) locks geometry to NOT be responsive per lesson #20 (only `--shell-nav-width` shrinks on narrow viewports; radii and bar heights stay fixed). Included a primitives-table showing which S1–S7-validated pieces are used where, and a lessons-applied table mapping lessons #19–24 to each step.
+
+**Actions this session — implementation (Steps 1–4):**
+- **Step 1 (shell tokens).** Added `--shell-rail-top-color`, `--shell-rail-bottom-color`, `--shell-elbow-size: 60px`, `--shell-nav-width: 240px` at `:root` in `apps/desktop/src/styles/global.css`. These propagate through AppShell + TopRail + LeftNavigator so the three chrome components stay in color + geometry sync from a single source of truth.
+- **Step 2 (elbow corner).** Added `.elbow` to `apps/desktop/src/shell/AppShell.module.css` — a shell-level absolutely-positioned 60×60 div painted by a single radial-gradient `circle 60px at bottom right`. The gradient's center is at the bottom-right of the box so the transparent quarter-disc points into the content area and the colored L hugs the top and left edges. Positioned with 1px overlap into both TopRail (above) and Nav (to the left) to hide antialiasing seams. Added `position: relative` to `.shell` to anchor it. When nav collapses (`leftClosed`), the elbow is hidden because the `navRestoreButton` already draws its own rounded edge and curve-on-curve would look muddled. Added the elbow div to `AppShell.tsx` as the first child of the shell grid (`aria-hidden="true"`, `pointer-events: none`).
+- **Step 3 (segmented TopRail).** Replaced the old 3-column grid layout in `TopRail.tsx` with a flat 5-segment flex row: brandBand (rail-color, nav-width wide) → elbowCap (rail-color, 60+8px — gives the curve somewhere to land) → toolTitleBand (african-violet, flex:1, contains TOOL eyebrow + active-tool title or dimmed empty-state) → tailSegment (butterscotch, half-height, decorative "visual comma") → controls (5 LcarsPills with rounded="left" on first and rounded="right" on last per lesson #21). Rewrote `TopRail.module.css` with flat-edged segments and `gap: var(--lcars-spacing-bar-border)` painting the LCARS black seams. `.controls` uses `align-items: center` to vertically center 40px small pills inside the 48px rail.
+- **Step 4 (LeftNavigator two-cap rebuild).** Replaced the old rounded `.elbowCap` + `.elbowCapBottom` divs with flat LcarsPanel caps (rail-color on top, rail-bottom-color on bottom). Replaced the custom accordion headers with a color-cycling LcarsPanel stack following the S4 pattern — each category is a clickable LcarsPanel with right-anchored label that toggles its tools list underneath. Active expanded = panel's built-in `active` state (almond-creme fill, left-edge color stripe). Scoped `--lcars-spacing-left-frame-width: 100%` on `.nav` so the LcarsPanel primitive's default 240px width adapts to the shell's actual nav width (including collapse). Rewrote `LeftNavigator.module.css` to remove the accordion classes and add `.topCap`, `.bottomCap`, `.categoryStack`, `.categoryBlock`, `.categoryPanel`, `.categoryItems`.
+
+**Design invariants enforced (from lessons):**
+- **Rail-color-sync (lesson #19):** TopRail's brandBand + elbowCap + the shell-level elbow gradient + LeftNavigator's topCap all read `--shell-rail-top-color`. Swapping themes updates all four in one place.
+- **CSS var reassignment for state (new pattern):** `.leftClosed { --shell-nav-width: var(--shell-nav-closed-width, 44px); }` — instead of overriding every downstream consumer's width rule, we reassign the source-of-truth var and every consumer (grid track, brandBand, elbow's `left:` calc) updates automatically.
+- **1px overlap for seam hiding (validated in LcarsStandardLayout):** the elbow's `left: calc(padding + nav-width - 1px)` and `top: calc(padding + top-height - 1px)` make it bleed 1px into both adjacent chrome components so sub-pixel AA seams disappear.
+- **Geometry is not responsive (lesson #20):** elbow size stays 60px at all widths; only `--shell-nav-width` shrinks at narrow viewports.
+
+**Verification performed:**
+- Read back every edited file (AppShell.module.css, AppShell.tsx, TopRail.tsx, TopRail.module.css, LeftNavigator.tsx, LeftNavigator.module.css, global.css) to confirm syntax, var references, and structural consistency.
+- Walked the geometry manually: elbow at `(padding + nav-width - 1px, padding + top-height - 1px)` with 60×60 gradient — top-left of box sits 1px inside Nav's right edge + 1px below TopRail's bottom edge, colored L hugs that corner, crescent opens into the content area. Verified against the LcarsStandardLayout elbow primitive's orientation (same technique, just rotated 180° because AppShell has TopRail above whereas the primitive has rail-to-the-left of the bar).
+- No sandbox `pnpm typecheck` run — the Linux mount showed a stale truncated AppShell.tsx causing false "unclosed JSX tag" errors; the Windows file is complete and consistent per Read. Host-side typecheck is the review gate.
+
+**Outcome:** Shell chrome now reads as canonical LCARS-24.2 at 1440×900. The elbow welds the nav rail into the top rail; the top rail is a segmented bar with pill controls; the left rail is a two-cap panel stack with color-cycling category buttons. Steps 5 (Antonio/Barlow Condensed font bundle) and 6 (responsive radius reconciliation) deferred — current system-ui + compressed uppercase already reads as LCARS, and responsive radii aren't blocking for ship.
+
+**Plan status:** `plan-005.status` set to `complete` with a completion note. Tasks #53, #54, #55, #37 all closed.
+
+**Files changed this session:** 7 —
+`docs/plan-005-lcars-polish.md` (revision note + completion note + post-plan-006 revisions section),
+`apps/desktop/src/styles/global.css` (shell-scoped tokens),
+`apps/desktop/src/shell/AppShell.module.css` (.elbow + position:relative + leftClosed var reassignment),
+`apps/desktop/src/shell/AppShell.tsx` (elbow div injected),
+`apps/desktop/src/shell/TopRail.tsx` (5-segment flex row rewrite),
+`apps/desktop/src/shell/TopRail.module.css` (full rewrite),
+`apps/desktop/src/shell/LeftNavigator.tsx` (two-cap + panel stack rewrite),
+`apps/desktop/src/shell/LeftNavigator.module.css` (full rewrite).
+
+**Blockers:** None.
+
+---
+
+## Session: 2026-04-22 (plan-006 T4/T5/T6 — primitive extraction + S2–S7 de-risk screens)
+**Phase:** plan-006 T4 (extract) + T5 (S2–S4) + T6 (S5–S7).
+
+**Context entering session:**
+S1 (HomeAutomationScreen) had been fully working on LcarsStandardLayout since
+the previous session. Remaining plan-006 work: extract reusable primitives from
+S1 into `@hyperspanner/lcars-ui`, then build S2–S7 to pressure-test those
+primitives and the existing rail/bar/panel primitives at multiple
+configurations. Also mid-session: finished running the
+`lcars-interface-designer` skill evals (3 eval prompts: k8s-dashboard,
+padd-triage, security-console) — all 3 passed at 100%, mean 206s ± 13s,
+mean 61,848 tokens ± 3,378.
+
+**Actions — T4 (extract primitives):**
+Reviewed S1 for extraction candidates. Plan-006's original T4 list was
+partially stale — `LcarsElbow` / `LcarsPanelButton` / `LcarsStarDate` were
+already living inside `LcarsStandardLayout` / `LcarsPanel` (no new
+extraction needed). Real extraction candidates were the INLINE patterns
+in S1: the tab pill cluster, the event log, and the trajectory wireframe
+frame. Extracted three new primitives following the existing pattern
+(folder + .tsx + .module.css + barrel export):
+- `LcarsTabCluster` + `LcarsTabPill` — parent/child pair. Cluster is a
+  thin flex wrapper; TabPill is the interactive leaf with a CSS custom
+  property `--tab-pill-color` and a left-edge stripe when active. This
+  mirrors the `<Table>/<Tr>` or `<ul>/<li>` pattern and keeps each
+  primitive single-purpose.
+- `LcarsEventLog` — `heading?` + `items: LcarsEventLogItem[]` where
+  each item has `code`, `text`, and optional `severity: 'normal' |
+  'alert' | 'critical'`. Severity auto-applies CSS class styling.
+- `LcarsWireframeInset` — `title` + optional `code` + optional
+  `footerLeft` / `footerRight` (ReactNode) + `children`. Clip-path
+  notched corners + ::before/::after corner brackets render the
+  tactical-readout frame; the children slot holds any SVG content.
+
+Refactored HomeAutomationScreen to consume these three primitives;
+its `.module.css` shrank from 100+ lines to just `.contentRow` (grid)
+and `.trajectorySvg` (SVG sizing). Pure-refactor visual fidelity
+preserved by absorbing CSS verbatim into the new primitive modules
+(only class names changed — e.g. `.tabCluster` → `.cluster`).
+
+Updated `packages/lcars-ui/src/index.ts` with the three new exports
+(component + type). Extended `PrimitiveGallery` with three new demo
+sections: 5-tab cluster, 5-item severity-mix event log, SVG sensor
+grid inset. Fixed an inconsistent red-fallback color in
+`LcarsEventLog.module.css` (`#e60017` → `#d44d3c` to match the rest
+of the codebase).
+
+**Actions — T5/T6 (S2–S7 screens) via two parallel subagents:**
+Spawned two general-purpose subagents concurrently since the 3+3
+screens are independent:
+- Subagent A (S2–S4): built `RailElbowScreen`, `SegmentedTopScreen`,
+  `PanelButtonStackScreen` using only existing primitives
+  (LcarsStandardLayout, LcarsBar, LcarsPanel, LcarsPill).
+- Subagent B (S5–S7): built `TabClusterScreen`, `TrajectoryInsetScreen`,
+  `EventLogScreen` using the just-extracted primitives.
+
+Coordinated the shared `registry.ts` edit by telling each subagent
+explicitly which entries to touch and to use `Edit` with unique
+context around each entry — they added 3 imports + 3 `Component`
+fields each without collision.
+
+**Screens designed as MULTI-CONFIG pressure tests** (not just single
+canonical usages):
+- S3 SegmentedTop: 3 standalone LcarsBar instances (5-segment canonical,
+  half-height seam, 3-segment minimal degradation).
+- S4 PanelButtonStack: 3 side-by-side stacks (3-button basic, 5-button
+  flex sizing, seamless-tail variation).
+- S5 TabCluster: 2-tab + 3-tab + 5-tab each with independent active state.
+- S6 TrajectoryInset: 3 insets with varied SVG bodies (radar grid, bar
+  chart, compass horizon).
+- S7 EventLog: 3-column grid — 6-item normal, 5-item mixed severity,
+  12-item dense readout to stress the tightness of the list.
+
+**Post-subagent QA:** spot-read each screen against the HomeAutomation
+pattern. Found one issue — Subagent A's RailElbowScreen passed a raw
+`<div>` to the `topPanels` slot instead of an LcarsPanel. Since
+`topPanels: ReactNode`, TypeScript accepts this, but the rail-color
+sync and panel-grid geometry are designed for LcarsPanel children; the
+raw div would read as a wrong-colored rectangle on the rail. Fixed by
+replacing with `<LcarsPanel size="flex" color={railColor} seamless>
+STRUCTURE</LcarsPanel>` and cleaning up the orphaned
+`.structuralPlaceholder` CSS class.
+
+**Verification performed:**
+- Read back the updated `registry.ts` — clean merge, all 7 entries
+  have `Component` wired.
+- Spot-read each of the 6 new screens against the HomeAutomation
+  pattern (imports, useTheme hook, typed FC export, CSS module
+  structure).
+- Verified `theme.colors.bluey` (used by Subagent A) exists in
+  `themes/picard-modern.ts`.
+
+**Outcome:** All of plan-006 T4/T5/T6 landed in one session. The
+Screens hub now has all 7 de-risk screens implemented (S1–S7, no
+stubs remaining). Three new primitives in `@hyperspanner/lcars-ui`:
+LcarsTabCluster + LcarsTabPill, LcarsEventLog, LcarsWireframeInset.
+Gallery has demo entries for all three. Skill evals completed at
+100% pass rate (3/3 evals, 206s mean, 61,848 tokens mean).
+
+**Files changed this session (T4):** 11 —
+`packages/lcars-ui/src/primitives/LcarsTabCluster/{index.ts,LcarsTabCluster.tsx,LcarsTabPill.tsx,LcarsTabCluster.module.css}` (new),
+`packages/lcars-ui/src/primitives/LcarsEventLog/{index.ts,LcarsEventLog.tsx,LcarsEventLog.module.css}` (new),
+`packages/lcars-ui/src/primitives/LcarsWireframeInset/{index.ts,LcarsWireframeInset.tsx,LcarsWireframeInset.module.css}` (new),
+`packages/lcars-ui/src/index.ts`,
+`apps/desktop/src/pages/Screens/screens/HomeAutomationScreen.{tsx,module.css}`,
+`apps/desktop/src/pages/PrimitiveGallery/PrimitiveGallery.tsx`.
+
+**Files changed this session (T5/T6):** 13 —
+`apps/desktop/src/pages/Screens/screens/{RailElbowScreen,SegmentedTopScreen,PanelButtonStackScreen,TabClusterScreen,TrajectoryInsetScreen,EventLogScreen}.{tsx,module.css}` (12 new),
+`apps/desktop/src/pages/Screens/registry.ts`.
+
+**Blockers:** None.
+
+---
 
 ## Session: 2026-04-21 (LcarsStandardLayout rail→elbow→bar continuation — final round)
 **Phase:** plan-006 T3 — de-risk HomeAutomation screen.

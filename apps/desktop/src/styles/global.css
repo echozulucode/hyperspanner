@@ -24,6 +24,45 @@
   font-display: swap;
 }
 
+/* Shell-scoped tokens — AppShell chrome authenticity (plan-005).
+ *
+ * These live alongside the LCARS primitive tokens so the AppShell can
+ * borrow the LCARS-24.2 rail/elbow/bar grammar without wrapping itself
+ * in the LcarsStandardLayout primitive (whose purpose is single-screen
+ * panel, not multi-zone IDE shell).
+ *
+ * The rail-top/rail-bottom split mirrors the primitive's convention:
+ * the top rail segment (brand band) uses one accent color, and the
+ * matching first bar segment must sync to it — otherwise the curve
+ * hand-off from rail to bar reads as a seam instead of a weld.
+ *
+ * The rail's canonical LCARS "shoulder" (the big rounded corner that
+ * welds the rail into the top bar) lives on the LeftNavigator's top
+ * and bottom caps via border-top-right-radius /
+ * border-bottom-right-radius — see .topCap / .bottomCap in
+ * LeftNavigator.module.css. The old shell-level radial-gradient elbow
+ * is retired; the rail's own curve IS the weld now. */
+:root {
+  --shell-rail-top-color: var(--lcars-color-orange, #ef8977);
+  --shell-rail-bottom-color: var(--lcars-color-bluey, #9fb5d7);
+  --shell-nav-width: 240px;
+  /* LCARS rail shoulder radii — drive border-top-right-radius on the
+   * LeftNavigator's top cap and border-bottom-right-radius on its
+   * bottom cap. 80px / 60px give a canonical proportioned "shoulder"
+   * curve; the top is bigger so the visual weight sits at the top of
+   * the rail, as in the LCARS-24.2 reference. Keep the cap heights
+   * ≥ the radius values so the quarter-circles read as true quarters
+   * (height shorter than radius flattens them into ellipses). */
+  --shell-rail-top-radius: 80px;
+  --shell-rail-bottom-radius: 60px;
+  /* Zone frame accent colors — thin rail-color strips on each docked
+   * zone's interior edge(s) give them a light LCARS-style frame.
+   * Each zone pulls its own accent so theme changes flow through. */
+  --shell-zone-center-accent: var(--lcars-color-african-violet, #8a7aa8);
+  --shell-zone-right-accent: var(--lcars-color-african-violet, #8a7aa8);
+  --shell-zone-bottom-accent: var(--lcars-color-butterscotch, #f1a55a);
+}
+
 /* Reset */
 *,
 *::before,

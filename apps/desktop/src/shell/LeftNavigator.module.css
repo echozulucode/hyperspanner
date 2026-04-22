@@ -1,185 +1,91 @@
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--lcars-spacing-panel-border, 0.25rem);
-  height: 100%;
-  width: var(--shell-nav-width, 264px);
+/*
+ * LeftNavigator — renders inside LcarsStandardLayout's bottomPanels slot.
+ *
+ * The layout primitive's .leftFrame.hasChildren reserves
+ * `calc(160px + 1.25rem)` of top padding for the decorative rail curve,
+ * then stacks children with `justify-content: flex-start` inside a flex
+ * column. Our wrapper claims the remaining vertical space with
+ * `flex: 1 1 auto; min-height: 0; overflow-y: auto` so the panel stack
+ * scrolls when it exceeds the rail height without breaking the curve's
+ * reserved area above.
+ */
+
+.stack {
+  flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
-  position: relative;
-}
-
-.elbowCap {
-  flex: 0 0 auto;
-  height: 64px;
-  background-color: var(--lcars-color-orange);
-  border-bottom-right-radius: 128px;
-}
-
-.elbowCapBottom {
-  flex: 0 0 auto;
-  height: 52px;
-  background-color: var(--lcars-color-orange);
-  border-top-right-radius: 128px;
-  margin-top: auto;
-}
-
-.header {
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.5rem 0.75rem 0.25rem;
-  background-color: transparent;
+  overflow-y: auto;
+  /* No gap — LcarsPanel's own bottom-seam provides the 4px black
+   * separator between stacked panels. A flex gap here would double the
+   * seam and throw off the rhythm. */
+  gap: 0;
 }
 
-.wordmark {
-  font-size: 1.1rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--lcars-color-orange);
-  line-height: 1;
-}
-
-.wordmarkSub {
-  font-size: 0.65rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  opacity: 0.55;
-  color: var(--lcars-color-almond-creme);
-}
-
-.search {
-  padding: 0 0.5rem 0.5rem;
-}
-
-.sectionHeader {
+.categoryBlock {
   display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+/* Override LcarsPanel's primitive defaults so the panel fits the rail's
+ * actual width and the text anchors correctly for a rail button. The
+ * primitive uses the global --lcars-spacing-left-frame-width (240px) for
+ * width — which is the rail's ENTIRE width, fine here because our
+ * wrapper is also 100% of the rail. width:100% + !important pins the
+ * panel to whatever width the parent supplies (so collapsed rails work
+ * without the panel overflowing).
+ */
+.categoryPanel {
+  width: 100% !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  padding: 0 1rem !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.1em !important;
+  flex: 0 0 auto !important;
+}
+
+/* Expanded tools nest directly under their category panel. They share
+ * the category's hue (thinner, same color) so the visual grouping is
+ * unambiguous — a category and its tools read as ONE block. A 4px
+ * black seam still separates each tool panel from its neighbors. */
+.categoryItems {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.toolPanel {
+  width: 100% !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  padding: 0 1rem 0 1.5rem !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.08em !important;
+  flex: 0 0 auto !important;
+  /* Slight opacity so tool panels read as a quieter variation of the
+   * category hue — preserves the visual grouping while signalling
+   * "secondary button". Active state still swaps the fill to
+   * almond-creme via LcarsPanel's own rules, so the opacity doesn't
+   * interfere with the active indicator. */
+  opacity: 0.88;
+}
+
+.toolLabel {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 1rem 0.25rem;
-  font-size: 0.65rem;
-  font-weight: bold;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--lcars-color-african-violet);
-}
-
-.sectionCount {
-  opacity: 0.6;
-  font-variant-numeric: tabular-nums;
-}
-
-.pillList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 0 0.5rem;
+  gap: 0.5rem;
 }
 
 .openDot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-left: 0.5rem;
+  width: 6px;
+  height: 6px;
   border-radius: 100vmax;
   background-color: var(--lcars-color-green, #66a97a);
   box-shadow: 0 0 6px rgba(102, 169, 122, 0.65);
-  flex: 0 0 auto;
-  align-self: center;
-}
-
-.pillListRow {
-  display: flex;
-  align-items: stretch;
-}
-
-.pillListRow button {
-  width: 100%;
-  justify-content: flex-start;
-  text-align: left;
-  padding-left: 1rem;
-}
-
-.accordion {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 0 0.5rem;
-  overflow-y: auto;
-}
-
-.accordionItem {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.accordionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0.75rem;
-  background-color: rgba(138, 122, 168, 0.18);
-  color: var(--lcars-color-text, #eae4d6);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.7rem;
-  font-weight: bold;
-  cursor: pointer;
-  border: none;
-  border-radius: 100vmax 0 0 100vmax;
-  text-align: left;
-  transition: background-color 150ms ease;
-}
-
-.accordionHeader:hover {
-  background-color: rgba(138, 122, 168, 0.32);
-}
-
-.accordionHeader:focus-visible {
-  outline: 2px solid var(--lcars-color-almond-creme, #fff);
-  outline-offset: -2px;
-}
-
-.accordionChevron {
-  transition: transform 200ms ease;
-  font-size: 0.8rem;
-  line-height: 1;
-}
-
-.accordionOpen .accordionChevron {
-  transform: rotate(90deg);
-}
-
-.accordionItems {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding-left: 0.5rem;
-}
-
-.accordionItems button {
-  width: 100%;
-  justify-content: flex-start;
-  padding-left: 1.25rem;
-}
-
-@media (max-width: 950px) {
-  .nav {
-    width: 64px;
-  }
-
-  .header,
-  .sectionHeader,
-  .search {
-    display: none;
-  }
-
-  .pillList button span,
-  .accordionHeader span:not([aria-hidden]),
-  .accordionItems button span {
-    display: none;
-  }
 }

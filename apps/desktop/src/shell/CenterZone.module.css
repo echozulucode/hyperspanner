@@ -5,6 +5,13 @@
   min-width: 0;
   background-color: transparent;
   gap: var(--lcars-spacing-panel-border, 0.25rem);
+  /* Minimal LCARS frame — a 3px rail-color accent runs down the LEFT
+   * edge of the center zone, continuing the rail grammar from the main
+   * LeftNavigator into this panel. It's thin enough to read as a
+   * "frame edge" rather than another rail, and it lives at zone
+   * level (not content level) so it extends through the tab strip,
+   * header, and content together — framing the whole panel. */
+  border-left: 3px solid var(--shell-zone-center-accent, var(--lcars-color-african-violet));
 }
 
 .content {

@@ -7,6 +7,14 @@
   gap: var(--lcars-spacing-panel-border, 0.25rem);
   background-color: rgba(255, 255, 255, 0.01);
   transition: opacity 180ms ease;
+  /* Minimal LCARS frame — a single butterscotch accent on the TOP
+   * edge (the inward-facing edge adjacent to the center work surface).
+   * Butterscotch is the bottom-zone personality color (matches the
+   * bottomRestoreButton when collapsed), so the frame ties the two
+   * states together visually: whether docked or collapsed, the console
+   * zone reads as butterscotch-bordered at its top edge. 3px matches
+   * the other zones for rhythm. */
+  border-top: 3px solid var(--shell-zone-bottom-accent, var(--lcars-color-butterscotch));
 }
 
 .zoneCollapsed {

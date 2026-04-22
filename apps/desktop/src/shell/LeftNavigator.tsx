@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { FC } from 'react';
-import { LcarsPill, LcarsSearchField } from '@hyperspanner/lcars-ui';
+import { LcarsPanel } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { listToolsByCategory, type ToolCategory, type ToolDescriptor } from '../tools';
 import styles from './LeftNavigator.module.css';
@@ -10,9 +10,14 @@ export interface LeftNavigatorProps {
   activeToolId?: string | null;
   /** Ids of every open tool — shown with an "open" indicator in the tree. */
   openToolIds?: ReadonlySet<string>;
-  /** Pinned favorite tool ids. Defaults to a small built-in set for Phase 3. */
-  favoriteIds?: readonly string[];
   onOpenTool?: (toolId: string) => void;
+  /**
+   * The rail's own color — the LcarsStandardLayout's leftFrame background
+   * color. We use this for the FIRST category panel so the visual
+   * transition from the decorative rail curve area into the panel stack
+   * is a color continuation rather than a hard seam.
+   */
+  railColor?: string;
 }
 
 interface NavCategory {
@@ -30,20 +35,29 @@ const CATEGORY_LABELS: Record<ToolCategory, string> = {
   utilities: 'Utilities',
 };
 
-const DEFAULT_FAVORITES: readonly string[] = ['json-validator', 'hash-workbench'];
-
+/**
+ * LeftNavigator — tool navigator rendered as a stack of LCARS rail panels.
+ *
+ * Lives inside LcarsStandardLayout's `bottomPanels` slot. Each category
+ * is a clickable LcarsPanel; clicking expands it in place to reveal its
+ * tools (also as thinner LcarsPanels). The whole stack scrolls
+ * independently when it overflows the rail.
+ *
+ * We drop the old search + favorites header because those primitives
+ * (LcarsSearchField + LcarsPill cluster) don't compose cleanly inside
+ * the rail's right-anchored panel grammar. Re-adding them belongs in
+ * the layout primitive's navigation slot up top, or as a future
+ * dedicated search overlay. For now: categories-only is a clean,
+ * canonical rail.
+ */
 export const LeftNavigator: FC<LeftNavigatorProps> = ({
   activeToolId,
   openToolIds,
-  favoriteIds = DEFAULT_FAVORITES,
   onOpenTool,
+  railColor,
 }) => {
   const { theme } = useTheme();
-  const [query, setQuery] = useState('');
-  // Categories start fully collapsed; an active filter query auto-expands matches.
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const byCategory = useMemo(() => listToolsByCategory(), []);
 
@@ -60,127 +74,69 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({
   );
 
   const toggleCategory = (id: string) => {
-    setOpenCategories((prev) => ({ ...prev, [id]: !prev[id] }));
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
-
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return categories;
-    return categories
-      .map((cat) => ({
-        ...cat,
-        tools: cat.tools.filter(
-          (t) =>
-            t.name.toLowerCase().includes(needle) ||
-            t.id.toLowerCase().includes(needle) ||
-            t.description.toLowerCase().includes(needle),
-        ),
-      }))
-      .filter((cat) => cat.tools.length > 0);
-  }, [query, categories]);
-
-  const favorites = useMemo(() => {
-    return favoriteIds
-      .map((id) => Object.values(byCategory).flat().find((t) => t.id === id))
-      .filter((t): t is ToolDescriptor => Boolean(t));
-  }, [favoriteIds, byCategory]);
 
   const isOpen = (id: string) => openToolIds?.has(id) ?? false;
 
+  // Palette cycles through canonical LCARS hues so the category stack
+  // reads as a "varied segmented bar" (S4 pattern). The FIRST color is
+  // railColor so the handoff from the decorative rail curve (which is
+  // painted in railColor by the layout primitive) into the first panel
+  // is a color continuation, not a seam.
+  const palette = [
+    railColor ?? theme.colors.africanViolet,
+    theme.colors.butterscotch,
+    theme.colors.bluey,
+    theme.colors.orange,
+    theme.colors.lilac ?? theme.colors.africanViolet,
+    theme.colors.peach ?? theme.colors.butterscotch,
+  ];
+
   return (
-    <nav className={styles.nav} aria-label="Tool navigator">
-      <div className={styles.elbowCap} aria-hidden="true" />
-
-      <div className={styles.header}>
-        <span className={styles.wordmark}>Hyperspanner</span>
-        <span className={styles.wordmarkSub}>Starfleet Ops · v0.0</span>
-      </div>
-
-      <div className={styles.search}>
-        <LcarsSearchField
-          value={query}
-          onChange={setQuery}
-          prefix="FIND"
-          placeholder="Filter tools…"
-          aria-label="Filter tools"
-        />
-      </div>
-
-      <div className={styles.sectionHeader}>
-        <span>Favorites</span>
-        <span className={styles.sectionCount}>{favorites.length}</span>
-      </div>
-      <div className={styles.pillList}>
-        {favorites.map((tool) => (
-          <div key={tool.id} className={styles.pillListRow}>
-            <LcarsPill
-              size="small"
-              rounded="both"
-              color={theme.colors.butterscotch}
-              active={tool.id === activeToolId}
-              onClick={() => onOpenTool?.(tool.id)}
-              aria-label={tool.name}
+    <div className={styles.stack} role="navigation" aria-label="Tool navigator">
+      {categories.map((cat, index) => {
+        const isExpanded = Boolean(expanded[cat.id]);
+        const panelColor = palette[index % palette.length];
+        return (
+          <div key={cat.id} className={styles.categoryBlock}>
+            <LcarsPanel
+              color={panelColor}
+              height="2.75rem"
+              active={isExpanded}
+              onClick={() => toggleCategory(cat.id)}
+              className={styles.categoryPanel}
             >
-              <span>{tool.name}</span>
-              {isOpen(tool.id) && (
-                <span className={styles.openDot} aria-hidden="true" />
-              )}
-            </LcarsPill>
-          </div>
-        ))}
-      </div>
-
-      <div className={styles.sectionHeader}>
-        <span>Categories</span>
-        <span className={styles.sectionCount}>{filtered.length}</span>
-      </div>
-      <div className={styles.accordion}>
-        {filtered.map((cat) => {
-          const expanded = openCategories[cat.id] ?? Boolean(query);
-          return (
-            <div
-              key={cat.id}
-              className={`${styles.accordionItem} ${expanded ? styles.accordionOpen : ''}`}
-            >
-              <button
-                type="button"
-                className={styles.accordionHeader}
-                aria-expanded={expanded}
-                aria-controls={`nav-cat-${cat.id}`}
-                onClick={() => toggleCategory(cat.id)}
+              {cat.label}
+            </LcarsPanel>
+            {isExpanded && (
+              <div
+                className={styles.categoryItems}
+                role="group"
+                aria-label={cat.label}
               >
-                <span>{cat.label}</span>
-                <span className={styles.accordionChevron} aria-hidden="true">
-                  ›
-                </span>
-              </button>
-              {expanded && (
-                <div id={`nav-cat-${cat.id}`} className={styles.accordionItems}>
-                  {cat.tools.map((tool) => (
-                    <div key={tool.id} className={styles.pillListRow}>
-                      <LcarsPill
-                        size="small"
-                        rounded="both"
-                        color={theme.colors.africanViolet}
-                        active={tool.id === activeToolId}
-                        onClick={() => onOpenTool?.(tool.id)}
-                        aria-label={tool.name}
-                      >
-                        <span>{tool.name}</span>
-                        {isOpen(tool.id) && (
-                          <span className={styles.openDot} aria-hidden="true" />
-                        )}
-                      </LcarsPill>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className={styles.elbowCapBottom} aria-hidden="true" />
-    </nav>
+                {cat.tools.map((tool) => (
+                  <LcarsPanel
+                    key={tool.id}
+                    color={panelColor}
+                    height="2rem"
+                    active={tool.id === activeToolId}
+                    onClick={() => onOpenTool?.(tool.id)}
+                    className={styles.toolPanel}
+                  >
+                    <span className={styles.toolLabel}>
+                      {tool.name}
+                      {isOpen(tool.id) && (
+                        <span className={styles.openDot} aria-hidden="true" />
+                      )}
+                    </span>
+                  </LcarsPanel>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 };
