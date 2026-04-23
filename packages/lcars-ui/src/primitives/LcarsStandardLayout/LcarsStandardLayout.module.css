@@ -241,14 +241,27 @@
    *     hairline gap between the crescent and the bar. */
   bottom: 0;
   width: 60px;
-  /* Total height = disc depth (47px) + bar-height extension. The 47px
+  /* Total height = disc depth (41px) + bar-height extension. The 41px
    * figure is empirical: the disc's horizontal-tangent point inside the
    * 60px-radius gradient must land exactly on the bar's top edge, and
-   * the flex column above the bar places that edge ~47px above the
+   * the flex column above the bar places that edge ~41px above the
    * container's bottom (not `bar_height` above, as naive math predicts).
-   * Shrinking the disc box from 60→47 pulls the tangent down to meet
+   * Shrinking the disc box from 60→41 pulls the tangent down to meet
    * the bar's actual top; the bar-height extension below the tangent
-   * still blankets the first segment so no subpixel gap can open up. */
+   * still blankets the first segment so no subpixel gap can open up.
+   *
+   * Note on the tuning: the disc depth is coupled to the consumer's
+   * chosen --lcars-layout-top-row-height, because the bar's top edge
+   * sits at `row_height - bar_height - topBarSlot_margin - extras` from
+   * the container bottom. Earlier the disc was 47px when AppShell pinned
+   * the row at 185px; dropping the row to 170px pulled the bar's top
+   * edge up ~6px, so the disc was shortened to 41px to keep the tangent
+   * on the bar. If a consumer retargets the top-row-height, this value
+   * likely needs a companion tweak. A future refactor could expose it
+   * as its own CSS var (--lcars-layout-top-elbow-disc-depth) so
+   * consumers can adjust without a primitive-level edit — we haven't
+   * done that yet because DerisScreen / PrimitiveGallery haven't asked
+   * for it. See lesson #45. */
   height: calc(41px + var(--lcars-spacing-bar-height, 28px));
   background: radial-gradient(
     circle 60px at top right,

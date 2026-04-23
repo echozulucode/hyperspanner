@@ -867,3 +867,44 @@ lessons:
       disappear threshold beats three graceful shrink thresholds
       for chrome stability.
     applied: true
+
+  - id: 45
+    date: 2026-04-23
+    source: "session"
+    category: architecture
+    lesson: |
+      The LcarsStandardLayout elbowTop disc depth is coupled to the
+      consumer's chosen --lcars-layout-top-row-height. The elbow is
+      absolutely positioned `bottom: 0` inside `.rightFrameTop` and
+      has height = `calc(discDepth + bar_height)`, where discDepth is
+      the primitive's empirical tuning constant (how far up from the
+      container bottom the disc's horizontal tangent lands). When the
+      row height was 185px, discDepth was 47px and the tangent landed
+      cleanly on the bar's top edge. When AppShell dropped the row to
+      170px on 2026-04-23, the bar's top edge shifted ~6px up (its
+      distance from container bottom shrank by the same amount the
+      row did, since the topBarSlot + elbow geometry below it are
+      fixed), so discDepth had to drop to 41px to keep the tangent
+      on the bar. Symptom if it's wrong: a hairline gap between the
+      elbow's curve and the bar's first segment, or the elbow
+      overshooting the bar and painting rail color into the spacer
+      above it.
+
+      Practical rule: if you retune `--lcars-layout-top-row-height`,
+      re-eyeball the elbow tangent and adjust discDepth by roughly
+      the same delta (shrinking the row by N px means shrinking the
+      disc by ≈N px). A future refactor could expose the depth as
+      `--lcars-layout-top-elbow-disc-depth` so consumers can tune
+      without editing the primitive CSS; we've deferred that until a
+      second consumer (DerisScreen or PrimitiveGallery) actually
+      wants a different row height. For now, leave a breadcrumb
+      comment on the `.elbowTop` rule pointing at the coupling so the
+      next reader doesn't treat 41px as magic.
+
+      Meta: this is another instance of the "stable chrome is a
+      multi-layer property" theme from #42 and #43, but inverted — when
+      we DO intentionally change one layer (row height), we have to
+      cascade the tuning through the layers that depend on it
+      (elbow geometry). Pinning a value stable doesn't prevent it
+      from being a load-bearing constant for other components.
+    applied: true

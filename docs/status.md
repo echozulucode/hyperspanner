@@ -92,6 +92,25 @@ content required (48 banner + 12 pad + 48 bannerRow + 10 spacer + 36 topBarSlot)
 is now visibly shorter than bottom again. Added an inline comment in AppShell.tsx so
 the next reader doesn't drift the value back up.
 
+**Sixth round (user-driven elbow re-tune):** After the 170px top-row change, the
+elbowTop's curve no longer lined up with the bar it welds to — the empirical disc
+depth (47px) was calibrated for the old 185px row, and dropping the row 15px shifted
+the bar's top edge ~6px higher from the container bottom. User tuned the elbow by
+hand: `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css`
+`.elbowTop` height changed from `calc(47px + bar-height)` to `calc(41px + bar-height)`.
+Tangent now lands cleanly on the bar again.
+
+I wrapped the new value with a rationale comment that calls out the coupling
+between row-height and disc-depth (shrinking one by N px means shrinking the other by
+≈N px) and flagged the future-refactor option of exposing the depth as its own CSS
+var so consumers can tune it without touching the primitive. Appended lesson #45 with
+the same pattern.
+
+Net outcome of the day's arc: top row pinned at 170px, banner pinned at 3rem, rail
+width pinned at 240px across desktop widths, cascade drops twice then vanishes at
+≤1100px, elbow disc re-tuned to 41px, secondary title removed. Top chrome is visibly
+stable across resize and tool-selection, and is shorter than the bottom as intended.
+
 ---
 
 ## Session: 2026-04-23 (late — top-row jitter correction + secondary title removal)
