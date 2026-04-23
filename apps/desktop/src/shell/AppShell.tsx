@@ -217,12 +217,42 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
   // Layout-primitive overrides. See previous commit history for full
   // rationale; keeping the summary short here so the render tree below
   // is easier to scan.
+  //
+  // `--lcars-font-size-banner` pins the banner font size so the top
+  // chrome stays visually stable across window sizes. The primitive's
+  // default is `clamp(1.25rem, 0.75rem + 4vw, 4rem)` — a viewport-
+  // responsive size that causes the banner to grow/shrink by a few
+  // pixels as the window is maximized vs restored, which reads as
+  // "top segment height changes on resize" even though the 185px row
+  // itself never moves.
+  //
+  // We pin to 3rem (48px at html:1rem) rather than 4rem for one sharp
+  // reason: apps/desktop/src/styles/global.css sets `html { font-size:
+  // 1.2rem }` at ≤1300px viewports, so 4rem actually evaluates to
+  // ~76.8px there — not 64px — and the taller banner blows the top
+  // row's 185px budget, clipping the bottom topBar segment entirely
+  // (exactly the symptom reported on 2026-04-23). 3rem gives us 48px
+  // at normal widths and 57.6px at the 1.2rem-html widths, both of
+  // which fit comfortably above the ~48px bannerRow + 10px spacer +
+  // 36px topBarSlot budget. The banner still looks generous; it just
+  // doesn't lord over the chrome. See lesson #43.
   const layoutStyle: CSSProperties = {
     '--lcars-layout-top-spacer-min': '10px',
     '--lcars-layout-top-bar-margin': '0.5rem',
     '--lcars-layout-nav-gap-x': '0.2rem',
     '--lcars-layout-nav-gap-y': '0.3rem',
-    '--lcars-layout-top-row-height': 'calc(160px + 25px)',
+    // Top-row height: 170px. Sits just 10px above the rail's 160px
+    // corner radius — the minimum clearance that keeps the curve intact
+    // while keeping the top rail visually SHORTER than the bottom rail
+    // (which is always ≥180px because of its hasChildren padding).
+    // Earlier iterations used 185px, but that made the top and bottom
+    // rails look equal-height, contradicting the compact-top design
+    // intent. Content fit: banner(48) + pad(12) + bannerRow(48) +
+    // spacer-min(10) + topBarSlot(36) ≈ 154px, leaving ~16px of
+    // breathing room inside the 170px pin — enough for subpixel
+    // rounding without blowing the row.
+    '--lcars-layout-top-row-height': '170px',
+    '--lcars-font-size-banner': '3rem',
   } as CSSProperties;
 
   return (

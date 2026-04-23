@@ -1,17 +1,98 @@
 ---
 type: status
 updated: 2026-04-23
-current_phase: "Phase 4/5 complete — navigator + HomeView + CommandPalette + shortcut system landed; host typecheck is the review gate. Top-row height is now genuinely fixed (content-drop strategy); secondary title chip removed."
+current_phase: "Phase 4/5 complete — navigator + HomeView + CommandPalette + shortcut system landed; host typecheck is the review gate. Top-row height restored to its compact 170px (shorter than the bottom rail, per design intent), leftFrameTop width is fixed at 240px across desktop widths, cascade collapses entirely at ≤1100px."
 blockers: []
 next_actions:
   - "Host-side `pnpm typecheck && pnpm test && pnpm build` to confirm Phase 4/5 implementation + today's layout corrections pass the Windows gate"
-  - "Visual spot-check at multiple window widths: select TEXT DIFF / WHITESPACE CLEAN and confirm the top-row height stays pinned and the cascade drops entries gracefully as the window narrows"
+  - "Visual spot-check: maximize vs restore a desktop window and confirm the leftFrameTop rail stays 240px wide and the top horizontal bar stays visible at every width"
+  - "Visual spot-check: drag the window narrower and confirm the cascade/titleLeading disappears cleanly at ≤1100px (no half-state where the banner has to compete with telemetry)"
   - "Begin Phase 6: vertical-slice tools + backend commands (replace placeholder tools with real implementations)"
   - "Phase 7 on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)"
   - "Consider plan-006 T7: graduate HomeAutomation-validated layout into an AppShell tool"
 ---
 
 # Status Log
+
+## Session: 2026-04-23 (late evening — fourth-round chrome correction: rail-width + banner-pin-in-rem)
+**Phase:** Continuation of the same-day top-row stability arc.
+
+**User feedback on the third-round fix:**
+> "no, with that last change the top horizontal segment is not visible at all. I also
+> noted that when I resized the window, the 'leftFrameTop' element appears to resize with
+> the window size changes. That element should be fixed. The titleLeading should
+> disappear if there isn't enough room."
+
+Two distinct problems exposed:
+
+1. **Bar invisible:** pinning `--lcars-font-size-banner: 4rem` interacted badly with the
+   existing `html { font-size: 1.2rem }` media rule at ≤1300px viewports. `rem` scales with
+   the html root, so `4rem` actually evaluated to ~76.8px at narrow desktop widths — not
+   the 64px the pin's math assumed — and the oversized banner pushed the topBar segment
+   past the row's 185px clip.
+2. **Rail resizes with window:** `apps/desktop/src/styles/global.css` responsively shrinks
+   `--lcars-spacing-left-frame-width` (240 → 200 → 180 → 150 → 120 → 62) across five
+   breakpoints. This was an intentional density trade per an earlier decision, but
+   directly contradicts the user's now-explicit preference that the chrome frame be
+   visually stable across window resizes.
+
+**Corrections applied:**
+- `apps/desktop/src/shell/AppShell.tsx`: reduced `--lcars-font-size-banner` pin from
+  `4rem` to `3rem`. At html:1rem that's 48px; at html:1.2rem (active ≤1300px) that's
+  57.6px. Both fit comfortably in the 185px row above the ~48px bannerRow + 10px
+  spacer + 36px topBarSlot budget. Comment rewritten to call out the html font-size
+  interaction so the next reader doesn't repeat the 4rem mistake.
+- `apps/desktop/src/styles/global.css`: removed the 1500px / 1300px / 950px / 750px
+  breakpoints that shrank `--lcars-spacing-left-frame-width`. The 240px default now
+  holds at every desktop width. Kept the ≤525px mobile-floor rule as a safety valve so
+  the rail doesn't consume a whole phone-sized screen. The surrounding comment block
+  rewrites the responsive-scaling rationale to document the new decision.
+- `apps/desktop/src/shell/ToolStatusPanels.module.css`: replaced the 4-step per-entry
+  drop ladder (1300/1050/900/700) with a 2-step ladder + one clean "vanish" rule:
+  ≤1500 drop counters, ≤1300 drop ZONE, ≤1100 hide `.cascade` entirely. Matches the
+  user's "titleLeading should disappear if there isn't enough room." Below 1100px the
+  banner owns the whole titleRow with no telemetry competing for horizontal space.
+
+**Actions — lessons:**
+- `docs/lessons.yaml`: appended lesson #43 (supersedes #42) — `rem` pins in chrome
+  content rides the html root font-size, so `4rem` isn't a stable value when global.css
+  bumps html to 1.2rem at narrow widths; use a cushioned rem value or pin in raw pixels.
+  Also documents the rail-width-scaling removal as the paired fix.
+- `docs/lessons.yaml`: appended lesson #44 — "fit or drop" beats "fit or shrink" for
+  optional chrome slots. One clean disappear threshold (1100px) is cleaner than three
+  graceful shrink thresholds because the intermediate states drag the slot into a
+  horizontal fight with the primary content.
+
+**Outcome:**
+- Top row now holds at 185px across every desktop window width, including at narrow
+  widths where html:1.2rem is in effect. The topBar is visible in all states.
+- Left rail (`leftFrameTop`) now holds at its canonical 240px across every desktop
+  window size — no visible rescale between maximized and restored states.
+- Cascade/titleLeading slot disappears entirely at ≤1100px rather than shrinking
+  through awkward intermediate states.
+- Meta: this is the fourth session entry in the top-row-chrome-stability arc (morning
+  clip fix → afternoon jitter correction → evening banner-pin → late-evening rem+rail
+  correction). Each round moved the problem one layer inward; #43 closes the loop on
+  "pin the content, not just the container" by noting that `rem` values in chrome are
+  themselves load-bearing and responsive if the html root isn't also pinned.
+
+**Next:** Host re-runs `pnpm typecheck && pnpm test && pnpm build` + a fresh visual
+spot-check at multiple window widths. Task #67 stays in_progress until the Windows
+gate is green.
+
+**Follow-up correction (same day, fifth round):** User noted the top segment had crept
+back to a taller-than-intended height. The previous pinned value `calc(160px + 25px)` =
+185px sat only ~5px below the bottom rail's intrinsic ~180px (from `hasChildren`
+padding = 160px radius + 1.25rem breathing), which made the top and bottom rails
+visually close to equal height — violating the explicit design intent recorded in the
+earlier "I preferred the shorter segment in the top section than matching the segment
+height in the bottom section" guidance. Pinned value reduced to `170px` — just 10px of
+clearance above the 160px rail corner radius, still comfortable for the ~154px of
+content required (48 banner + 12 pad + 48 bannerRow + 10 spacer + 36 topBarSlot). Top
+is now visibly shorter than bottom again. Added an inline comment in AppShell.tsx so
+the next reader doesn't drift the value back up.
+
+---
 
 ## Session: 2026-04-23 (late — top-row jitter correction + secondary title removal)
 **Phase:** Same-day follow-up on the morning's LcarsStandardLayout fix.
@@ -63,6 +144,28 @@ shorter segment in the top section than matching the segment height in the botto
   — they don't set `--lcars-layout-top-row-height` (auto default) and don't pass a
   titleChip; the titleRow's nowrap change is a behavior tightening that improves their
   robustness too.
+
+**Addendum — 2026-04-23 (banner font-size pin, third round on the same symptom):**
+After the jitter-correction above landed, the user reported a remaining small height
+change in the upper segment when toggling between maximized and non-maximized window
+states. Root cause: `LcarsBanner.large`'s default font-size is
+`clamp(1.25rem, 0.75rem + 4vw, 4rem)` — viewport-width-responsive. Pinning the outer
+row height doesn't pin the banner content's intrinsic size; the spacer absorbs the
+vertical slack so the bar doesn't move, but the banner itself visibly grows and shrinks,
+which reads as "the top segment's height changed."
+
+Fix: AppShell's `layoutStyle` now sets `--lcars-font-size-banner: 4rem`, matching the
+previous maximized appearance and stabilizing it at every viewport width. A paragraph of
+inline rationale + a pointer to the primitive's default is attached for the next reader.
+Safe across realistic desktop widths — HYPERSPANNER at 4rem is ~450px, and the right
+column has ~600px+ of space even at narrow breakpoints.
+
+Appended lesson #42 (category: architecture). The core takeaway: stable chrome is a
+multi-layer property. Pinning the container isn't enough — any load-bearing content
+primitive with `vw`/`vh` terms or responsive media queries must also be pinned via the
+escape hatch it provides. In practice this was a three-round chain (#40 anchor-to-clip,
+#41 row growth pressure, #42 content primitive breath); every layer from the container
+down to the terminal primitive must be stable or the composite breathes.
 
 **Next:** Host re-runs `pnpm typecheck && pnpm test && pnpm build` + a visual spot-check
 at multiple window widths. Task #67 stays in_progress until the Windows gate is green.

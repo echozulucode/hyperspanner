@@ -65,39 +65,35 @@
  * titleLeading slot next to a FIXED-height banner row — if the cascade
  * ever gets wider than the row can allow, .cascade's overflow:hidden
  * silently clips it, which is worse than an explicit drop. We shed
- * entries proactively as the viewport narrows, from least-useful to
- * most-useful:
+ * entries as the viewport narrows, then drop the whole cascade well
+ * before space gets truly tight, so the banner never has to compete:
  *
- *   ≤ 1300px : drop per-zone counters (C / R / B) — order-of-magnitude
+ *   ≤ 1500px : drop per-zone counters (C / R / B) — order-of-magnitude
  *              info, rarely consulted mid-task.
- *   ≤ 1050px : also drop ZONE — the active tool's position is implicit
+ *   ≤ 1300px : also drop ZONE — the active tool's position is implicit
  *              from where the tab is visible.
- *   ≤  900px : also drop CAT — categorization is available in the
- *              navigator. Leave ACTIVE as the one-entry readout.
- *   ≤  700px : drop the cascade entirely. Banner + nav pills own the
- *              top row at this size.
+ *   ≤ 1100px : drop the cascade entirely. Below this width the banner +
+ *              nav pills need every pixel to fit in the 185px row
+ *              without the bar clipping out of the overflow:hidden wrap.
+ *              The user's explicit guidance (2026-04-23): "The
+ *              titleLeading should disappear if there isn't enough
+ *              room." Entire slot goes, not just its contents.
  *
  * Entry order (defined in ToolStatusPanels.tsx): ACTIVE, CAT, ZONE, C, R, B.
  * nth-child(n+4) keeps the first three, etc. */
-@media (max-width: 1300px) {
+@media (max-width: 1500px) {
   .cascade > *:nth-child(n + 4) {
     display: none;
   }
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1300px) {
   .cascade > *:nth-child(n + 3) {
     display: none;
   }
 }
 
-@media (max-width: 900px) {
-  .cascade > *:nth-child(n + 2) {
-    display: none;
-  }
-}
-
-@media (max-width: 700px) {
+@media (max-width: 1100px) {
   .cascade {
     display: none;
   }

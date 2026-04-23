@@ -752,3 +752,118 @@ lessons:
       content is starting to fight the height, the fix is to shed
       content, not to relax the height.
     applied: true
+
+  - id: 42
+    date: 2026-04-23
+    source: "session"
+    category: architecture
+    lesson: |
+      Pinning the top-row HEIGHT is only half of "stable chrome" —
+      pinning the ROW doesn't pin the CONTENT inside it. Any content
+      primitive whose intrinsic size depends on viewport width
+      (clamp(...) with a `vw` term, or media queries that change
+      font-size / padding) will still breathe as the window resizes.
+      The spacer inside the row absorbs the vertical slack so
+      downstream siblings like a welded bar don't move — but the
+      content itself visibly grows/shrinks, which a user reads as
+      "the upper segment height is changing" even though the row's
+      outer bounds are fixed.
+
+      Concretely: LcarsBanner.large's default font-size is
+      `clamp(1.25rem, 0.75rem + 4vw, 4rem)`. Between a non-maximized
+      ~1280px window and a maximized ~1920px window, that resolves
+      to ~63px vs a hard-capped 64px — only 1-4 pixels of difference,
+      but very much visible. Wider delta (e.g. a non-max ~1000px
+      window) amplifies the breath.
+
+      Fix pattern: for any consumer that has pinned the outer chrome
+      height, also pin the intrinsic size of the load-bearing content
+      primitives that live inside it. LcarsBanner exposes
+      `--lcars-font-size-banner` for exactly this — AppShell now sets
+      it to a fixed `4rem`, which matches the previous maximized
+      look and stays there at every viewport width. More generally:
+      audit the content elements inside a pinned chrome for any
+      `vw`/`vh` terms or responsive media queries that affect
+      intrinsic size, and provide a way to override them when
+      visual stability is a hard requirement.
+
+      Companion note: this is the third-in-a-chain of fixes for the
+      same user-perceived "top section changes height on me" symptom
+      (see #40 and #41). Each round moved the problem one layer
+      inward: from the elbow anchor (fixed-height + overflow-hidden
+      clip), to the row's growth pressure (titleRow wrap + titleChip),
+      to the content primitive's own responsive sizing. The meta-
+      lesson is that "stable chrome" is a multi-layer property — every
+      layer from the container down to the terminal content primitive
+      must be stable, or the composite breathes.
+    applied: true
+
+  - id: 43
+    date: 2026-04-23
+    source: "session"
+    category: architecture
+    supersedes: 42
+    lesson: |
+      When you pin a chrome primitive's intrinsic size in `rem`, remember
+      that `rem` is anchored to the html element's font-size — and
+      apps/desktop/src/styles/global.css sets `html { font-size: 1.2rem }`
+      at ≤1300px viewports. So `--lcars-font-size-banner: 4rem` is
+      actually 76.8px at those widths, not 64px, and the extra ~13px
+      easily blows the 185px top-row budget — clipping the bottom
+      topBar segment entirely and producing the "top horizontal
+      segment is not visible at all" symptom reported on 2026-04-23.
+      This supersedes #42's specific recommendation to set the banner
+      pin to 4rem: the general principle (pin the content, not just
+      the container) is still correct, but "4rem" is NOT a safe
+      concrete value when the html root font-size scales up at narrow
+      widths. Use a smaller cushioned value (we now use 3rem = 48px
+      at 1rem-html, 57.6px at 1.2rem-html), or pin in raw pixels to
+      fully decouple from the html root.
+
+      Paired fix: rail-width responsive scaling was also reverted in
+      the same session. Previously global.css shrank
+      `--lcars-spacing-left-frame-width` at 1500/1300/950/750/525
+      breakpoints (240→200→180→150→120→62). The user observed the
+      leftFrameTop visibly changing width as a desktop window resized
+      between maximized and restored, which directly contradicts the
+      "rock-stable frame" design goal. The 1500/1300/950/750 tiers
+      were removed; only the ≤525 mobile-emergency floor remains.
+
+      Meta-lesson: "responsive scaling" of chrome dimensions is a
+      feature that trades visual stability for density. When the
+      design goal is explicitly visual stability (a pinned
+      never-breathing frame), every responsive override of a chrome
+      dimension is a latent bug even if each individual rescale was
+      defensible on its own. Audit the whole responsive stack
+      (`@media` in global.css, clamp/vw in primitives, `rem` values
+      that ride html font-size) together, not piecewise.
+    applied: true
+
+  - id: 44
+    date: 2026-04-23
+    source: "session"
+    category: architecture
+    lesson: |
+      "Fit or drop" is cleaner than "fit or shrink" for fixed-height
+      chrome slots. Earlier we implemented a per-entry drop ladder
+      for the CascadeStatus strip inside titleLeading
+      (@media 1300/1050/900/700) — granular, but the intermediate
+      states (2 entries, 1 entry, 0 entries) each had their own
+      fit math and the 1-entry state still competed with the banner
+      for horizontal room. After the user said "The titleLeading
+      should disappear if there isn't enough room," we coarsened
+      the ladder to two drop-some states (1500, 1300) and one
+      drop-all state (1100), and the top row now has one clean
+      inflection point (1100px) below which the banner owns the
+      full titleRow width. The user perception improved even though
+      the quantity of visible information at mid-widths went down.
+
+      Principle: when a slot's purpose is "show optional telemetry
+      if it fits," the right failure mode is "vanish, don't compete."
+      Intermediate shrink states drag the slot into a horizontal
+      fight with the primary content, and the primary content
+      always loses something — a gap, an alignment, or a subtle
+      re-flow that compounds into visible jitter. One sharp
+      disappear threshold beats three graceful shrink thresholds
+      for chrome stability.
+    applied: true

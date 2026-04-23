@@ -249,7 +249,7 @@
    * Shrinking the disc box from 60→47 pulls the tangent down to meet
    * the bar's actual top; the bar-height extension below the tangent
    * still blankets the first segment so no subpixel gap can open up. */
-  height: calc(47px + var(--lcars-spacing-bar-height, 28px));
+  height: calc(41px + var(--lcars-spacing-bar-height, 28px));
   background: radial-gradient(
     circle 60px at top right,
     transparent 59.5px,

@@ -266,33 +266,27 @@ a:active {
  * disproportionate to the bar it joins and the hand-off looks broken
  * (which is what produced the "missing bar" visual at narrow widths).
  *
- * Only the RAIL WIDTH scales responsively now — it's the one dimension
- * that genuinely needs to give up real-estate on smaller screens. */
-@media (max-width: 1500px) {
-  :root {
-    --lcars-spacing-left-frame-width: 200px;
-  }
-}
-
+ * The RAIL WIDTH also used to scale responsively (240→200 at 1500px,
+ * 180 at 1300, 150 at 950, 120 at 750, 62 at 525) because real-estate
+ * is scarce at narrow widths. That was reverted on 2026-04-23: the
+ * user observed the rail visibly shifting width as a desktop window
+ * was resized between maximized and restored states, and wanted the
+ * rail pinned. The 240px default is now the one true value at every
+ * desktop breakpoint, so the chrome is rock-stable.
+ *
+ * The ≤525 floor stays because at phone-sized widths, a 240px rail
+ * would leave <100px for content — that's not a "mild visual shift,"
+ * that's a broken layout. At tablet widths (≤750) the rail now sits
+ * at its full 240px; content can scroll horizontally if needed.
+ *
+ * Only remaining responsive side-effect: the `html { font-size: 1.2rem }`
+ * bump at ≤1300px — intentional, to keep body copy readable when the
+ * window shrinks. This means rem-based measurements grow by 20% there,
+ * so any consumer pinning a chrome dimension in `rem` should sanity-
+ * check the math at both 1rem and 1.2rem html sizes. See lesson #43. */
 @media (max-width: 1300px) {
   html {
     font-size: 1.2rem;
-  }
-
-  :root {
-    --lcars-spacing-left-frame-width: 180px;
-  }
-}
-
-@media (max-width: 950px) {
-  :root {
-    --lcars-spacing-left-frame-width: 150px;
-  }
-}
-
-@media (max-width: 750px) {
-  :root {
-    --lcars-spacing-left-frame-width: 120px;
   }
 }
 
