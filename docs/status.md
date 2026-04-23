@@ -1,7 +1,7 @@
 ---
 type: status
 updated: 2026-04-22
-current_phase: "plan-005 COMPLETE + iteration — canonical LCARS curves on LeftNav + minimal frame rails on docked zones"
+current_phase: "plan-005 polish — inspector layout + elbow/bar weld fine-tuning"
 blockers: []
 next_actions:
   - "plan-005 steps 5–6 (typography bundle + responsive radius reconciliation) — deferred, non-blocking for ship"
@@ -10,6 +10,77 @@ next_actions:
 ---
 
 # Status Log
+
+## Session: 2026-04-22 (plan-005 polish — inspector layout + elbow/bar weld)
+**Phase:** plan-005 polish iteration on user feedback — two distinct asks.
+
+**Feedback 1:** "The inspector should be fixed to the right side with the tabs using all remaining space."
+
+**Feedback 2:** "Still a gap between the elbow and the bar below it." (Reported across multiple iterations — 3px, 10px, 12px overlap values all failed to close the visible seam.)
+
+**Actions:**
+- **Inspector full-height (VS Code pattern).** Changed `AppShell.module.css .workspace` grid from
+  `'center right' / 'bottom bottom'` (inspector half-height, bottom footer full-width) to
+  `'center right' / 'bottom right'` (inspector full-height right rail, bottom zone only under
+  center). Updated the ASCII diagram in the CSS comment to match. The center cell's `1fr` now
+  reclaims all horizontal space to the LEFT of the inspector, while the inspector column holds
+  its set width on the right across both rows. Matches VS Code / IDE conventions where the
+  sidebar is a true side panel, not a half-height column floating above a full-width footer.
+
+- **Elbow ↔ bar weld, empirical tuning.** Spent ~8 rounds trying to close a visible gap between
+  `.elbowTop`'s disc tangent and the top bar's top edge via analytical geometry — cranking the
+  overlap from 1px → 3px → 10px → 12px, and adding a rail-colored extension strip below the
+  disc. All iterations failed because the diagnosis was wrong: the bar wasn't actually at the
+  container's bottom edge where naive math said it would be. User supplied the empirical fix:
+  `.elbowTop { height: calc(47px + var(--lcars-spacing-bar-height, 28px)) }`, pulling the
+  disc's horizontal-tangent point down by 13px to meet the bar's actual top edge. Kept
+  `.elbowBottom` at the original `calc(60px + bar-height)` — the bottom row's geometry is
+  different (bar is first flow child of `.rightFrame`, whose flex column has no pinned
+  height), and the 60px depth lands the tangent correctly on that side. Elbows are now
+  **asymmetrically tuned** — this is intentional and documented in both the CSS comment and a
+  new lesson.
+
+- **Reverted speculative overlap cranks.** The 72px-tall, 12px-overlap variant I shipped
+  mid-session was cargo-culted math, not a geometry-aware fix. Replaced with the empirical
+  47/60 split plus the rail-colored extension strip that actually explains why the weld is
+  now invisible.
+
+**Why the analytical math failed:** The top row has `height: var(--lcars-layout-top-row-height)`
+pinned by AppShell to `calc(160px + 25px) = 185px`, and the right column inside it is a flex
+column `[titleRow, bannerRow, spacer(flex:1), bar(28px, flex-shrink:0), elbow(absolute)]`.
+Naive flex math says the bar's bottom edge sits at the container's bottom edge, with the
+spacer absorbing all excess vertical space above. But in practice the bar's top edge landed
+~47px above the container bottom — not the 28px my math predicted. I spent too long trying to
+explain why before accepting the empirical number. The likely culprit is a combination of the
+`.topBarSlot { margin-top }` being absorbed differently than I assumed and subpixel rounding
+at the user's zoom level, but the exact answer is less important than the fix.
+
+**Other diagnostic dead-ends worth noting:**
+- Early attempts assumed the issue was "not enough overlap" and bumped the overlap values
+  blindly. The user's phrase "we had this aligned properly before" was a strong signal to
+  stop piling on fixes and investigate the regression instead — acted on too late.
+- The Linux bash mount's view of several source files (`AppShell.tsx`, `RailElbowScreen.tsx`,
+  `registry.ts`, `AppShell.module.css`) showed them truncated mid-statement, while the
+  Windows-side Read tool showed them complete. Confirmed via ls-byte-count that Windows is
+  the source of truth; bash mount has a stale or partially-synced view. Don't trust bash for
+  source file inspection — use Read directly. Dev server compiles fine, so this is
+  sandbox-local only.
+
+**Files changed this session:**
+- `apps/desktop/src/shell/AppShell.module.css` — grid template areas changed to VS Code pattern
+  (inspector spans both rows).
+- `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css` —
+  `.elbowTop` now at `bottom: 0; height: calc(47px + bar-height)` with extension strip;
+  `.elbowBottom` at `top: 0; height: calc(60px + bar-height)` with extension strip. Rewrote
+  the CSS comments to describe the disc-plus-extension geometry and flag the asymmetric tuning.
+
+**Blockers:** None.
+
+**Outcome:** Inspector reads as a true right-docked side panel. Top and bottom elbows weld
+cleanly into their respective bars with no visible seam. Asymmetric elbow tuning is now
+documented and non-surprising for future touches.
+
+---
 
 ## Session: 2026-04-22 (plan-005 iteration — canonical rail shoulder + zone frame rails)
 **Phase:** plan-005 polish iteration on user feedback.

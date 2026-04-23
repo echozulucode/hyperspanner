@@ -449,3 +449,69 @@ lessons:
       Reasoning shortcut: point the gradient center at the corner
       furthest from where you want the colored region to paint.
     applied: true
+
+  - id: 29
+    date: 2026-04-22
+    source: "session"
+    category: process
+    lesson: |
+      When a user says "we had this aligned properly before," treat
+      that as a regression signal — stop piling on new fixes and
+      revert to the last-known-good state first, then investigate
+      what changed. In the LcarsStandardLayout elbow-gap session I
+      kept cranking the overlap value (1px → 3px → 10px → 12px with
+      72px height) based on analytical guesses about flex-box
+      geometry, even after the user reported the result still looked
+      wrong. Each speculative fix added complexity and made the real
+      regression harder to see. The right move was to revert and ask
+      the user for a concrete pixel-accurate fix from their devtools
+      — which is ultimately what resolved it (`calc(47px +
+      bar-height)`). Analytical math about rendered layout is
+      notoriously fragile when flex columns, percentage segments,
+      and CSS vars interact; the user's rendered-browser observation
+      is ground truth. Ask for a devtools screenshot or a concrete
+      pixel override before guessing a fourth time.
+    applied: true
+
+  - id: 30
+    date: 2026-04-22
+    source: "session"
+    category: architecture
+    lesson: |
+      LcarsStandardLayout's top and bottom elbows are NOT mirror-
+      symmetric. The top row is a flex column pinned to 185px with
+      banner/cascade/spacer stacked above the bar; the bottom row
+      is flex:1 with `<main>` filling the space below the bar. The
+      bar's actual top edge lands at a different distance from the
+      container bottom/top than naive math predicts, and the two
+      rows land at different distances because their flex
+      compositions differ. Empirical tuning: elbowTop needs
+      `calc(47px + bar-height)`, elbowBottom needs `calc(60px +
+      bar-height)`. Do NOT "clean up" the asymmetry by mirroring
+      one side to the other — the user explicitly corrected this
+      ("the bottom one needs to be 60 height since the bottom
+      segment is taller than the upper segments which needs to be
+      47"). Keep the two values independently tuned with a CSS
+      comment explaining why they differ, so a future cleanup pass
+      doesn't collapse them.
+    applied: true
+
+  - id: 31
+    date: 2026-04-22
+    source: "observation"
+    category: tooling
+    lesson: |
+      The bash sandbox's mount view of the Windows workspace can
+      show stale or truncated file contents relative to what the
+      Read tool sees (which reads from the Windows filesystem
+      directly). In this session bash's view of AppShell.tsx,
+      registry.ts, RailElbowScreen.tsx, and AppShell.module.css
+      appeared to be cut off mid-statement, while the Read tool
+      showed complete content and the Vite dev server compiled
+      without error. Treat the Windows filesystem (what Read/Edit
+      operate on) as source of truth; bash views are for running
+      scripts/commands, not for diffing or verifying file content.
+      If bash shows a file that looks truncated or inconsistent,
+      re-read with the Read tool before concluding anything is
+      broken.
+    applied: true
