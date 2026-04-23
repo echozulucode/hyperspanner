@@ -3,7 +3,7 @@ type: plan
 project: "Hyperspanner"
 status: active
 version: 1
-updated: 2026-04-20
+updated: 2026-04-22
 phases:
   - id: 0
     name: "Bootstrap (Tauri + React + Vite + pnpm workspace)"
@@ -19,10 +19,10 @@ phases:
     status: complete
   - id: 4
     name: "Tool registry + navigator"
-    status: pending
+    status: complete
   - id: 5
     name: "Command palette"
-    status: pending
+    status: complete
   - id: 6
     name: "Vertical-slice tools + backend commands"
     status: pending
@@ -41,7 +41,7 @@ phases:
   - id: 11
     name: "Testing / packaging / first release"
     status: pending
-current_phase: 4
+current_phase: 6
 ---
 
 # Plan: Hyperspanner
@@ -68,8 +68,19 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
   splitCenter / mergeCenter / setActive / toggleZone / applyPreset / resetLayout;
   single-instance focus with pulse; `useTool<T>` per-tool runtime slot; ZoneTabStrip +
   TabActionMenu wired through AppShell; Vitest + @testing-library/react unit tests.
-- **Phase 4 next** — real tool registry beyond the placeholder set; LeftNavigator-driven
-  discovery with category filters, favorites, and command palette.
+- **Phase 4 complete** — `useFavorites` + `useRecents` (Zustand + persist middleware, MRU
+  ordered, capped); LeftNavigator rebuilt with search + PINNED + RECENT + Browse sections;
+  TabActionMenu gains Pin/Unpin toggle; HomeView launchpad (pinned + recent + browse card
+  grid) replaces the placeholder empty-state in CenterZone; every openTool path feeds
+  recents.
+- **Phase 5 complete** — `CommandPalette` (Cmd+K, portaled modal, scored filter, tools +
+  actions); `keys/` module with `useGlobalShortcuts` (per-binding `whenTyping` policy),
+  `ShortcutHelp` overlay (Shift+?), and a `Shortcut` / `formatShortcut` helper set. All
+  shortcut callers flow through the registry; zone toggles still composed via
+  `useShellShortcuts`.
+- **Phase 6 next** — replace placeholder tools with real vertical-slice implementations
+  (JSON Validator, Diff, Base64, JWT Inspector, etc.) and wire the first Tauri backend
+  commands they depend on (filesystem read, text transform).
 
 ## Decisions Made
 | Date | Decision | Rationale |

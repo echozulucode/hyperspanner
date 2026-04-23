@@ -61,11 +61,44 @@
   flex: 0 0 auto;
 }
 
-/* On narrow viewports, hide the per-zone counters (C/R/B) — they're the
- * least useful entries and removing them keeps the cascade to a single
- * line next to the nav pills instead of wrapping onto a second row. */
-@media (max-width: 1100px) {
+/* Responsive drop ladder. The cascade sits in LcarsStandardLayout's
+ * titleLeading slot next to a FIXED-height banner row — if the cascade
+ * ever gets wider than the row can allow, .cascade's overflow:hidden
+ * silently clips it, which is worse than an explicit drop. We shed
+ * entries proactively as the viewport narrows, from least-useful to
+ * most-useful:
+ *
+ *   ≤ 1300px : drop per-zone counters (C / R / B) — order-of-magnitude
+ *              info, rarely consulted mid-task.
+ *   ≤ 1050px : also drop ZONE — the active tool's position is implicit
+ *              from where the tab is visible.
+ *   ≤  900px : also drop CAT — categorization is available in the
+ *              navigator. Leave ACTIVE as the one-entry readout.
+ *   ≤  700px : drop the cascade entirely. Banner + nav pills own the
+ *              top row at this size.
+ *
+ * Entry order (defined in ToolStatusPanels.tsx): ACTIVE, CAT, ZONE, C, R, B.
+ * nth-child(n+4) keeps the first three, etc. */
+@media (max-width: 1300px) {
   .cascade > *:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+@media (max-width: 1050px) {
+  .cascade > *:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .cascade > *:nth-child(n + 2) {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .cascade {
     display: none;
   }
 }

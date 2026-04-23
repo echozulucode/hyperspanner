@@ -1,9 +1,8 @@
 import type { FC, ReactNode } from 'react';
-import { LcarsEmptyState, LcarsPill } from '@hyperspanner/lcars-ui';
-import { useTheme } from '../contexts/ThemeContext';
 import type { CenterSplit, OpenTool, SplitSide } from '../state';
 import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
+import { HomeView } from '../screens';
 import { ZoneTabStrip } from './ZoneTabStrip';
 import { PaneDropTarget } from './PaneDropTarget';
 import type { DropRegion } from './PaneDropTarget';
@@ -15,7 +14,10 @@ export interface CenterZoneProps {
   /** Active tab id for the center zone. */
   activeTabId: string | null;
   split: CenterSplit;
-  onOpenSampleTool?: () => void;
+  /** Invoked when the home view launchpad opens a tool. */
+  onOpenTool?: (toolId: string) => void;
+  /** Phase-5 palette hook. HomeView surfaces it in its hero affordances. */
+  onOpenPalette?: () => void;
 }
 
 /**
@@ -32,9 +34,9 @@ export const CenterZone: FC<CenterZoneProps> = ({
   tools,
   activeTabId,
   split,
-  onOpenSampleTool,
+  onOpenTool,
+  onOpenPalette,
 }) => {
-  const { theme } = useTheme();
   const activeTool = tools.find((t) => t.id === activeTabId) ?? null;
   const activeDescriptor = activeTool ? getTool(activeTool.id) : null;
   const hasTabs = tools.length > 0;
@@ -73,17 +75,14 @@ export const CenterZone: FC<CenterZoneProps> = ({
 
   const renderTool = (tool: OpenTool | null): ReactNode => {
     if (!tool) {
+      // No active tool ≡ the workspace is empty (or the active side of a
+      // split is empty). Render HomeView as the launchpad; any click on a
+      // tool card fires onOpenTool, which AppShell wires to openTool +
+      // trackOpen so launching from home feeds recents.
       return (
-        <LcarsEmptyState
-          eyebrow="CENTER · CTR-00"
-          title="No active tool"
-          description="Open a tool from the navigator to begin. The command palette (⌘K) is the fastest path."
-          icon={<span aria-hidden>◉</span>}
-          action={
-            <LcarsPill color={theme.colors.orange} onClick={onOpenSampleTool}>
-              OPEN SAMPLE
-            </LcarsPill>
-          }
+        <HomeView
+          onOpenTool={(id) => onOpenTool?.(id)}
+          onOpenPalette={onOpenPalette}
         />
       );
     }

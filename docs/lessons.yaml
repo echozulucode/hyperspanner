@@ -515,3 +515,240 @@ lessons:
       re-read with the Read tool before concluding anything is
       broken.
     applied: true
+
+  - id: 32
+    date: 2026-04-22
+    source: "session"
+    category: architecture
+    lesson: |
+      Put search, favorites, and recents IN the navigator rail itself —
+      not split across a separate overlay, top-nav header, or modal.
+      Once the rail gets its own scroll container and the search field
+      is pinned as a non-shrinking flex child, LcarsPanel composes fine
+      as a section-header primitive, and the rail becomes the single
+      entry point for tool launching. This matches LCARS's "everything
+      framed by the rail" affordance and removes the need for a
+      separate entry surface. The earlier TODO in LeftNavigator that
+      claimed "search + favorites don't compose cleanly here" was a
+      pre-Phase-4 artifact — the real blocker was the missing flex
+      scroll plumbing on the rail stack, not the composition.
+    applied: true
+
+  - id: 33
+    date: 2026-04-22
+    source: "session"
+    category: state
+    lesson: |
+      Zustand 5 + persist middleware recipe that works cleanly across
+      jsdom tests and production: (a) wrap the store in `persist(...)`
+      with `createJSONStorage(() => localStorage)` (not `localStorage`
+      directly — the factory form lets the middleware lazily detect
+      storage availability during tests); (b) suffix the store name
+      with `:v1` so we can bump the version later without a migration
+      function; (c) `partialize` to only persist the array itself, not
+      the action closures. For Vitest, configure `environment: jsdom`
+      in `vite.config.ts` (or per-file via `// @vitest-environment
+      jsdom`) — Node's test environment has no `localStorage` and the
+      persist middleware crashes on first write. Also: call
+      `useFavorites.persist.clearStorage()` in `beforeEach` to isolate
+      tests.
+    applied: true
+
+  - id: 34
+    date: 2026-04-22
+    source: "session"
+    category: ux
+    lesson: |
+      Keyboard shortcut registries need per-binding "whenTyping"
+      policy, not a single global rule. Default to `whenTyping:
+      'block'` so typing in a search field or tool input can't
+      accidentally fire Ctrl+W / Escape / etc. — but individual
+      bindings that MUST fire from inside an input (⌘K to open the
+      palette is the classic one) opt in via `whenTyping: 'allow'`.
+      Detection: event.target is an HTMLInputElement,
+      HTMLTextAreaElement, or has contentEditable='true' — check all
+      three, not just INPUT. Also: bind at window level (capture
+      phase) so the handler runs before any child input's default
+      handling, and check event.defaultPrevented on the way in to
+      cooperate with other capture-phase listeners.
+    applied: true
+
+  - id: 35
+    date: 2026-04-22
+    source: "session"
+    category: search
+    lesson: |
+      Tiered numeric scoring beats boolean match for filter ranking.
+      For a tool launcher that needs name + description + keyword
+      search, a scoring function like `nameStartsWith=0,
+      nameIncludes=1, descStartsWith=2, descIncludes=3, nothing=99`
+      followed by `sort(by score then alphabetic)` gives the user what
+      they mean: typing "js" surfaces "JSON Validator" before "Regex
+      Tester (JS flavor)" because the name-prefix hit beats the
+      description hit. A pure `string.includes(query)` filter can't
+      express that ordering without a secondary pass, and
+      substring-match alone puts popular tools at the bottom when
+      their names don't happen to start with the query.
+    applied: true
+
+  - id: 36
+    date: 2026-04-22
+    source: "session"
+    category: typing
+    lesson: |
+      When the same handler function is attached to multiple React
+      elements of different HTML types, widen the event generic to
+      the common ancestor (`HTMLElement`) rather than pinning to the
+      first one. TabActionMenu's `handleKey` binds to both the
+      trigger wrapper `<div>` (rootRef) and the portaled menu `<ul>`
+      (listRef); typing it `ReactKeyboardEvent<HTMLDivElement>` makes
+      the <ul> binding fail the handler's signature check. Either
+      split into two handlers, or — simpler — widen to `HTMLElement`
+      and accept that you lose a tiny bit of element-specific type
+      safety that you weren't using anyway. TS 5.9's stricter JSX
+      event-handler inference surfaces this; TS 5.4 let it slide
+      because of weaker contravariance checking.
+    applied: true
+
+  - id: 37
+    date: 2026-04-22
+    source: "session"
+    category: typing
+    lesson: |
+      TypeScript 5.9 types `DataTransfer.types` as `readonly string[]`
+      (not the legacy `DOMStringList`), which means a runtime
+      structural cast to `DOMStringList` is rejected because
+      `DOMStringList` has extra required members (`item`, numeric
+      indexer) that `readonly string[]` doesn't provide. For
+      cross-browser DataTransfer.types handling, cast through
+      `unknown` to a minimal shape
+      `{ contains?: (s: string) => boolean }` and feature-test before
+      calling — falls back to `Array.from(types).includes(MIME)` on
+      the modern array-form. This pattern also works for any
+      legacy-DOM-vs-modern interop where the old type had strict
+      structural requirements but the new one doesn't.
+    applied: true
+
+  - id: 38
+    date: 2026-04-22
+    source: "session"
+    category: tooling
+    lesson: |
+      File-tool Edit/Write operations can silently leave files
+      partially null-padded or truncated on disk, even when the tool
+      result reports success and subsequent Read calls return
+      apparently-complete content. Symptom: host `tsc` reports "JSX
+      element has no corresponding closing tag" on files you just
+      edited, while the sandbox Read shows the full file. Safest fix
+      path for a significantly-corrupted file: (a) check `git status`
+      — if the file is tracked and HEAD has a clean prior version,
+      `git show HEAD:path > /tmp/clean.ext` then `cp /tmp/clean.ext
+      path`; (b) if the file is untracked or HEAD is stale, rewrite
+      the whole file in one bash heredoc
+      (`cat > path << 'EOF' ... EOF`) which writes atomically via
+      shell redirect and can't produce a half-written file;
+      (c) verify with `wc -l`, `tail -N`, `tr -cd '\000' < path | wc
+      -c`, `file path`, and brace/paren balance counts.
+      NEVER attempt "cleanup" via `tr -d '\000'` on a file you
+      suspect is corrupted — it strips legitimate bytes if the file
+      is partly written and leaves behind a syntactically-plausible
+      but semantically-broken prefix.
+    applied: true
+
+  - id: 39
+    date: 2026-04-22
+    source: "session"
+    category: tooling
+    lesson: |
+      Tauri v1's scaffolded vite.config.ts uses `target: 'safari13'` for
+      non-Windows builds, but esbuild's compat table refuses to
+      down-transpile certain parameter-destructuring and arrow-function
+      patterns below Safari 14 — the build fails with "Transforming
+      destructuring to the configured target environment (safari13 + N
+      overrides) is not supported yet" on perfectly normal code like
+      `const Provider = ({ children, foo = 'default' }) => {...}`. The
+      fix is to bump the target to `safari14`, which matches Tauri v2's
+      recommended macOS 11 (Big Sur) minimum and is the lowest esbuild
+      accepts for modern destructuring. This is a pure tooling
+      constraint, not a runtime one — Safari 13 supports all these
+      features at runtime. If you need to keep safari13 as the runtime
+      floor, you'd have to write the code without the patterns esbuild
+      flags, which in practice means no parameter destructuring with
+      defaults — not a viable constraint for a React codebase.
+    applied: true
+
+  - id: 40
+    date: 2026-04-23
+    source: "session"
+    category: architecture
+    lesson: |
+      For load-bearing chrome where absolutely-positioned decorative
+      elements (e.g. an elbow welded to a bar) anchor to a container's
+      edge, never pin the container with a fixed `height`. Use
+      `min-height` instead. Fixed height + `overflow: hidden` silently
+      clips content the moment interior pressure (a titleChip that
+      appears on tool selection, a nav row that wraps on narrow
+      viewports, a longer title string) exceeds the reserved budget —
+      and the absolute elbow keeps painting at `bottom: 0` of a
+      container whose intrinsic content bottom now sits above the clip
+      line, so the elbow visually detaches from the bar it was supposed
+      to weld to. Symptom in LcarsStandardLayout: "top-bar segments
+      disappear when I select a tool; reset brings them back" — reset
+      clears the titleChip, the title row shrinks to one line, content
+      fits under the fixed height, and the clip stops engaging. The
+      fix is one word: `height` → `min-height`. The consumer still
+      pins the baseline compactness (AppShell keeps 185px via
+      --lcars-layout-top-row-height), but the row can now grow with
+      its content instead of clipping it. `flex-shrink: 0` on the
+      wrap still prevents pressure from sibling rows. Companion
+      principle: any container that (a) has `overflow: hidden` and
+      (b) hosts position:absolute children anchored to its edges
+      should be audited for this anti-pattern — the hidden overflow
+      turns "too much content" into "invisibly misaligned chrome"
+      rather than "visible overflow you can spot and fix."
+    applied: true
+
+  - id: 41
+    date: 2026-04-23
+    source: "session"
+    category: architecture
+    supersedes: 40
+    lesson: |
+      SUPERSEDES lesson #40's recommendation. The min-height fix
+      there traded a clipping bug (top-bar segments disappearing on
+      tool selection) for a height-growth bug: the top chrome started
+      to breathe every time the active tool changed or nav pills wrapped,
+      which reads as layout jitter and violates the LCARS grammar
+      expectation that the top frame is a stable, fixed-weight element.
+      The correct pattern for fixed-height decorative chrome is:
+
+        (a) Keep the container at FIXED height (not min-height). The
+            chrome's visual budget is a design decision, not something
+            content should be able to expand.
+        (b) Absorb growth pressure INSIDE the fixed budget by making
+            content-bearing rows strictly non-wrapping (`flex-wrap:
+            nowrap` + `min-width: 0` on the row and on its shrinkable
+            children).
+        (c) Give the shrinkable children an explicit drop ladder via
+            media queries, shedding least-important entries first as
+            the viewport narrows. At a floor width, hide the whole
+            slot so no overflow/clipping can occur.
+        (d) Eliminate accessories that add growth pressure without
+            earning their keep. In this case the "secondary title"
+            (titleChip rendering the active tool name next to the
+            banner) was redundant with the cascade's ACTIVE entry and
+            was the single biggest contributor to wrap-induced growth;
+            removing it was the cleanest simplification.
+
+      Specifically applied: reverted .wrap.topRow to `height: ...`,
+      changed .titleRow to `flex-wrap: nowrap` with `min-width: 0`,
+      deleted AppShell's titleChip derivation + prop pass + LcarsChip
+      import, and added a 1300/1050/900/700px drop ladder to the
+      cascade (ACTIVE stays last; the whole cascade hides ≤ 700px).
+      The original clipping symptom no longer occurs because the
+      content can no longer grow the row in the first place; the
+      fixed-height chrome now degrades via drops rather than via
+      clipping. General principle: when a fixed-height chrome's
+      content is starting to fight the height, the fix is to shed
+      content, not to relax the height.
+    applied: true

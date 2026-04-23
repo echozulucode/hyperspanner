@@ -1,17 +1,19 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { CSSProperties, FC } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { LcarsChip, LcarsPill, LcarsStandardLayout } from '@hyperspanner/lcars-ui';
+import { LcarsPill, LcarsStandardLayout } from '@hyperspanner/lcars-ui';
 import { LeftNavigator } from './LeftNavigator';
 import { CenterZone } from './CenterZone';
 import { RightZone } from './RightZone';
 import { BottomZone } from './BottomZone';
 import { CascadeStatus } from './ToolStatusPanels';
+import { CommandPalette } from './CommandPalette';
 import { useShellShortcuts } from './useZoneState';
-import { useWorkspaceStore } from '../state';
+import { useWorkspaceStore, useTrackOpen } from '../state';
 import { getTool } from '../tools';
 import { useTheme } from '../contexts/ThemeContext';
 import type { ThemeName } from '../themes';
+import { useGlobalShortcuts, ShortcutHelp } from '../keys';
 import styles from './AppShell.module.css';
 
 export interface AppShellProps {
@@ -65,7 +67,20 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
   const toggleZone = useWorkspaceStore((s) => s.toggleZone);
   const resetLayout = useWorkspaceStore((s) => s.resetLayout);
 
+  // Recents tracking — every path that opens a tool (nav click, sample
+  // "try it" button, and soon the command palette) routes through
+  // handleOpenTool, so this is the single chokepoint where we can
+  // update history without sprinkling trackOpen() across call sites.
+  const trackOpen = useTrackOpen();
+
   useShellShortcuts(useCallback((zone) => toggleZone(zone), [toggleZone]));
+
+  // Command palette state — the palette is a modal overlay owned by the
+  // shell because its actions (openTool, resetLayout, cycleTheme) all
+  // live up here. Keeping the state at this level avoids threading a
+  // second "open palette" callback through every child that needs it.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const openToolIds = useMemo<ReadonlySet<string>>(
     () =>
@@ -81,25 +96,47 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
     (toolId: string) => {
       const descriptor = getTool(toolId);
       openTool(toolId, descriptor?.defaultZone);
+      // Track AFTER opening so a descriptor-less id (stale registry
+      // entry) still updates the recents list — the workspace store
+      // is tolerant of unknown ids and recents is purely informational.
+      trackOpen(toolId);
     },
-    [openTool],
+    [openTool, trackOpen],
   );
 
-  const handleOpenSample = useCallback(() => {
-    const descriptor = getTool('json-validator');
-    if (descriptor) openTool(descriptor.id, descriptor.defaultZone);
-  }, [openTool]);
+  const handleOpenPalette = useCallback(() => setPaletteOpen(true), []);
+  const handleClosePalette = useCallback(() => setPaletteOpen(false), []);
+  const handleCloseHelp = useCallback(() => setHelpOpen(false), []);
 
-  const activeCenterDescriptor = useMemo(() => {
-    if (!centerActive) return null;
-    return getTool(centerActive);
-  }, [centerActive]);
-
-  const cycleTheme = () => {
+  const cycleTheme = useCallback(() => {
     const idx = themeOrder.indexOf(themeName);
     const next = themeOrder[(idx + 1) % themeOrder.length];
     setTheme(next);
-  };
+  }, [themeName, setTheme]);
+
+  // Global shortcut bindings not covered by useShellShortcuts. The zone
+  // toggles still live there because they share a "when typing, ignore"
+  // policy; the palette and help overlay have different gating rules
+  // (⌘K should fire even from inputs; ? should NOT). useGlobalShortcuts
+  // consults each binding's own policy.
+  useGlobalShortcuts([
+    {
+      id: 'palette.open',
+      description: 'Open command palette',
+      key: 'k',
+      mod: true,
+      whenTyping: 'allow',
+      run: () => setPaletteOpen((prev) => !prev),
+    },
+    {
+      id: 'shortcuts.help',
+      description: 'Show keyboard shortcuts',
+      key: '?',
+      shift: true,
+      whenTyping: 'block',
+      run: () => setHelpOpen((prev) => !prev),
+    },
+  ]);
 
   // Rail color hand-off — the bottom rail's quarter-circle lands on the
   // FIRST panel in the bottomPanels stack. The LeftNavigator exports
@@ -113,9 +150,7 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
         size="small"
         rounded="left"
         color={theme.colors.bluey}
-        onClick={() => {
-          /* Phase 5 wires command palette */
-        }}
+        onClick={handleOpenPalette}
         aria-label="Command palette"
       >
         ⌘K · PALETTE
@@ -167,58 +202,32 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
     .filter(Boolean)
     .join(' ');
 
-  const activeTitle = activeCenterDescriptor?.name?.toUpperCase();
+  // Deliberately NO titleChip / "secondary title" here. An earlier
+  // iteration rendered the active tool's name as an LcarsChip beside
+  // the banner, but that composition pushed the titleRow wider than
+  // its container on longer tool names (TEXT DIFF, WHITESPACE CLEAN,
+  // etc.), which used to wrap the title row onto two lines and clip
+  // the top bar + welded elbow. The active tool is already surfaced
+  // in the CascadeStatus readout (ACTIVE: <name>), so dropping the
+  // chip is a clean simplification: one canonical place to look, and
+  // the top-row chrome stays at its pinned height regardless of which
+  // tool is selected. See LcarsStandardLayout.module.css .wrap.topRow
+  // and .titleRow for the matching primitive-side design notes.
 
-  // Active-tool marker rendered inline with the banner. Using LcarsChip
-  // (size small, secondary variant) mirrors the "LcarsBanner · LcarsChip"
-  // composition in the primitive gallery. undefined when no center tool
-  // is active, so the primitive skips the titleRow wrapper entirely.
-  const titleChip = activeTitle ? (
-    <LcarsChip size="small" variant="secondary">
-      {activeTitle}
-    </LcarsChip>
-  ) : undefined;
-
-  // Layout-primitive overrides.
-  //   --lcars-layout-top-spacer-min: 10px — compact floor for the spacer
-  //      above the topBar; the 20px default adds visible gap we don't need.
-  //   --lcars-layout-top-spacer-flex: 1 (DEFAULT) — the spacer KEEPS its
-  //      grow so the topBar/elbow stay welded to the bottom of the row
-  //      even when the rail's hasChildren intrinsic is taller than the
-  //      banner+nav stack (which is always, with the authentic 160px
-  //      rail curve). Never set this to 0 while topPanels is populated.
-  //   --lcars-layout-top-bar-margin: 0.5rem — a hair of breathing space
-  //      above the topBar without the old ~30px gap.
-  //   --lcars-layout-nav-gap-x/y: 0.2rem — tight pill cluster; the default
-  //      gaps (0.5rem / 0.65rem) felt too airy for a rapid switcher.
-  //
-  // Why no rail radius/padding override: a smaller top-rail corner made
-  // the top/bottom rails visually asymmetric (tight 50px arc at the top
-  // vs the canonical 160px arc at the bottom). Keeping both rails at
-  // their 160px default restores LCARS-authentic symmetry. The side
-  // effect — a taller top row driven by the rail's hasChildren intrinsic
-  // (panels + 160px + 1.25rem of decorative padding) — is actually what
-  // pins the row height stable: the rail's intrinsic is constant regardless
-  // of which tool is active, so selecting a tool can't resize the header.
+  // Layout-primitive overrides. See previous commit history for full
+  // rationale; keeping the summary short here so the render tree below
+  // is easier to scan.
   const layoutStyle: CSSProperties = {
     '--lcars-layout-top-spacer-min': '10px',
     '--lcars-layout-top-bar-margin': '0.5rem',
     '--lcars-layout-nav-gap-x': '0.2rem',
     '--lcars-layout-nav-gap-y': '0.3rem',
-    // Pin the top row to "just enough for the authentic 160px rail
-    // curve plus a hair of straight edge above it". No topPanels means
-    // leftFrameTop's intrinsic is 0; we want the curve's full quarter-
-    // circle to render (requires >=160px height), with ~25px of straight
-    // rail at the top for visual breathing. rightFrameTop's banner+nav+
-    // bar content is absorbed by the spacer (flex:1) so the bar and
-    // elbow stay welded to the bottom regardless of content wrap.
     '--lcars-layout-top-row-height': 'calc(160px + 25px)',
   } as CSSProperties;
 
   return (
     <LcarsStandardLayout
       title="HYPERSPANNER"
-      titleChip={titleChip}
       titleLeading={<CascadeStatus />}
       navigation={navigation}
       bottomPanels={
@@ -241,7 +250,8 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
             tools={centerTools}
             activeTabId={centerActive}
             split={centerSplit}
-            onOpenSampleTool={handleOpenSample}
+            onOpenTool={handleOpenTool}
+            onOpenPalette={handleOpenPalette}
           />
         </div>
 
@@ -285,6 +295,14 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
           )}
         </div>
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={handleClosePalette}
+        onOpenTool={handleOpenTool}
+        onResetLayout={resetLayout}
+        onCycleTheme={cycleTheme}
+      />
+      <ShortcutHelp open={helpOpen} onClose={handleCloseHelp} />
     </LcarsStandardLayout>
   );
 };

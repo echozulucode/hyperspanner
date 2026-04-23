@@ -25,3 +25,23 @@ export type { LayoutPreset } from './presets';
 
 export { useTool } from './useTool';
 export type { UseToolReturn } from './useTool';
+
+export {
+  useFavoritesStore,
+  useFavorites,
+  useIsFavorite,
+  useToggleFavorite,
+  toggleFavorite,
+  removeFavorite,
+  clearAllFavorites,
+} from './useFavorites';
+
+export {
+  useRecentsStore,
+  useRecents,
+  useTrackOpen,
+  trackOpen,
+  forgetRecent,
+  clearRecents,
+  RECENTS_CAP,
+} from './useRecents';

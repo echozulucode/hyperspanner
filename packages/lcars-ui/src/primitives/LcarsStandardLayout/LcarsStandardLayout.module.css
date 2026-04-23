@@ -64,16 +64,41 @@
    * .wrap.gap below re-enables shrink for the bottom row via higher
    * specificity (two classes vs one). */
   flex-shrink: 0;
-  /* Optional explicit height for the top row. Default `auto` keeps the
-   * content-driven behavior (intrinsic of the taller sibling wins).
-   * A consumer that wants the top chrome to be bulletproof-stable —
-   * unaffected by banner wrapping, cascade value length, or which tool
-   * is selected — can set this to a fixed value (e.g. 240px to match
-   * the rail's hasChildren intrinsic). Content inside .rightFrameTop
-   * is absorbed by .spacer (flex:1), so no clipping at that size. */
+  /* Optional FIXED height for the top row is applied via .wrap.topRow
+   * below. Default `auto` yields content-driven sizing; any consumer
+   * that pins --lcars-layout-top-row-height gets a rock-stable top
+   * chrome that never breathes when tools are selected, banners change,
+   * or nav pills wrap. The content-drop strategy (nowrap titleRow +
+   * nowrap cascade with media-query drops) absorbs growth pressure
+   * INSIDE the pinned height rather than letting the row grow. See
+   * .wrap.topRow and .titleRow below for the full rationale. */
 }
 
 .wrap.topRow {
+  /* FIXED height, not min-height. Design decision: in LCARS chrome the
+   * top row's visual weight (rail curve + top bar + elbow) is tuned to
+   * a single baseline height; letting it grow with content would make
+   * the chrome "breathe" every time the active tool changes or nav
+   * pills wrap, which reads as layout jitter rather than a stable frame.
+   *
+   * How we avoid the "segments get clipped when a tool is selected"
+   * bug without relaxing this height: the growth pressure is absorbed
+   * INSIDE the row instead of by the row. Concretely:
+   *   - .titleRow is flex-wrap: nowrap — banner + titleLeading can
+   *     never stack vertically, so the row height is bounded by the
+   *     banner's line-height, not by content wrapping.
+   *   - The cascade inside titleLeading is also nowrap + overflow:
+   *     hidden (see apps/desktop/src/shell/ToolStatusPanels.module.css),
+   *     and media queries drop trailing entries as the viewport narrows.
+   *   - Navigation pills DO flex-wrap, but that's in .bannerRow which
+   *     is the one slot where vertical growth is acceptable — .spacer
+   *     below it absorbs the slack up to its min-height floor.
+   *
+   * If you find yourself wanting to bump this height because content is
+   * being clipped, the correct fix is almost always upstream: drop an
+   * unnecessary piece from .titleLeading (via a new media-query floor
+   * or by omitting it entirely on narrow viewports), not to bleed into
+   * the bar+elbow budget. */
   height: var(--lcars-layout-top-row-height, auto);
 }
 
@@ -284,15 +309,27 @@
 /* Title row — used when `titleChip` and/or `titleLeading` is supplied.
  * The banner (and its optional chip) stay right-aligned; an optional
  * `titleLeading` element lives in the empty space on the LEFT and uses
- * `margin-right: auto` to keep the banner pinned to the right. `flex-wrap`
- * lets the layout collapse to stacked rows gracefully on narrow viewports
- * without punching through the wrap's overflow: hidden. */
+ * `margin-right: auto` to keep the banner pinned to the right.
+ *
+ * flex-wrap: NOWRAP on purpose — wrapping would stack banner and
+ * titleLeading vertically, doubling the row's intrinsic height every
+ * time a longer tool name makes titleLeading's cascade too wide to fit
+ * next to the banner. The top-row chrome is pinned to a fixed height
+ * via --lcars-layout-top-row-height (see .wrap.topRow); a wrapped
+ * titleRow would overflow that pin and get clipped, making the topBar
+ * segments and the welded elbowTop disappear. Instead, the titleLeading
+ * slot is flex-shrinkable (flex: 0 1 auto) with overflow: hidden on
+ * its CascadeStatus content, and media queries inside the cascade
+ * drop trailing entries at narrow widths. The banner always wins the
+ * horizontal-space fight; the cascade gracefully truncates or drops
+ * items to fit. */
 .titleRow {
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 /* Banner + chip group (right side). Baseline-aligned with each other so

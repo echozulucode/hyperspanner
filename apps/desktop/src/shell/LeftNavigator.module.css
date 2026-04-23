@@ -89,3 +89,41 @@
   background-color: var(--lcars-color-green, #66a97a);
   box-shadow: 0 0 6px rgba(102, 169, 122, 0.65);
 }
+
+/* Search field sits above the sections as a non-shrinking flex child so
+ * it stays visible when the stack scrolls. LcarsSearchField renders as a
+ * pill with its own internal padding, so we only need a thin block of
+ * padding around it to keep it from butting into the rail edges. */
+.searchSlot {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.5rem 0.75rem;
+}
+
+.searchField {
+  width: 100%;
+}
+
+/* Section headers (PINNED / RECENT / RESULTS) use the same primitive as
+ * category headers but without a click affordance and with `active`
+ * latched on so the fill doesn't dim — they're informational, not
+ * toggleable. A hair shorter than category panels so the eye can tell
+ * at a glance "this is a meta-section, not another folder". */
+.sectionHeader {
+  width: 100% !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  padding: 0 1rem !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.15em !important;
+  flex: 0 0 auto !important;
+  cursor: default !important;
+}
+
+.emptyHint {
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  color: var(--lcars-color-almond-creme, #e8d9b2);
+  opacity: 0.6;
+  font-style: italic;
+  text-align: right;
+}

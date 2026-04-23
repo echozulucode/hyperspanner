@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import type { CSSProperties, FC, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Zone } from '../state';
+import { useIsFavorite, useToggleFavorite } from '../state';
 import styles from './TabActionMenu.module.css';
 
 export interface TabActionMenuProps {
@@ -22,6 +23,7 @@ export interface TabActionMenuProps {
 
 type EntryId =
   | 'focus'
+  | 'toggle-pin'
   | 'move-center'
   | 'move-right'
   | 'move-bottom'
@@ -67,8 +69,19 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
 
+  // Favorite state — sourced directly from the store so TabActionMenu owns
+  // the pin/unpin affordance without AppShell / ZoneTabStrip having to
+  // thread the state through. Menu rows live and die with the menu, so
+  // keeping this local doesn't leak a subscription beyond the tab's life.
+  const isFavorite = useIsFavorite(toolId);
+  const toggleFavorite = useToggleFavorite();
+
   const entries: Entry[] = [
     { id: 'focus', label: 'Focus' },
+    {
+      id: 'toggle-pin',
+      label: isFavorite ? 'Unpin from Rail' : 'Pin to Rail',
+    },
     {
       id: 'move-center',
       label: 'Move to Center',
@@ -162,6 +175,9 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
         case 'focus':
           onFocus(toolId);
           break;
+        case 'toggle-pin':
+          toggleFavorite(toolId);
+          break;
         case 'move-center':
           onMove(toolId, 'center');
           break;
@@ -191,7 +207,17 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
           break;
       }
     },
-    [toolId, onFocus, onMove, onSplit, onMerge, onMaximize, onResetLayout, onClose],
+    [
+      toolId,
+      onFocus,
+      onMove,
+      onSplit,
+      onMerge,
+      onMaximize,
+      onResetLayout,
+      onClose,
+      toggleFavorite,
+    ],
   );
 
   const advance = (delta: number) => {
@@ -205,7 +231,11 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
     });
   };
 
-  const handleKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  // Widened to HTMLElement because this handler is attached to both the
+  // trigger wrapper <div> (rootRef) and the portaled menu <ul> (listRef).
+  // React's synthetic KeyboardEvent is generic over the currentTarget's
+  // element type, so binding to both requires the common-ancestor type.
+  const handleKey = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (!open) return;
     switch (event.key) {
       case 'ArrowDown':

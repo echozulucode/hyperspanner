@@ -1,15 +1,319 @@
 ---
 type: status
-updated: 2026-04-22
-current_phase: "plan-005 polish — inspector layout + elbow/bar weld fine-tuning"
+updated: 2026-04-23
+current_phase: "Phase 4/5 complete — navigator + HomeView + CommandPalette + shortcut system landed; host typecheck is the review gate. Top-row height is now genuinely fixed (content-drop strategy); secondary title chip removed."
 blockers: []
 next_actions:
-  - "plan-005 steps 5–6 (typography bundle + responsive radius reconciliation) — deferred, non-blocking for ship"
-  - "Begin Phase 4: real tool registry + navigator categories + command palette"
-  - "Consider plan-006 T7 concurrently: graduate HomeAutomation-validated layout into an AppShell tool"
+  - "Host-side `pnpm typecheck && pnpm test && pnpm build` to confirm Phase 4/5 implementation + today's layout corrections pass the Windows gate"
+  - "Visual spot-check at multiple window widths: select TEXT DIFF / WHITESPACE CLEAN and confirm the top-row height stays pinned and the cascade drops entries gracefully as the window narrows"
+  - "Begin Phase 6: vertical-slice tools + backend commands (replace placeholder tools with real implementations)"
+  - "Phase 7 on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)"
+  - "Consider plan-006 T7: graduate HomeAutomation-validated layout into an AppShell tool"
 ---
 
 # Status Log
+
+## Session: 2026-04-23 (late — top-row jitter correction + secondary title removal)
+**Phase:** Same-day follow-up on the morning's LcarsStandardLayout fix.
+
+**User feedback on the morning fix:** The `height` → `min-height` change solved the
+clipping symptom but introduced layout jitter — selecting TEXT DIFF or WHITESPACE CLEAN
+(the tools with the longest names) made the top row grow visibly, because titleChip +
+banner + titleLeading couldn't fit on one line and wrapped. User preference was explicit:
+keep the top-row chrome at its shorter pinned height, and drop content (starting with the
+secondary title, then cascade entries) rather than growing the row. "I also preferred the
+shorter segment in the top section than matching the segment height in the bottom section."
+
+**Correction applied (supersedes the morning direction):**
+- `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css`:
+  reverted `.wrap.topRow` from `min-height` back to fixed `height`. Changed `.titleRow`
+  from `flex-wrap: wrap` to `flex-wrap: nowrap` with `min-width: 0` so banner +
+  titleLeading can never stack vertically. Rewrote the comments on both rules to
+  document the new content-drop strategy (growth pressure is absorbed inside the row via
+  drops, never by relaxing the height).
+- `apps/desktop/src/shell/AppShell.tsx`: removed the `titleChip` derivation, its
+  wrapping comment block, the `titleChip={titleChip}` prop pass on `<LcarsStandardLayout>`,
+  the `activeCenterDescriptor`/`activeTitle` helpers (now unused), and the `LcarsChip`
+  import. Replaced with a short comment explaining why the secondary title is
+  deliberately absent — the active tool is surfaced in `CascadeStatus`'s `ACTIVE`
+  entry, so duplicating it next to the banner was buying jitter for zero new info.
+- `apps/desktop/src/shell/ToolStatusPanels.module.css`: replaced the single 1100px
+  drop rule with a 4-step drop ladder: ≤1300px drop C/R/B, ≤1050px drop ZONE,
+  ≤900px drop CAT (leaving only ACTIVE), ≤700px hide the cascade entirely. Now the
+  fixed-width top row degrades predictably at every window size rather than clipping
+  silently.
+
+**Actions — lessons:**
+- `docs/lessons.yaml`: appended lesson #41 (category: architecture, supersedes: 40).
+  #40's "use min-height" advice was wrong for this class of load-bearing chrome; #41
+  states the corrected pattern: keep the height fixed, make content-bearing rows
+  nowrap + min-width:0, provide an explicit drop ladder, and eliminate accessories
+  (like a redundant secondary title) that add growth pressure without earning it.
+  Honoring the append-only lessons contract — #40 stays in place with its original
+  text for provenance; readers follow the `supersedes: 40` pointer on #41 to the
+  corrected advice.
+
+**Outcome:**
+- The top-row chrome no longer breathes when tools are selected. At a wide window
+  with all 6 cascade entries visible, the row stays at 185px. As the window narrows,
+  cascade entries drop in order of decreasing importance (counters → ZONE → CAT) so
+  nothing gets silently clipped. The original "segments disappear on tool select" bug
+  is eliminated at the source: content can no longer overflow the fixed row.
+- Other `LcarsStandardLayout` consumers (DerisScreen, PrimitiveGallery) are unaffected
+  — they don't set `--lcars-layout-top-row-height` (auto default) and don't pass a
+  titleChip; the titleRow's nowrap change is a behavior tightening that improves their
+  robustness too.
+
+**Next:** Host re-runs `pnpm typecheck && pnpm test && pnpm build` + a visual spot-check
+at multiple window widths. Task #67 stays in_progress until the Windows gate is green.
+
+---
+
+## Session: 2026-04-23 (LcarsStandardLayout top-row / elbow sync fix)
+**Phase:** Post-Phase-5 polish — surfaced by the user after the Phase 4/5 landing when
+selecting tools revealed a layout regression.
+
+**Symptom reported by user:**
+> "when I select some tools, the top section is being affected. e.g. the top segments
+> disappear / are no longer visible until I hit the reset button. Also, it seems like the
+> height of the upper segments can change and the elbowTop height isn't being adjusted to
+> match. They either need to stay in sync or the top segment height needs to be fixed."
+
+**Diagnosis:** `LcarsStandardLayout.module.css` pinned `.wrap.topRow` with a hard
+`height: var(--lcars-layout-top-row-height, auto)`. AppShell sets that var to
+`calc(160px + 25px)` = 185px for a compact top. When a center tool is active, `titleChip`
+renders inside `.titleRow` (a flex row with `flex-wrap: wrap`). Combined with the banner
+text + `titleLeading` (CascadeStatus) + a narrow-ish viewport, the chip can push the title
+onto two lines, and/or nav pills can wrap to a second row. Each adds enough height that
+title + nav + spacer-min (10px in AppShell) + topBar margin + topBar segments exceeds the
+185px budget. `.wrap` has `overflow: hidden`, so the overflow clips the topBar segments
+from the bottom up. The `elbowTop` is absolutely positioned with `bottom: 0` of
+`.rightFrameTop`, which fills the 185px — so the elbow keeps painting at y ≈ 110–185, but
+the bar segments it was supposed to weld to just got clipped out of existence. Reset
+clears tools → no titleChip → title row shrinks to one line → everything fits under 185px
+again → bar re-appears.
+
+**Fix applied (one-line structural change + comment updates):**
+- `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css`:
+  changed `.wrap.topRow { height: ... }` to `.wrap.topRow { min-height: ... }`. Consumers
+  still pin the baseline (AppShell's 185px stays), but the row is now free to grow when
+  its content demands more, eliminating the clip path. The existing `flex-shrink: 0` on
+  `.wrap` continues to protect the top row from being squeezed by pressure from the
+  bottom row — that invariant is untouched.
+- Updated the explanatory comments on both `.wrap` and `.wrap.topRow` to reflect the new
+  min-height semantics and cross-reference each other, so the next reader understands
+  why it's min-height and not height.
+
+**Actions — lessons captured:**
+- Appended lesson #40 to `docs/lessons.yaml` — category `architecture`: "Fixed height +
+  `overflow: hidden` + absolutely-positioned children anchored to container edges is a
+  silent-clip anti-pattern. Use `min-height` so the container grows with content instead
+  of hiding it; the welded absolute element stays in sync because it always anchors to
+  the real content edge, not a premature clip line."
+
+**Outcome:**
+- AppShell renders identically in the common (no-tool or short-title) case — 185px top
+  row pinned by min-height is visually the same as 185px pinned by height.
+- When a tool is selected and content pressure grows the title row, the top row now
+  grows with it. The `topBar` segments and `elbowTop` stay visibly welded. No ResizeObserver,
+  no JS — pure CSS.
+- No consumer regressions expected. Other `LcarsStandardLayout` users (DerisScreen,
+  PrimitiveGallery) don't override `--lcars-layout-top-row-height`, so they still use
+  the auto default — min-height:auto behaves identically to height:auto.
+
+**Next:** Host re-runs `pnpm typecheck && pnpm test && pnpm build` + visual spot-check.
+Task #67 (Phase 4/5 verification pass) stays in_progress until the Windows gate is green.
+
+---
+
+## Session: 2026-04-22 (Phase 4 + Phase 5 — navigator rebuild, HomeView, command palette, shortcuts)
+**Phase:** 4 (tool registry + navigator) + 5 (command palette) executed together as one milestone.
+
+**Scope chosen:** Navigator + HomeView + CommandPalette + keyboard shortcut system in a single
+push, with favorites/recents/search surfaced IN the rail itself rather than split across a
+separate overlay or header — single entry point, consistent with LCARS "everything framed by
+the rail" affordance.
+
+**Actions — state layer (tasks #59, #60):**
+- Added `useFavorites` (Zustand + `persist` middleware backed by `createJSONStorage(() =>
+  localStorage)`). Exposes `favorites: string[]`, `toggleFavorite(id)`, `clearFavorites()`,
+  plus the selector helpers `useIsFavorite(id)` and `useToggleFavorite()` for components that
+  only need one slice. MRU ordering — toggling pin moves the id to the front.
+- Added `useRecents` with identical persist pattern. `trackOpen(id)` unshifts + dedupes +
+  caps at `RECENTS_CAP = 8`. `useTrackOpen()` returns a stable reference for consumers.
+- Wired `trackOpen` into `AppShell.handleOpenTool` so every openTool call (tab click, palette
+  enter, HomeView launchpad card, keyboard shortcut) feeds recents. Order matters: `openTool`
+  fires first, then `trackOpen` — so a stale-registry id still updates the recents list even
+  if no descriptor resolves.
+- Unit tests for both hooks under `state/useFavorites.test.ts` and `state/useRecents.test.ts`
+  (`// @vitest-environment jsdom` so the persist middleware can read/write the in-memory
+  localStorage shim).
+
+**Actions — navigator rebuild (task #61):**
+- Full rewrite of `shell/LeftNavigator.tsx` (294 lines). Top of the stack is an
+  `LcarsSearchField` with a FIND prefix, value pinned to a local `query` state.
+- Below search, three conditional regions:
+  1. **PINNED** — `pinnedTools` from `favorites` mapped through the `toolsById` index.
+  2. **RECENT** — `recentTools` from `recents`, filtered to exclude anything already pinned
+     (so the same tool doesn't appear twice in the rail).
+  3. **Browse** — canonical category stack (Text, Validation, Data, Binary, Network,
+     Utilities), each a collapsible `LcarsPanel`.
+- When `query.trim().length > 0`, the three default regions are replaced by a flat
+  **RESULTS** section with a score-based sort: name-prefix (0) beats name-substring (1)
+  beats desc-prefix (2) beats desc-substring (3). Ties break alphabetically.
+- Meta-section palette is deliberate — pinned=butterscotch (warm, "you marked this"),
+  recent=bluey (cool, historical), search results=red (signals "active filter — default
+  stack hidden"). Browse categories cycle through the LCARS hue palette, with the FIRST
+  category seeded from `railColor` so the decorative rail curve's color continues into the
+  first panel without a seam.
+- Tool rows render with a small green `.openDot` indicator when `openToolIds` contains the
+  id, so the rail shows workspace status at a glance.
+
+**Actions — pin/unpin from tab menu (task #62):**
+- Extended `shell/TabActionMenu.tsx` with a `toggle-pin` EntryId. Entry label flips between
+  "Pin to Rail" and "Unpin from Rail" based on `useIsFavorite(toolId)`; dispatch calls
+  `useToggleFavorite()` on the current tool id. Menu now has two bottom-group operations
+  (pin toggle + reset view) before the destructive close at the very bottom.
+
+**Actions — HomeView launchpad (tasks #63, #64):**
+- New `screens/HomeView.tsx` (191 lines). Hero banner with eyebrow "HYPERSPANNER · v0.1"
+  and title "STARFLEET ENGINEERING CONSOLE", plus an action row with two pills —
+  `OPEN PALETTE · ⌘K` (wired to `onOpenPalette`) and `BROWSE TOOLS` (scroll-hint to the
+  Browse section below).
+- Body is a stack of sections in the same grammar as the rail: Pinned (butterscotch),
+  Recent (bluey), Browse (category-colored). Each section renders its tools as a
+  responsive CSS-grid of card buttons (`auto-fill` with `minmax(240px, 1fr)`), each card
+  has a 6px colored accent bar on the left, a name (1-line ellipsis) and description
+  (2-line clamp).
+- `CenterZone.tsx` renders `<HomeView onOpenTool onOpenPalette />` as its empty-state —
+  both when nothing is docked center AND when an individual split side is empty. HomeView
+  replaces the old `LcarsEmptyState + LcarsPill` "OPEN SAMPLE" placeholder.
+
+**Actions — command palette (task #65):**
+- New `shell/CommandPalette.tsx` (310 lines) + `CommandPalette.module.css`. Portal-rendered
+  modal via `createPortal(content, document.body)` with a fixed scrim that click-closes.
+- Inner palette is an `LcarsSearchField` at the top + a scroll list of `CommandItem` rows.
+  Each row has a colored accent bar, label (highlighted on cursor), a muted description,
+  and a right-aligned kind tag (TOOL / ACTION).
+- Catalog = all tools (kind: 'tool', color from category palette, run = `onOpenTool(id)`)
+  + conditional actions: "Reset Layout" (kind: 'action', when anything non-default is in
+  workspace), "Cycle Theme" (always). Scoring mirrors the navigator's filter — label-prefix
+  beats label-substring beats keyword-match beats description-substring.
+- Keyboard: ArrowUp/Down move cursor (wraps), Home/End jump, Enter executes, Escape closes,
+  Tab is trapped. `scrollIntoView({ block: 'nearest' })` keeps the cursor visible as it
+  moves. Focus captured via `requestAnimationFrame` so the DOM has painted before we try
+  to focus the input (the earlier `useEffect` placement was racing with the portal mount).
+
+**Actions — shortcut registry + help overlay (task #66):**
+- New `keys/` module with four pieces:
+  - `shortcuts.ts` — `Shortcut` type (`{ id, description, key, mod?, shift?, alt?,
+    whenTyping?, run }`), `WhenTypingPolicy = 'allow' | 'block'`, plus `formatShortcut()`
+    (Mac renders ⌘⇧K, Windows renders Ctrl+Shift+K) and `isMacPlatform()`.
+  - `useGlobalShortcuts.ts` — `useEffect` with empty deps registers a single window
+    keydown listener. A `ref` keeps the bindings list current without re-subscribing
+    (so callers can pass a fresh array each render without triggering listener churn).
+    Match logic: wantMod === event.metaKey/ctrlKey, wantShift === event.shiftKey,
+    wantAlt === event.altKey, key compared case-insensitively. `whenTyping: 'block'`
+    (default) no-ops when the active element is a text input/textarea/contenteditable;
+    `allow` lets the shortcut fire even while typing (the palette open/close uses this
+    so ⌘K works while the search field is focused).
+  - `ShortcutHelp.tsx` + `ShortcutHelp.module.css` — portal modal with a static
+    `HELP_CATALOG` (Global group: palette + help; Workspace group: zone toggles).
+    Esc + click-outside close. Reason for a static catalog rather than deriving from
+    the live bindings: shortcut behavior spans multiple handlers (zone toggles live in
+    `useShellShortcuts`, palette in `useGlobalShortcuts`), and grouping/ordering for
+    presentation shouldn't couple to registration.
+  - `index.ts` barrel.
+- Wired into `AppShell.tsx`:
+  - `useGlobalShortcuts([{ palette: Cmd+K, whenTyping: 'allow' }, { help: Shift+?,
+    whenTyping: 'block' }])`.
+  - `paletteOpen` / `helpOpen` local state; both toggle to close on re-press.
+  - The TopRail PALETTE pill's onClick now fires `handleOpenPalette` (same entry
+    point as the shortcut).
+  - `<CommandPalette />` and `<ShortcutHelp />` rendered at the bottom of the shell
+    tree; each is a portal at runtime so they don't affect layout when closed.
+
+**Verification performed (task #67):**
+- Sandbox `tsc` cannot be trusted — see lesson below. Host-side `pnpm typecheck &&
+  pnpm test && pnpm build` is the gate, same as prior phases (lesson #2, #18).
+- Static code review: walked every new/edited file against strict + `verbatimModuleSyntax`
+  (import-type separation for `FC`, `ReactNode`, `Shortcut`, `ToolDescriptor`, `SplitSide`,
+  etc.), confirmed ARIA on the palette + help modal, confirmed escape/click-outside
+  handlers fire, and confirmed the recents/favorites persist keys don't collide.
+- Confirmed Zone 0 regressions are impossible — Phase 4/5 touches only additive state
+  (favorites, recents), additive UI (HomeView, CommandPalette, ShortcutHelp), and one
+  insertion point in handleOpenTool. No existing behavior changed.
+
+**Outcome:** Phase 4 + Phase 5 milestone reached in one push. Tool discovery is now
+complete: rail with search/pinned/recent/browse, HomeView launchpad as the empty-state,
+Cmd+K command palette, Shift+? shortcut help. Every openTool path — tab click, palette,
+HomeView card, TabActionMenu reopen — feeds recents; every tool can be pinned from its
+tab menu and appears in the rail's PINNED section.
+
+**Files changed this session:** ~16 —
+`apps/desktop/src/state/useFavorites.ts` (new),
+`apps/desktop/src/state/useRecents.ts` (new),
+`apps/desktop/src/state/useFavorites.test.ts` (new),
+`apps/desktop/src/state/useRecents.test.ts` (new),
+`apps/desktop/src/state/index.ts` (barrel export updates),
+`apps/desktop/src/shell/AppShell.tsx` (trackOpen + palette + shortcuts wiring),
+`apps/desktop/src/shell/LeftNavigator.tsx` (full rewrite, 294 lines),
+`apps/desktop/src/shell/LeftNavigator.module.css` (+searchSlot, +sectionHeader, +emptyHint),
+`apps/desktop/src/shell/TabActionMenu.tsx` (toggle-pin entry),
+`apps/desktop/src/shell/CenterZone.tsx` (HomeView empty-state),
+`apps/desktop/src/shell/CommandPalette.tsx` (new, 310 lines),
+`apps/desktop/src/shell/CommandPalette.module.css` (new),
+`apps/desktop/src/screens/HomeView.tsx` (new, 191 lines),
+`apps/desktop/src/screens/HomeView.module.css` (new),
+`apps/desktop/src/screens/index.ts` (new barrel),
+`apps/desktop/src/keys/{shortcuts.ts,useGlobalShortcuts.ts,ShortcutHelp.tsx,ShortcutHelp.module.css,index.ts}`
+(new module).
+
+**Blockers:** None. Host-side verification gate only.
+
+
+**Addendum (same day, after host verification surfaced file truncation):**
+Host-side `pnpm typecheck && pnpm test && pnpm build` run revealed that several of the files
+I had edited via the file-tool Edit operation during Phase 4/5 had been silently truncated on
+disk — partly null-padded, partly cut mid-line — even though the tool result reported success
+and subsequent Read calls returned apparently-complete content. Host TSC reported: HomeView.tsx
+JSX element `div`/`section` has no corresponding closing tag; PaneDropTarget.tsx `{` expected at
+line 101; TabActionMenu.tsx JSX element `ul` has no corresponding closing tag at line 272.
+
+**Root cause:** File-tool Edit/Write can silently produce a partially-written file, and the
+bash sandbox's mount view of the host filesystem can lag behind the real state, so the
+truncation wasn't visible via either Read or sandbox-side `tsc`. A mistaken attempt to
+"clean" the affected files via `tr -d '\000'` stripped additional legitimate bytes and
+left them in a worse state.
+
+**Recovery actions:**
+- For tracked files (PaneDropTarget.tsx, TabActionMenu.tsx): extracted the clean version from
+  `git show HEAD:path` via redirect to /tmp, then rewrote on top via bash heredoc with Phase
+  4/5 fixes re-applied (DOMStringList→minimal-shape feature test; handleKey widened from
+  `HTMLDivElement` to `HTMLElement` for dual-element binding; pin/unpin entry wired into
+  TabActionMenu).
+- For untracked files (HomeView.tsx, HomeView.module.css): appended the missing JSX close
+  tags and CSS rule via bash heredoc `>>` redirect to restore the prefix that was intact.
+- Verified every file after reconstruction: zero null bytes (`tr -cd '\000' | wc -c`),
+  valid UTF-8 (`file`), balanced braces + parens.
+- Also restored `docs/lessons.yaml` and `docs/status.md` from `git show HEAD:path` — both
+  had been similarly truncated by earlier file-tool Edits. Appended Phase 4/5 lessons
+  (#32–#38) via bash heredoc and re-inserted the Phase 4/5 session entry above the prior
+  content.
+
+**Lessons captured (lessons.yaml #32–#38):** put search/favorites/recents in the rail itself
+(#32); Zustand 5 + persist recipe for jsdom tests (#33); keyboard shortcut whenTyping
+allow/block policy (#34); tiered scoring beats boolean match (#35); widen event generic to
+`HTMLElement` when the same handler binds multiple element types (#36); cast DataTransfer.types
+through `unknown` to a minimal shape for cross-browser DOMStringList↔readonly-string[] interop
+(#37); file-tool Edit can silently truncate, prefer bash heredoc rewrites for large changes
+and verify on disk with `wc -l` + `tr -cd '\000' | wc -c` (#38).
+
+**Verification posture:** Sandbox can't be trusted for typecheck due to mount staleness.
+Awaiting host re-run of `pnpm typecheck && pnpm test && pnpm build` to confirm the
+reconstruction resolves the 8 JSX truncation errors without introducing new ones.
+
+---
 
 ## Session: 2026-04-22 (plan-005 polish — inspector layout + elbow/bar weld)
 **Phase:** plan-005 polish iteration on user feedback — two distinct asks.

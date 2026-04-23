@@ -69,10 +69,16 @@ export const PaneDropTarget: FC<PaneDropTargetProps> = ({
       if (!aliveRef.current) return;
       const types = event.dataTransfer?.types;
       if (!types) return;
-      // DOMStringList in some browsers — normalize with contains/includes.
+      // `types` is typed as `readonly string[]` in modern TS lib.dom, but
+      // historically browsers exposed a DOMStringList. Normalize by
+      // feature-testing for `contains` (DOMStringList) and falling back to
+      // `includes` (modern array-like). A runtime cast to `unknown` keeps
+      // this cross-compatible without a structural DOMStringList cast,
+      // which TS 5.9 rejects because `readonly string[]` lacks `item`.
+      const typesAny = types as unknown as { contains?: (s: string) => boolean };
       const hasMime =
-        typeof (types as DOMStringList).contains === 'function'
-          ? (types as DOMStringList).contains(TAB_MIME)
+        typeof typesAny.contains === 'function'
+          ? typesAny.contains(TAB_MIME)
           : Array.from(types as unknown as Iterable<string>).includes(TAB_MIME);
       if (!hasMime) return;
       // dataTransfer.getData() is NOT available during dragstart in most

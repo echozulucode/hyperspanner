@@ -1,0 +1,154 @@
+/*
+ * CommandPalette — ⌘K modal overlay.
+ *
+ * Scrim covers the viewport and dims everything behind. Palette is a
+ * centered column, max-width ~620px, with its own internal scroll for
+ * the results list. All positioning is `position: fixed` because it
+ * renders via portal to document.body and needs to ignore every ancestor
+ * scroll/overflow rule.
+ */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 1000;
+  /* So the click handler in the component knows "clicked outside the
+   * palette" — clicks on this scrim ARE outside the palette's subtree
+   * but inside the scrim, which is fine: the click-outside effect
+   * checks containment against the palette root, not the scrim. */
+}
+
+.palette {
+  width: min(620px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #1a1a1a;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  /* Subtle outer ring to anchor the palette against the dim scrim — not
+   * too saturated so the LCARS accent bars on each row remain the
+   * brightest color in the frame. */
+  outline: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.searchSlot {
+  padding: 0.75rem 0.75rem 0.6rem;
+  border-bottom: 2px solid var(--lcars-color-orange, #ff8800);
+}
+
+.searchField {
+  width: 100%;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem 0.4rem 0;
+  cursor: pointer;
+  min-height: 2.75rem;
+  color: var(--lcars-color-text, #eae4d6);
+  transition: background-color 80ms ease;
+}
+
+.rowActive,
+.row:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.rowActive {
+  /* A hair brighter than :hover so keyboard selection wins over mouse
+   * hover when both coincide. */
+  background-color: rgba(255, 136, 0, 0.12);
+}
+
+.rowAccent {
+  flex: 0 0 4px;
+  background-color: var(--lcars-color-orange, #ff8800);
+  /* Slight inset so the accent doesn't touch the palette edge — feels
+   * more like an LCARS left-frame element, less like a border. */
+  margin-left: 0.75rem;
+  border-radius: 2px;
+}
+
+.rowBody {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  padding: 0.1rem 0;
+}
+
+.rowLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--lcars-color-almond-creme, #e8d9b2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowDesc {
+  font-size: 0.75rem;
+  color: var(--lcars-color-text, #eae4d6);
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowKind {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  opacity: 0.55;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.rowAction .rowKind {
+  border-color: rgba(204, 153, 204, 0.5); /* african-violet adjacent */
+  color: var(--lcars-color-african-violet, #cc99cc);
+  opacity: 0.9;
+}
+
+.empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--lcars-color-text, #eae4d6);
+  opacity: 0.6;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.footer {
+  display: flex;
+  gap: 1.25rem;
+  justify-content: center;
+  padding: 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  color: var(--lcars-color-text, #eae4d6);
+  opacity: 0.5;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
