@@ -64,6 +64,17 @@
    * .wrap.gap below re-enables shrink for the bottom row via higher
    * specificity (two classes vs one). */
   flex-shrink: 0;
+  /* Optional explicit height for the top row. Default `auto` keeps the
+   * content-driven behavior (intrinsic of the taller sibling wins).
+   * A consumer that wants the top chrome to be bulletproof-stable —
+   * unaffected by banner wrapping, cascade value length, or which tool
+   * is selected — can set this to a fixed value (e.g. 240px to match
+   * the rail's hasChildren intrinsic). Content inside .rightFrameTop
+   * is absorbed by .spacer (flex:1), so no clipping at that size. */
+}
+
+.wrap.topRow {
+  height: var(--lcars-layout-top-row-height, auto);
 }
 
 /* The second .wrap (bottom row) takes the remaining vertical space so
@@ -184,9 +195,36 @@
 .elbowTop {
   position: absolute;
   left: 0;
-  bottom: calc(var(--lcars-spacing-bar-height, 28px) - 1px);
+  /* Two-part geometry: a 60×60 radial-gradient disc that forms the
+   * crescent curve, plus a rail-colored extension strip below it that
+   * blankets the full bar height.
+   *
+   *   bottom: 0 — anchors the elbow to the container's bottom edge, so
+   *     the curve lines up with the bar regardless of how the flex
+   *     column above it distributes space.
+   *
+   *   height: 60px disc + bar-height extension. The disc occupies the
+   *     TOP 60px of the box, centered at the box's top-right, so its
+   *     horizontal-tangent point lands at elbow-local y=60 — exactly
+   *     on the bar's top edge. The EXTRA bar-height pixels below the
+   *     disc are a solid rail-colored rectangle (every pixel there has
+   *     distance ≥ 60 from the gradient center) that fully blankets
+   *     the bar's first segment. Since syncFirstSegmentColor already
+   *     paints the bar's first segment in rail-color, the blanket is
+   *     invisible — but it absorbs any subpixel rounding, zoom
+   *     rounding, or layout drift that could otherwise produce a
+   *     hairline gap between the crescent and the bar. */
+  bottom: 0;
   width: 60px;
-  height: 60px;
+  /* Total height = disc depth (47px) + bar-height extension. The 47px
+   * figure is empirical: the disc's horizontal-tangent point inside the
+   * 60px-radius gradient must land exactly on the bar's top edge, and
+   * the flex column above the bar places that edge ~47px above the
+   * container's bottom (not `bar_height` above, as naive math predicts).
+   * Shrinking the disc box from 60→47 pulls the tangent down to meet
+   * the bar's actual top; the bar-height extension below the tangent
+   * still blankets the first segment so no subpixel gap can open up. */
+  height: calc(47px + var(--lcars-spacing-bar-height, 28px));
   background: radial-gradient(
     circle 60px at top right,
     transparent 59.5px,
@@ -212,9 +250,27 @@
 .elbowBottom {
   position: absolute;
   left: 0;
-  top: calc(var(--lcars-spacing-bar-height, 28px) - 1px);
+  /* Mirror of .elbowTop — flipped vertically. The bar is the FIRST flow
+   * child of .rightFrame, so bar-top = container-top. The elbow anchors
+   * to that edge (top: 0) and extends the same disc + extension pattern
+   * upside-down:
+   *   - Extension strip in the TOP bar-height px is solid rail-color,
+   *     blanketing the bar's first segment.
+   *   - 60×60 disc sits in the BOTTOM 60px of the box, centered at
+   *     bottom-right, so its horizontal-tangent point lands on the bar's
+   *     bottom edge — the crescent continues the rail upward from there.
+   */
+  top: 0;
   width: 60px;
-  height: 60px;
+  /* Not a mirror of elbowTop's 47px — the BOTTOM bar is taller than the
+   * top bar (the bottom row's segmented LcarsBar uses the full canonical
+   * bar height, while the top bar's effective join point sits higher
+   * due to the flex column's spacing). The 60px disc depth lines up the
+   * crescent's horizontal tangent with the bottom bar's bottom edge;
+   * the bar-height extension above the tangent still blankets the
+   * first segment. Do NOT sync this with elbowTop — they're
+   * independently tuned for their respective bar rows. */
+  height: calc(60px + var(--lcars-spacing-bar-height, 28px));
   background: radial-gradient(
     circle 60px at bottom right,
     transparent 59.5px,
@@ -225,17 +281,42 @@
 
 /* ── BANNER ROW CONTENTS ────────────────────────────────────────────── */
 
-/* Title-with-chip row — used when `titleChip` is supplied. The chip sits
- * inline with the banner, right-aligned, baseline-aligned with the
- * banner text's baseline so it reads as a sibling marker rather than
- * floating content. `flex-wrap: wrap` lets the chip drop to its own row
- * on narrow viewports where the banner has shrunk. */
+/* Title row — used when `titleChip` and/or `titleLeading` is supplied.
+ * The banner (and its optional chip) stay right-aligned; an optional
+ * `titleLeading` element lives in the empty space on the LEFT and uses
+ * `margin-right: auto` to keep the banner pinned to the right. `flex-wrap`
+ * lets the layout collapse to stacked rows gracefully on narrow viewports
+ * without punching through the wrap's overflow: hidden. */
 .titleRow {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+/* Banner + chip group (right side). Baseline-aligned with each other so
+ * the chip reads as a sibling marker of the banner text. */
+.titleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+}
+
+/* Left slot (cascade / monitors / status). `margin-right: auto` steals
+ * remaining row space, pushing .titleGroup to the right — this is what
+ * produces the "banner right, cascade left" composition in a single
+ * row. flex-shrink:1 lets the slot give up width first when the viewport
+ * narrows, so the banner title is never the first to wrap. */
+.titleLeading {
+  display: flex;
+  align-items: flex-end;
+  flex: 0 1 auto;
+  margin-right: auto;
+  /* Slight bottom padding so the leading content's descenders line up
+   * near the banner's baseline rather than floating above it. */
+  padding-bottom: 0.35rem;
 }
 
 .titleChip {

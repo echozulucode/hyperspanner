@@ -6,7 +6,7 @@ import { LeftNavigator } from './LeftNavigator';
 import { CenterZone } from './CenterZone';
 import { RightZone } from './RightZone';
 import { BottomZone } from './BottomZone';
-import { CascadeStatus, TopRailStatus } from './ToolStatusPanels';
+import { CascadeStatus } from './ToolStatusPanels';
 import { useShellShortcuts } from './useZoneState';
 import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
@@ -181,40 +181,46 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
 
   // Layout-primitive overrides.
   //   --lcars-layout-top-spacer-min: 10px — compact floor for the spacer
-  //      above the topBar (the default 20px re-inflates the row beyond
-  //      what we want for the rapid-switcher chrome).
-  //   --lcars-layout-top-spacer-flex: 1 (default) — the spacer KEEPS its
-  //      grow so the topBar stays welded to the bottom of the row when
-  //      the rail side happens to be a few pixels taller; we don't want
-  //      a floating bar with empty space beneath it.
-  //   --lcars-layout-top-bar-margin: 0.5rem — keeps a hair of breathing
-  //      space above the topBar without reintroducing the old gap.
+  //      above the topBar; the 20px default adds visible gap we don't need.
+  //   --lcars-layout-top-spacer-flex: 1 (DEFAULT) — the spacer KEEPS its
+  //      grow so the topBar/elbow stay welded to the bottom of the row
+  //      even when the rail's hasChildren intrinsic is taller than the
+  //      banner+nav stack (which is always, with the authentic 160px
+  //      rail curve). Never set this to 0 while topPanels is populated.
+  //   --lcars-layout-top-bar-margin: 0.5rem — a hair of breathing space
+  //      above the topBar without the old ~30px gap.
   //   --lcars-layout-nav-gap-x/y: 0.2rem — tight pill cluster; the default
   //      gaps (0.5rem / 0.65rem) felt too airy for a rapid switcher.
-  //   --lcars-layout-top-rail-radius / panel-padding — the canonical
-  //      160px corner radius with 160px+1.25rem bottom padding made the
-  //      leftFrameTop ~240px tall (curve + TopRailStatus panels), which
-  //      overran the now-compact rightFrameTop and left the segments
-  //      floating mid-row. Shrinking to a 50px curve with 50px+0.75rem
-  //      padding lets the rail match the compact top's height while
-  //      keeping a visible rounded corner; the bar/elbow weld stays
-  //      aligned because the elbow is an independent 60×60 primitive.
+  //
+  // Why no rail radius/padding override: a smaller top-rail corner made
+  // the top/bottom rails visually asymmetric (tight 50px arc at the top
+  // vs the canonical 160px arc at the bottom). Keeping both rails at
+  // their 160px default restores LCARS-authentic symmetry. The side
+  // effect — a taller top row driven by the rail's hasChildren intrinsic
+  // (panels + 160px + 1.25rem of decorative padding) — is actually what
+  // pins the row height stable: the rail's intrinsic is constant regardless
+  // of which tool is active, so selecting a tool can't resize the header.
   const layoutStyle: CSSProperties = {
     '--lcars-layout-top-spacer-min': '10px',
     '--lcars-layout-top-bar-margin': '0.5rem',
     '--lcars-layout-nav-gap-x': '0.2rem',
     '--lcars-layout-nav-gap-y': '0.3rem',
-    '--lcars-layout-top-rail-radius': '0 0 0 50px',
-    '--lcars-layout-top-rail-panel-padding': 'calc(50px + 0.75rem)',
+    // Pin the top row to "just enough for the authentic 160px rail
+    // curve plus a hair of straight edge above it". No topPanels means
+    // leftFrameTop's intrinsic is 0; we want the curve's full quarter-
+    // circle to render (requires >=160px height), with ~25px of straight
+    // rail at the top for visual breathing. rightFrameTop's banner+nav+
+    // bar content is absorbed by the spacer (flex:1) so the bar and
+    // elbow stay welded to the bottom regardless of content wrap.
+    '--lcars-layout-top-row-height': 'calc(160px + 25px)',
   } as CSSProperties;
 
   return (
     <LcarsStandardLayout
       title="HYPERSPANNER"
       titleChip={titleChip}
+      titleLeading={<CascadeStatus />}
       navigation={navigation}
-      cascade={<CascadeStatus />}
-      topPanels={<TopRailStatus />}
       bottomPanels={
         <LeftNavigator
           activeToolId={centerActive ?? rightActive ?? bottomActive ?? null}

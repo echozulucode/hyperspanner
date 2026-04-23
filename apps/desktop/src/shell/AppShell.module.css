@@ -3,12 +3,19 @@
  * only styles the workspace grid that lives inside the layout primitive's
  * main slot, plus the right/bottom restore affordances.
  *
- * Workspace grid:
+ * Workspace grid (VS Code-style anchoring):
  *   ┌──────────────┬────────┐
- *   │  center      │ right  │
- *   ├──────────────┴────────┤
- *   │  bottom               │
- *   └───────────────────────┘
+ *   │  center      │        │
+ *   ├──────────────┤ right  │
+ *   │  bottom      │        │
+ *   └──────────────┴────────┘
+ *
+ * The inspector (right) is pinned to the right edge at its full height,
+ * while the center zone's tabs absorb all remaining horizontal space to
+ * the left of it. The bottom zone stacks under center only — it does NOT
+ * extend under the inspector — so the inspector feels like a true side
+ * panel rather than a half-height column floating above a full-width
+ * footer.
  *
  * Collapse states shrink the right column or bottom row to a narrow stub
  * so the restore affordance stays visible. The 1fr center cell reclaims
@@ -39,9 +46,15 @@
   display: grid;
   grid-template-columns: 1fr var(--ws-right-width, 320px);
   grid-template-rows: 1fr var(--ws-bottom-height, 240px);
+  /* Right column spans both rows — the inspector is a full-height side
+   * panel anchored to the right edge. Bottom zone only spans the left
+   * column, so the center tabs + console share the "remaining space"
+   * left of the inspector. This matches VS Code / IDE conventions and
+   * reads as a proper docked side panel rather than a half-height
+   * stripe above a full-width footer. */
   grid-template-areas:
     'center right'
-    'bottom bottom';
+    'bottom right';
   --ws-right-closed-width: 40px;
   --ws-bottom-closed-height: 32px;
   gap: var(--lcars-spacing-panel-border, 0.25rem);

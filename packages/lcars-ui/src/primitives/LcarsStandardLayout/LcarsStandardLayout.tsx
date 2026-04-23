@@ -17,6 +17,15 @@ export interface LcarsStandardLayoutProps {
    * gallery.
    */
   titleChip?: ReactNode;
+  /**
+   * Optional content rendered in the empty space to the LEFT of the
+   * banner title — same row, baseline-aligned. Intended for compact
+   * telemetry/status readouts (e.g. CascadeStatus) that want to sit
+   * in the header without eating a dedicated banner row beneath the
+   * title. The title itself stays right-aligned; this slot grows into
+   * whatever width is left on the left side.
+   */
+  titleLeading?: ReactNode;
 
   /** Stacked LcarsPanel children for the TOP rail (blue by default). */
   topPanels?: ReactNode;
@@ -90,6 +99,7 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
   title,
   stardate,
   titleChip,
+  titleLeading,
   topPanels,
   bottomPanels,
   cascade,
@@ -136,7 +146,7 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
     <div className={`${styles.container} ${className}`} style={rootStyle}>
       {trim && <div className={styles.headtrim} aria-hidden="true" />}
 
-      <div className={styles.wrap}>
+      <div className={`${styles.wrap} ${styles.topRow}`}>
         <div
           className={`${styles.leftFrameTop} ${topPanels ? styles.hasChildren : ''}`}
         >
@@ -144,10 +154,15 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
         </div>
         <div className={styles.rightFrameTop}>
           {bannerText !== null &&
-            (titleChip ? (
+            (titleChip || titleLeading ? (
               <div className={styles.titleRow}>
-                <LcarsBanner size="large">{bannerText}</LcarsBanner>
-                <div className={styles.titleChip}>{titleChip}</div>
+                {titleLeading && (
+                  <div className={styles.titleLeading}>{titleLeading}</div>
+                )}
+                <div className={styles.titleGroup}>
+                  <LcarsBanner size="large">{bannerText}</LcarsBanner>
+                  {titleChip && <div className={styles.titleChip}>{titleChip}</div>}
+                </div>
               </div>
             ) : (
               <LcarsBanner size="large">{bannerText}</LcarsBanner>
