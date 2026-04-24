@@ -1,7 +1,23 @@
 //! Hyperspanner Tauri runtime.
 //!
-//! Phase 0: bootstrap only. Commands, state, and tool modules are added
-//! in later phases per `docs/plan-002-implementation.md`.
+//! Phase 6.0: backend command surface scaffolding. The `commands` module
+//! groups IPC-exposed functions by concern (fs today; hash/protobuf/tls land
+//! in later 6.x sub-phases). Every command returns `HyperspannerResult<T>`
+//! so errors cross the IPC boundary as a `{ kind, message }` object.
+//!
+//! Keep this file tiny: its job is to wire the subsystem, not host logic.
+//! When adding a new command:
+//!   1. Implement it under `commands/<module>.rs` with `#[tauri::command]`.
+//!   2. Re-export (or expose via `pub use`) as needed.
+//!   3. Register it below in `tauri::generate_handler![]`.
+//!   4. Add a typed TS binding under `apps/desktop/src/ipc/`.
+//!
+//! The `invoke_handler` list is the public IPC contract — deleting or
+//! renaming an entry is a breaking change the TS side must pick up in the
+//! same commit.
+
+pub mod commands;
+pub mod error;
 
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -21,7 +37,11 @@ pub fn run() {
     info!("hyperspanner starting");
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![ping])
+        .invoke_handler(tauri::generate_handler![
+            ping,
+            commands::fs::read_file_bytes,
+            commands::fs::read_text_file,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running hyperspanner");
 }

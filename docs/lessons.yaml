@@ -682,6 +682,78 @@ lessons:
     source: "session"
     category: architecture
     lesson: |
+      Serde's derived Serialize for a Rust enum produces an externally-
+      tagged shape like `{"NotAFile": {"path": "..."}}` that's awkward
+      to consume from TypeScript — every branch has a different key,
+      so the TS side needs a deserializer pass to even get to the
+      discriminant. For a cross-language error taxonomy (Tauri IPC
+      errors, gRPC-over-JSON bridges, anything that crosses a typed
+      boundary with a string-literal-union on the receiving end),
+      hand-roll a `Serialize` impl that flattens to
+      `{"kind": "...", "message": "..."}`. Then the TS caller can
+      `switch (err.kind)` over a union of string literals with
+      exhaustiveness checked. Variant payload fields (like `offset`
+      in `InvalidUtf8 { offset: usize }`) fold into the human-readable
+      `message` via thiserror's `#[error(...)]` format string —
+      losing the structured field in transport is usually fine
+      because UI code almost always just renders the message anyway.
+      If a specific variant field ever needs typed access on the TS
+      side, add it to the flat payload alongside `kind`/`message` —
+      don't revert to serde's default enum tagging.
+    applied: true
+
+  - id: 41
+    date: 2026-04-23
+    source: "session"
+    category: testing
+    lesson: |
+      For a Tauri IPC layer (`@tauri-apps/api/core`'s `invoke`),
+      prefer a lazy dynamic import inside a small seam function over a
+      top-level import. Two reasons. (1) Vitest in jsdom doesn't ship
+      the Tauri runtime — a top-level import blows up at module load
+      during tests that only exercise wrapper logic. (2) A dynamic
+      import with a literal module string still tree-shakes cleanly
+      in production Vite builds, so you pay nothing for the
+      flexibility. Pair it with a `__setInvokeForTests(fn | null)`
+      escape hatch that lets unit tests inject a `vi.fn()` without
+      having to mock an entire ES module graph. The underscore prefix
+      + explicit `ForTests` naming makes the seam obvious as
+      test-only when grepping production code. This pattern
+      generalizes to any singleton platform API (`window.crypto`,
+      `navigator.clipboard`, Electron IPC) that is absent or
+      unreliable in the test environment.
+    applied: true
+
+  - id: 42
+    date: 2026-04-23
+    source: "decision"
+    category: architecture
+    lesson: |
+      When scaffolding a backend command surface for a suite of tools
+      that land across multiple sub-phases, resist the urge to stand
+      up every command the roadmap mentions. For Hyperspanner Phase
+      6.0 the temptation was to land `hash_bytes`, `decode_protobuf`,
+      and `tls_inspect` alongside the filesystem commands — after
+      all, they're "planned." Deferring each to the sub-phase that
+      actually ships the consumer (`hash_bytes` → 6.4, `decode_*` +
+      `tls_*` → 6.5) avoids two traps: (a) the command signature gets
+      designed against an imagined UI and has to be re-shaped when
+      the real tool lands, and (b) you drag in heavy dependencies
+      (`prost-reflect`, `rustls`, a RustCrypto stack) before anything
+      in the codebase actually uses them, which slows every cold
+      `cargo build` for weeks of development for no benefit. The
+      right Phase-N.0 command surface is: the commands the
+      immediately-next sub-phase needs, plus the shared infra
+      (error module, IPC wrapper, module layout) that any future
+      command will slot into. Everything else is "later" and should
+      stay later.
+    applied: true
+
+  - id: 40
+    date: 2026-04-23
+    source: "session"
+    category: architecture
+    lesson: |
       For load-bearing chrome where absolutely-positioned decorative
       elements (e.g. an elbow welded to a bar) anchor to a container's
       edge, never pin the container with a fixed `height`. Use
@@ -907,4 +979,40 @@ lessons:
       cascade the tuning through the layers that depend on it
       (elbow geometry). Pinning a value stable doesn't prevent it
       from being a load-bearing constant for other components.
+    applied: true
+
+  - id: 46
+    date: 2026-04-23
+    source: "error"
+    category: tooling
+    lesson: |
+      Prefer ES-syntax targets (`es2020`, `es2022`) over browser-
+      specific targets (`safari14`, `chrome105`) in Vite's
+      `build.target` when the runtime environment is known to support
+      modern JS. esbuild's browser compat tables have a recurring
+      false-positive bug: certain parameter-destructuring and arrow-
+      function patterns get flagged as "needs transpilation" for
+      Safari 13 / Safari 14, but esbuild then errors with
+      "Transforming destructuring to the configured target environment
+      ... is not supported yet" because the transformation itself
+      isn't implemented. The patterns are supported natively by the
+      target browser — esbuild is just wrong about needing to lower
+      them.
+
+      We hit this first on `safari13` (the Tauri v1 default) and bumped
+      to `safari14`, then hit it again on `safari14` during Phase 4/5
+      verification. The pattern will almost certainly repeat if we bump
+      to `safari15`. The syntactic target `es2020` avoids the browser
+      compat table entirely — esbuild just validates against the ES2020
+      spec, which all three Tauri v2 runtimes (WebView2, WKWebView,
+      WebKitGTK) fully implement.
+
+      General rule: reach for a browser target only when you have a
+      specific feature whose runtime support you're uncertain of.
+      Otherwise, use the lowest ES syntax level your code actually
+      needs, and let the browser's native engine handle the rest.
+
+      Related: Vite's default target is `'modules'` (≈ES2020 + modern
+      browsers), which also works — we chose explicit `es2020` for the
+      "the next reader should understand why" documentation value.
     applied: true

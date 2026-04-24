@@ -2,8 +2,8 @@
 type: plan
 project: "Hyperspanner"
 status: active
-version: 1
-updated: 2026-04-22
+version: 3
+updated: 2026-04-23
 phases:
   - id: 0
     name: "Bootstrap (Tauri + React + Vite + pnpm workspace)"
@@ -25,7 +25,7 @@ phases:
     status: complete
   - id: 6
     name: "Vertical-slice tools + backend commands"
-    status: pending
+    status: in_progress
   - id: 7
     name: "Presets + persistence"
     status: pending
@@ -78,9 +78,35 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
   `ShortcutHelp` overlay (Shift+?), and a `Shortcut` / `formatShortcut` helper set. All
   shortcut callers flow through the registry; zone toggles still composed via
   `useShellShortcuts`.
-- **Phase 6 next** — replace placeholder tools with real vertical-slice implementations
-  (JSON Validator, Diff, Base64, JWT Inspector, etc.) and wire the first Tauri backend
-  commands they depend on (filesystem read, text transform).
+- **Phase 6 in progress** — decomposed into six sub-phases (user-approved scope on
+  2026-04-23: backend-first, then all 13 tools):
+  - **6.0 Backend command surface + scaffolding** (implementation landed 2026-04-23,
+    awaiting Windows-host verification) — Rust layer: `HyperspannerError` enum
+    (thiserror + flat `{ kind, message }` serde transport) at `src-tauri/src/error.rs`;
+    `commands::fs::{read_file_bytes, read_text_file}` at `src-tauri/src/commands/fs.rs`
+    with seven unit tests (`tempfile` dev-dep); both commands registered in
+    `src-tauri/src/lib.rs`. TS layer: `apps/desktop/src/ipc/` with `errors.ts`
+    (typed `HyperspannerError` class + `toHyperspannerError` normalizer),
+    `invoke.ts` (lazy-imported transport with a test seam), `fs.ts` (typed
+    wrappers), `index.ts` (barrel), `ipc.test.ts` (twelve Vitest cases). Explicitly
+    DEFERRED to their owning sub-phase: `hash_bytes` (→6.4), `decode_protobuf` (→6.5),
+    `tls_inspect` (→6.5). Reason logged as lesson #42 — resist designing a command
+    surface against imagined requirements; land each command with its consumer.
+  - **6.1 JSON Validator vertical slice + tool-pattern doc** — first real tool on top
+    of the scaffolding. Establishes the tool-component shape so the remaining 12 land
+    on rails. Pure in-browser (no backend), but built using `useTool` + the IPC wrappers
+    so future tools can swap in Tauri invokes without structural changes.
+  - **6.2 Text + data tools (no backend)** — Case Transform, Whitespace Clean, Base64
+    Pad, URL Codec, CIDR Calc, Regex Tester, YAML Validator (js-yaml). ~7 tools.
+  - **6.3 Text Diff** — separate sub-phase because of the two-pane layout work and
+    diff-library evaluation (jsdiff vs diff-match-patch).
+  - **6.4 Binary + hashing** — Hash Workbench (SubtleCrypto for small inputs, backend
+    `hash_bytes` + filesystem read for large files), Hex Inspector (filesystem read +
+    offset-navigated hex+ASCII viewer). Adds `hash_bytes` to the backend.
+  - **6.5 Network + protocol** — Protobuf Decode (prost-reflect), TLS Inspector
+    (rustls). Adds `decode_protobuf` and `tls_inspect` commands. Most involved Rust.
+  - **6 verification** — full typecheck+test+build + visual spot-check of every tool,
+    flip `current_phase` to 7.
 
 ## Decisions Made
 | Date | Decision | Rationale |
@@ -89,6 +115,9 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
 | 2026-04-20 | Primitives decoupled from `useTheme`/`useSound` | Library must be framework-pure; host app wires hooks via props |
 | 2026-04-20 | Data-viz primitives (Table, Sparkline, Gauge, Chart, DataCascade) deferred to Phase 6 | Their consumers (tools) don't land until Phase 6 — avoid building against imagined requirements |
 | 2026-04-20 | Semantic role → token mapping lives in `tokens/index.ts` | Variants remap per theme without touching primitives |
+| 2026-04-23 | Phase 6.0 backend ships `fs` commands only; `hash_bytes`/`decode_protobuf`/`tls_inspect` deferred to their owning sub-phases | Avoid designing against imagined consumer requirements; avoid dragging in `prost-reflect`/`rustls`/RustCrypto crates before any code uses them (lesson #42) |
+| 2026-04-23 | Rust→TS error transport is a flat `{ kind, message }` shape (hand-rolled Serialize) rather than serde's externally-tagged enum | TS side gets a discriminated string-literal union to switch on instead of having to deserialize variant-keyed objects (lesson #40) |
+| 2026-04-23 | TS IPC transport uses a lazy dynamic import with a `__setInvokeForTests` seam instead of a top-level `@tauri-apps/api` import | Vitest in jsdom doesn't ship the Tauri runtime; a seam keeps tests runnable without global module mocks while production builds still tree-shake (lesson #41) |
 
 ## Errors Encountered
 | Date | Error | Resolution |
@@ -96,3 +125,4 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
 | 2026-04-20 | Tauri dev build failed: `icons/icon.ico not found; required for generating a Windows Resource file during tauri-build` | Generated multi-resolution ICO (16/24/32/48/64/128/256) + ICNS + PNGs via Python/Pillow. On Windows, `tauri-build` runs a resource generator unconditionally — icons are required even in dev. |
 | 2026-04-20 | `packages.metadata does not exist` warning during `cargo tauri dev` | Harmless; legacy Cargo.toml section Tauri 2 no longer uses. Ignored. |
 | 2026-04-20 | Linux sandbox can't follow pnpm node_modules symlinks (I/O error) | Typecheck verification must run on Windows host; bash sandbox is only useful for non-node tooling. |
+| 2026-04-23 | `pnpm build` failed during Phase 4/5 verification: esbuild error "Transforming destructuring to the configured target environment ('safari14' + 2 overrides) is not supported yet" on ThemeContext (99 errors total, all parameter destructuring / arrow patterns). | Switched `apps/desktop/vite.config.ts` `build.target` from browser-specific (`chrome105`/`safari14`) to syntax-level `es2020`. esbuild's Safari compat table has a recurring false-positive pattern where it flags destructuring as "needs transpilation" but can't transpile it; we'd hit the same bug on safari13 previously. ES-syntax target sidesteps the browser table entirely. Logged as lesson #46. |

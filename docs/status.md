@@ -1,18 +1,125 @@
 ---
 type: status
 updated: 2026-04-23
-current_phase: "Phase 4/5 complete — navigator + HomeView + CommandPalette + shortcut system landed; host typecheck is the review gate. Top-row height restored to its compact 170px (shorter than the bottom rail, per design intent), leftFrameTop width is fixed at 240px across desktop widths, cascade collapses entirely at ≤1100px."
+current_phase: "Phase 6.0 in progress — backend command scaffolding scaffolded. Rust `HyperspannerError` + `commands::fs::{read_file_bytes, read_text_file}` implemented with unit tests; TS IPC layer at `apps/desktop/src/ipc/` (errors.ts, invoke.ts, fs.ts, index.ts) with Vitest coverage. Waiting on Windows host to run `cargo test` + `pnpm test` + `pnpm build` to close 6.0."
 blockers: []
 next_actions:
-  - "Host-side `pnpm typecheck && pnpm test && pnpm build` to confirm Phase 4/5 implementation + today's layout corrections pass the Windows gate"
-  - "Visual spot-check: maximize vs restore a desktop window and confirm the leftFrameTop rail stays 240px wide and the top horizontal bar stays visible at every width"
-  - "Visual spot-check: drag the window narrower and confirm the cascade/titleLeading disappears cleanly at ≤1100px (no half-state where the banner has to compete with telemetry)"
-  - "Begin Phase 6: vertical-slice tools + backend commands (replace placeholder tools with real implementations)"
+  - "Host-side `cargo test -p hyperspanner` (from `apps/desktop/src-tauri`) to confirm the seven `commands::fs` unit tests pass and `tempfile` resolves"
+  - "Host-side `pnpm --filter @hyperspanner/desktop test` to run the new `src/ipc/ipc.test.ts` — exercises the error normalizer + invoke transport seam + fs wrappers"
+  - "Host-side `pnpm --filter @hyperspanner/desktop typecheck && pnpm --filter @hyperspanner/desktop build` — the IPC module uses a dynamic `import('@tauri-apps/api/core')`; make sure Vite tree-shakes cleanly and no new lint errors slipped in"
+  - "Dev smoke: `pnpm tauri dev` in apps/desktop, then from the browser devtools run `window.__TAURI__.core.invoke('ping')` (sanity), then spot-check the new commands against a known file"
+  - "Proceed to Phase 6.1 (JSON Validator) once 6.0 verifies — the JSON validator establishes the per-tool scaffold + tool-pattern doc the other twelve tools will land on"
   - "Phase 7 on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)"
-  - "Consider plan-006 T7: graduate HomeAutomation-validated layout into an AppShell tool"
 ---
 
 # Status Log
+
+## Session: 2026-04-23 (Phase 6.0 — backend command surface + TS IPC layer)
+**Phase:** 6.0 — backend command surface design + scaffolding (Task #68).
+
+**Scope landed this session:**
+- **Rust error module** — `apps/desktop/src-tauri/src/error.rs`. Introduces
+  `HyperspannerError` enum (`thiserror`) with six variants: `Io`,
+  `PathNotFound`, `NotAFile`, `FileTooLarge`, `InvalidEncoding`,
+  `InvalidUtf8`. Hand-rolled `Serialize` impl emits a flat
+  `{ kind, message }` object so the TS side can pattern-match on a string
+  literal union instead of a nested serde enum shape. `kind()` helper
+  returns a stable machine-readable tag; module docstring explicitly
+  binds the tag vocabulary to `apps/desktop/src/ipc/errors.ts` as a
+  cross-language contract.
+- **Rust commands module** — `apps/desktop/src-tauri/src/commands/mod.rs`
+  + `commands/fs.rs`. Two commands: `read_file_bytes(path, max_bytes?)`
+  and `read_text_file(path, encoding?, max_bytes?)`. Shared
+  `stat_and_check` helper folds path-exists + is-file + size-check into
+  one pass so both commands emit the same error kinds for the same
+  failure modes. 64 MiB default size ceiling; callers override via
+  `max_bytes`. Phase 6.0 intentionally supports `utf-8` only in
+  `read_text_file` (rejects with `invalid_encoding` otherwise) — we add
+  `encoding_rs` when a real tool demands it, not on spec. Seven unit
+  tests cover: happy-path bytes read, missing-path, directory-as-path,
+  size-limit rejection, utf-8 happy path, encoding spelling variants,
+  unknown encoding, invalid-utf8 offset reporting. Uses `tempfile`
+  (added as `[dev-dependencies]` in `Cargo.toml`).
+- **Rust runtime wiring** — `apps/desktop/src-tauri/src/lib.rs` gains
+  `pub mod commands; pub mod error;` and registers the two new commands
+  in `tauri::generate_handler![]`. Module docstring makes the
+  add-a-command checklist explicit (implement under `commands/*`,
+  register here, add a TS binding under `ipc/`).
+- **TS IPC layer** — new `apps/desktop/src/ipc/` directory:
+  - `errors.ts` — `HyperspannerErrorKind` string union matching the Rust
+    `kind()` vocabulary one-for-one (plus a client-side `"unknown"`
+    fallback for transport-layer failures). `HyperspannerError` class
+    with `Object.setPrototypeOf` guard so `instanceof` survives
+    transpilation. `toHyperspannerError()` normalizer handles every
+    rejection shape Tauri can hand us: typed payload, bare string,
+    `Error`, unknown object (JSON-stringified as last resort).
+  - `invoke.ts` — `invoke<T>(cmd, args)` wrapper that routes every
+    rejection through the normalizer so callers always catch
+    `HyperspannerError`. Lazy-loads `@tauri-apps/api/core` via dynamic
+    import so Vitest (jsdom, no Tauri runtime) doesn't choke on module
+    resolution. `__setInvokeForTests` seam lets tests inject a mock
+    transport without bundler gymnastics.
+  - `fs.ts` — `readFileBytes` / `readTextFile` typed wrappers. Options
+    objects (not positional) so adding a new field is source-compatible.
+    Response shapes match Rust's `rename_all = "camelCase"` serde output
+    directly.
+  - `index.ts` — barrel; UI code imports from `@/ipc` and never touches
+    `@tauri-apps/api/core` itself.
+  - `ipc.test.ts` — twelve Vitest cases: error normalizer across all
+    payload shapes, unknown-kind collapse, invoke happy path + rejection
+    normalization, fs wrappers forward expected command names and arg
+    shapes, rejected Rust errors surface as typed `HyperspannerError`.
+
+**Design decisions made:**
+- **Minimum viable Rust surface = `fs` only.** Deferred `hash_bytes` to
+  sub-phase 6.4, `decode_protobuf` and `tls_inspect` to 6.5. Reason:
+  bundling `prost-reflect`, `rustls`, and a RustCrypto stack before the
+  consumer UI exists would design the command shapes against imagined
+  requirements. Each of those tools will shape its own backend during
+  its own sub-phase, with a real consumer in hand.
+- **`Vec<u8>` over JSON IPC accepted for scaffolding.** ~5x overhead
+  per byte (each `u8` serializes as a JSON number). Fine at Phase 6.0
+  scale where no tool is streaming huge buffers yet. Flagged in
+  `commands/fs.rs` module docs as the first optimization target when
+  Hash Workbench (6.4) starts feeding multi-hundred-MB files through.
+  Candidate replacement transports: base64 string payload, or Tauri's
+  native `Response` bytes channel.
+- **Error normalizer takes an `unknown`-kind fallback.** Rust never
+  emits `"unknown"`, but the TS transport can reject for reasons Rust
+  never sees (missing command, wire-level failure). Collapsing all of
+  those to a single typed variant keeps the caller-side switch
+  exhaustive without forcing every UI to handle a separate "transport"
+  exception type.
+- **Lazy-imported invoke transport.** `import('@tauri-apps/api/core')`
+  fires on first call, not at module load. Keeps Vitest happy in jsdom
+  without a manual mock, and production bundles still tree-shake to a
+  single direct call since the dynamic import has a literal string.
+
+**Files added:**
+- `apps/desktop/src-tauri/src/error.rs`
+- `apps/desktop/src-tauri/src/commands/mod.rs`
+- `apps/desktop/src-tauri/src/commands/fs.rs`
+- `apps/desktop/src/ipc/errors.ts`
+- `apps/desktop/src/ipc/invoke.ts`
+- `apps/desktop/src/ipc/fs.ts`
+- `apps/desktop/src/ipc/index.ts`
+- `apps/desktop/src/ipc/ipc.test.ts`
+
+**Files changed:**
+- `apps/desktop/src-tauri/Cargo.toml` — added `[dev-dependencies] tempfile = "3"` for the fs unit tests.
+- `apps/desktop/src-tauri/src/lib.rs` — registered `commands::fs::read_file_bytes` and `commands::fs::read_text_file`; added `pub mod commands; pub mod error;` declarations.
+
+**Verification planned (blocked on Windows host):**
+- `cargo test -p hyperspanner` — runs seven fs command tests.
+- `pnpm --filter @hyperspanner/desktop test` — runs twelve IPC tests.
+- `pnpm --filter @hyperspanner/desktop typecheck && pnpm --filter @hyperspanner/desktop build` — catches verbatimModuleSyntax / strict-mode regressions, confirms Vite produces a clean bundle with the dynamic import.
+- `pnpm tauri dev` + devtools ping to confirm nothing in the handler list breaks registration.
+
+**Lessons logged:** #40, #41, #42 (see lessons.yaml).
+
+**Next:** Task #68 stays in_progress until the host runs pass; on green, flip to completed and start Task #69 (Phase 6.1 JSON Validator vertical slice).
+
+---
 
 ## Session: 2026-04-23 (late evening — fourth-round chrome correction: rail-width + banner-pin-in-rem)
 **Phase:** Continuation of the same-day top-row stability arc.
@@ -110,6 +217,31 @@ Net outcome of the day's arc: top row pinned at 170px, banner pinned at 3rem, ra
 width pinned at 240px across desktop widths, cascade drops twice then vanishes at
 ≤1100px, elbow disc re-tuned to 41px, secondary title removed. Top chrome is visibly
 stable across resize and tool-selection, and is shorter than the bottom as intended.
+
+**Seventh round (verification pass, build failure):** Host ran
+`pnpm typecheck && pnpm test && pnpm build`. Typecheck clean (both packages), tests
+clean (40 passed across 4 files), but build failed with 99 esbuild errors of the form
+"Transforming destructuring to the configured target environment ('safari14' + 2
+overrides) is not supported yet" starting at the ThemeContext's parameter
+destructuring.
+
+Diagnosis: pre-existing Vite config issue, not a regression from the chrome arc.
+esbuild's browser compat tables have a known false-positive pattern for Safari
+13/14 — they flag destructuring as "needs transpilation" but esbuild can't actually
+transpile it, so the build errors out even though Safari natively supports the
+pattern. We'd already bumped the target from `safari13` → `safari14` earlier for
+this exact reason; `safari14` now has the same bug one version up.
+
+Fix: `apps/desktop/vite.config.ts` switched `build.target` from
+`process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari14'` to a
+syntactic `'es2020'`. All three Tauri v2 runtimes (WebView2, WKWebView on macOS 11+,
+WebKitGTK) support ES2020 natively, so the target is still tight, but esbuild now
+validates against the ES2020 spec instead of a browser compat table — sidestepping
+the false-positive pattern entirely. Logged as lesson #46 (category: tooling) and as
+a row in `plan.md`'s Errors table.
+
+**Next:** User to re-run `pnpm build` to confirm the ES2020 target clears the build
+cleanly. Once green, task #67 can close and Phase 6 (vertical-slice tools) can start.
 
 ---
 

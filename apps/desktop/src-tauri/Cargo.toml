@@ -21,6 +21,11 @@ thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+[dev-dependencies]
+# Scoped to unit tests for `crate::commands::fs` — writes controlled
+# fixtures for the stat/size/utf-8 branches without polluting the repo.
+tempfile = "3"
+
 [features]
 # Default-enabled features go here as the project grows.
 custom-protocol = ["tauri/custom-protocol"]
