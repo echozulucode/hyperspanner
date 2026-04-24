@@ -677,7 +677,7 @@ lessons:
       defaults — not a viable constraint for a React codebase.
     applied: true
 
-  - id: 40
+  - id: 47
     date: 2026-04-23
     source: "session"
     category: architecture
@@ -702,7 +702,7 @@ lessons:
       don't revert to serde's default enum tagging.
     applied: true
 
-  - id: 41
+  - id: 48
     date: 2026-04-23
     source: "session"
     category: testing
@@ -724,7 +724,7 @@ lessons:
       unreliable in the test environment.
     applied: true
 
-  - id: 42
+  - id: 49
     date: 2026-04-23
     source: "decision"
     category: architecture
@@ -1016,3 +1016,145 @@ lessons:
       browsers), which also works — we chose explicit `es2020` for the
       "the next reader should understand why" documentation value.
     applied: true
+
+  - id: 50
+    date: 2026-04-24
+    source: "session"
+    category: tooling
+    lesson: |
+      Serde payload structs that cross the Tauri IPC boundary should
+      always derive `Debug` + `Serialize` together — and, if they're
+      returned from a `#[tauri::command]`, the moment you write any
+      unit test that does `.expect_err(...)` or `.unwrap_err()` on
+      a `Result<ThisStruct, _>`, you need `Debug`. Rust's `Result`
+      methods print the `Ok` value via its `Debug` impl when the
+      expectation fails, so missing `Debug` on the success type
+      turns an error path test into a compile error (`the trait
+      bound `T: Debug` is not satisfied`). The cost of adding
+      `Debug` is zero for this shape of struct (no private fields,
+      no sensitive data — they already serialize to the TS side),
+      so the right rule is to pair `Debug` with `Serialize` by
+      default on every IPC payload struct. We hit the missing
+      derive on `FileBytes` and `FileText` during Phase 6.0
+      verification — five compile errors at the `.expect_err("should
+      fail")` sites in `commands/fs.rs::tests`. Adding `Debug` to
+      both struct derives was a two-character fix, but the right
+      time to make the fix is at struct-declaration time, not at
+      "the first test suite that touches the error path" time. If
+      you ever want to keep `Debug` off (redaction, private fields),
+      write a manual impl rather than skipping the derive — the
+      test-site compile error is too easy to trigger accidentally.
+    applied: true
+
+  - id: 51
+    date: 2026-04-24
+    source: "session"
+    category: architecture
+    lesson: |
+      Cross-runtime text parsers (JSON, URL, regex-like) that rely on
+      error-message parsing to extract structured position info need
+      LAYERED fallback probes, not a single "handles my current
+      runtime" regex. The failure mode: a Node 22 minor-version bump
+      changed `JSON.parse`'s error format for one specific variant
+      (`Unexpected token 'X', "<source fragment>" is not valid JSON`),
+      dropping the `position N` suffix and the `line X column Y`
+      suffix that older V8 emitted. The normalizer's two regex
+      branches (position-form, line-col form) both missed, and the
+      function returned `{ line: null, column: null, offset: null }`
+      for every "Unexpected token" error — but the test harness was
+      checking `expect(r.offset).not.toBeNull()`, so 7 of 22 lib
+      tests flipped red on the upgrade without us changing any
+      production code. The fix is a multi-probe normalizer that
+      tries structured formats first (position N → offset, line X
+      column Y → line+col) and then falls back to content-based
+      recovery (extract the offending char from the message and use
+      `text.indexOf(char)` to compute an offset; `Unexpected end of
+      JSON input` → position at `text.length`). Paired improvement:
+      the suffix-stripping regex used to clean the displayed message
+      needed to be loosened from a quoted-string-only pattern to
+      `/,\s*[\s\S]*is not valid JSON\s*$/i` to handle V8's literal
+      `...` ellipsis prefix and embedded newlines when the source
+      fragment spans lines. General principle: if a parser's error-
+      shape contract isn't stable across the runtimes you support
+      (Node vs. browser Chromium vs. Safari vs. even different
+      Node minors), treat error-message parsing as a best-effort
+      extraction that degrades gracefully rather than a structured
+      protocol. Start with the most specific structured form, fall
+      back through progressively weaker heuristics, and always
+      return a non-null offset if ANY probe hits. Tests for this
+      normalizer should cover at least three representative error
+      strings per target runtime, and should be paired with a node
+      probe that prints the actual current-runtime error messages
+      so the next reader can verify the regex set is still complete.
+    applied: true
+
+  - id: 52
+    date: 2026-04-24
+    source: "session"
+    category: testing
+    lesson: |
+      `@testing-library/react`'s auto-cleanup does NOT fire under
+      Vitest unless `@testing-library/jest-dom` is also imported —
+      the cleanup registration lives in jest-dom's setup hook, not
+      in @testing-library/react itself. Without jest-dom, every
+      `render()` call appends a fresh tree to `document.body` and
+      none of them are ever removed, which silently leaks DOM across
+      test cases. Symptom: a test suite where the first test passes
+      and every subsequent test that queries by role/label/text
+      throws `Found multiple elements with the text of: <X>` — the
+      previous tests' trees are still attached, so `getByText`
+      matches them too. The fix is either (a) install
+      `@testing-library/jest-dom` and import it once from a setup
+      file, or (b) import `cleanup` from `@testing-library/react`
+      explicitly and call it in `afterEach`. We chose (b) to avoid
+      pulling in the matcher library we don't otherwise need, and
+      to keep the cleanup obligation visible at the top of every
+      `*.test.tsx` file. The same fix applies to any framework-
+      agnostic render utility (@testing-library/preact, @testing-
+      library/svelte, etc.) under Vitest. Rule: component-test suites
+      MUST call `cleanup()` in their `afterEach` unless they've
+      already wired jest-dom; codify this in the repo's tool-pattern
+      doc so every new tool test inherits the invariant instead of
+      rediscovering it one failed render at a time.
+    applied: true
+
+  - id: 53
+    date: 2026-04-24
+    source: "session"
+    category: testing
+    lesson: |
+      Generic function types at test seams are fundamentally un-
+      satisfiable by concrete test fakes, and trying to satisfy them
+      directly produces TS2345 errors that have no clean fix at the
+      structural level. The shape: `type InvokeFn = <T>(cmd: string,
+      args?: Record<string, unknown>) => Promise<T>` — the caller
+      picks `T`, which means a concrete fake like
+      `async () => 'pong'` (whose return type is `Promise<string>`)
+      cannot satisfy "whatever `T` the caller wants." Real Tauri
+      `invoke` has the exact same hole at the type-system level; the
+      wire is untyped, so the generic is a promise the platform
+      can't actually keep. The pragmatic fix in test code is to
+      cast through `unknown` to `InvokeFn`: `(async () => 'pong') as
+      unknown as InvokeFn`. This is honest about what we're doing —
+      we're asserting "trust me, this fake matches the seam's
+      contract at runtime," which is true because the caller picks
+      a `T` that aligns with the fake's actual return type. Related
+      failure from the same session: with
+      `useUnknownInCatchVariables: true`, `.catch((e: unknown) => e)`
+      gives you `unknown`, and even though a preceding
+      `expect(err).toBeInstanceOf(HyperspannerError)` asserts the
+      runtime shape, TypeScript doesn't propagate runtime matcher
+      assertions into the compile-time type. To access typed fields,
+      narrow with an `if (err instanceof HyperspannerError) { ... }`
+      block; the `if` is purely a compile-time device once the
+      runtime check has already passed. Both patterns are signals
+      that the test is working at the edge of what TS's type system
+      can model — the seam's generic promise and the catch's
+      unknown fallout — and both have a canonical workaround that
+      doesn't require weakening the production types. Don't try to
+      "fix" by changing `InvokeFn` to a non-generic shape or
+      removing `useUnknownInCatchVariables`; the production types
+      are correct for production callers, and the tests are the
+      place where the cast lives.
+    applied: true
+

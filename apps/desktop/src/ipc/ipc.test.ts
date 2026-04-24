@@ -5,6 +5,7 @@ import {
   toHyperspannerError,
 } from './errors';
 import { __setInvokeForTests, invoke } from './invoke';
+import type { InvokeFn } from './invoke';
 import { readFileBytes, readTextFile } from './fs';
 
 /**
@@ -73,7 +74,11 @@ describe('invoke transport', () => {
   });
 
   it('returns the resolved value on success', async () => {
-    __setInvokeForTests(async () => 'pong' as unknown as string);
+    // Cast through `unknown` because `InvokeFn` is generic `<T>(...) =>
+    // Promise<T>` — a concrete `() => Promise<string>` arrow can't satisfy
+    // an arbitrary caller-picked `T`. Real Tauri invoke has the same hole
+    // at the type system level; the wire is untyped.
+    __setInvokeForTests(((async () => 'pong') as unknown) as InvokeFn);
     const result = await invoke<string>('ping');
     expect(result).toBe('pong');
   });
@@ -92,9 +97,14 @@ describe('invoke transport', () => {
     __setInvokeForTests(async () => {
       throw 'command X not found';
     });
-    const err = await invoke('X').catch((e) => e);
+    const err: unknown = await invoke('X').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(HyperspannerError);
-    expect(err.kind).toBe('unknown');
+    // Narrow for TS — the expect above already asserts the runtime shape,
+    // so we're not masking a failure mode; the `if` is a compile-time
+    // device.
+    if (err instanceof HyperspannerError) {
+      expect(err.kind).toBe('unknown');
+    }
   });
 });
 

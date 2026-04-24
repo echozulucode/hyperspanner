@@ -1,0 +1,40 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: bold;
+  color: var(--lcars-color-bg, #0a0a0f);
+  white-space: nowrap;
+}
+
+.ok {
+  background: var(--lcars-color-green, #8fa980);
+}
+
+.error {
+  background: var(--lcars-color-red, #d88463);
+}
+
+.warn {
+  background: var(--lcars-color-mustard, #d8b863);
+}
+
+.neutral {
+  background: var(--lcars-color-african-violet, #8a7aa8);
+}
+
+.detail {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--lcars-color-sand, #eae4d6);
+  opacity: 0.85;
+}

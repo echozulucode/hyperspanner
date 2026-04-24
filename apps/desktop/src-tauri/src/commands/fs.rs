@@ -39,7 +39,7 @@ use crate::error::{HyperspannerError, HyperspannerResult};
 /// hash workbench (which passes its own override).
 pub const DEFAULT_MAX_BYTES: u64 = 64 * 1024 * 1024;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileBytes {
     /// File contents. See transport note in module docs re: JSON overhead.
@@ -48,7 +48,7 @@ pub struct FileBytes {
     pub path: String,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileText {
     pub text: String,

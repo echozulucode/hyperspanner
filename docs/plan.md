@@ -2,8 +2,8 @@
 type: plan
 project: "Hyperspanner"
 status: active
-version: 3
-updated: 2026-04-23
+version: 4
+updated: 2026-04-24
 phases:
   - id: 0
     name: "Bootstrap (Tauri + React + Vite + pnpm workspace)"
@@ -79,9 +79,11 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
   shortcut callers flow through the registry; zone toggles still composed via
   `useShellShortcuts`.
 - **Phase 6 in progress** — decomposed into six sub-phases (user-approved scope on
-  2026-04-23: backend-first, then all 13 tools):
-  - **6.0 Backend command surface + scaffolding** (implementation landed 2026-04-23,
-    awaiting Windows-host verification) — Rust layer: `HyperspannerError` enum
+  2026-04-23: backend-first, then all 13 tools). Sub-phases 6.0 and 6.1 both
+  verified on Windows host 2026-04-24 (cargo test + pnpm test/typecheck/build
+  green after four small fixes logged in the Errors table below):
+  - **6.0 Backend command surface + scaffolding** (verified 2026-04-24) —
+    Rust layer: `HyperspannerError` enum
     (thiserror + flat `{ kind, message }` serde transport) at `src-tauri/src/error.rs`;
     `commands::fs::{read_file_bytes, read_text_file}` at `src-tauri/src/commands/fs.rs`
     with seven unit tests (`tempfile` dev-dep); both commands registered in
@@ -90,12 +92,20 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
     `invoke.ts` (lazy-imported transport with a test seam), `fs.ts` (typed
     wrappers), `index.ts` (barrel), `ipc.test.ts` (twelve Vitest cases). Explicitly
     DEFERRED to their owning sub-phase: `hash_bytes` (→6.4), `decode_protobuf` (→6.5),
-    `tls_inspect` (→6.5). Reason logged as lesson #42 — resist designing a command
+    `tls_inspect` (→6.5). Reason logged as lesson #49 — resist designing a command
     surface against imagined requirements; land each command with its consumer.
-  - **6.1 JSON Validator vertical slice + tool-pattern doc** — first real tool on top
-    of the scaffolding. Establishes the tool-component shape so the remaining 12 land
-    on rails. Pure in-browser (no backend), but built using `useTool` + the IPC wrappers
-    so future tools can swap in Tauri invokes without structural changes.
+  - **6.1 JSON Validator vertical slice + tool-pattern doc** (verified
+    2026-04-24) — shipped
+    `apps/desktop/src/tools/json-validator/` (pure `lib.ts` with `validateJson` /
+    `formatJson` / `minifyJson` / offset<->line-col conversion; `JsonValidator.tsx`
+    on top of the shared `ToolFrame`; `JsonValidator.module.css`; 20+ lib tests
+    under node env + 7 component tests under jsdom). Shared tool scaffolding landed
+    at `apps/desktop/src/tools/components/` (`ToolFrame` zone-responsive chrome;
+    `ToolStatusPill` with four semantic states). Registry entry for `json-validator`
+    now points at the real component. Tool pattern codified in
+    `docs/tool-pattern.md` — the five rules (component-vs-lib split, discriminated-
+    union errors, `useTool` for state, zone-responsive layout, IPC-only OS access)
+    set the template for the remaining twelve tools.
   - **6.2 Text + data tools (no backend)** — Case Transform, Whitespace Clean, Base64
     Pad, URL Codec, CIDR Calc, Regex Tester, YAML Validator (js-yaml). ~7 tools.
   - **6.3 Text Diff** — separate sub-phase because of the two-pane layout work and
@@ -115,9 +125,9 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
 | 2026-04-20 | Primitives decoupled from `useTheme`/`useSound` | Library must be framework-pure; host app wires hooks via props |
 | 2026-04-20 | Data-viz primitives (Table, Sparkline, Gauge, Chart, DataCascade) deferred to Phase 6 | Their consumers (tools) don't land until Phase 6 — avoid building against imagined requirements |
 | 2026-04-20 | Semantic role → token mapping lives in `tokens/index.ts` | Variants remap per theme without touching primitives |
-| 2026-04-23 | Phase 6.0 backend ships `fs` commands only; `hash_bytes`/`decode_protobuf`/`tls_inspect` deferred to their owning sub-phases | Avoid designing against imagined consumer requirements; avoid dragging in `prost-reflect`/`rustls`/RustCrypto crates before any code uses them (lesson #42) |
-| 2026-04-23 | Rust→TS error transport is a flat `{ kind, message }` shape (hand-rolled Serialize) rather than serde's externally-tagged enum | TS side gets a discriminated string-literal union to switch on instead of having to deserialize variant-keyed objects (lesson #40) |
-| 2026-04-23 | TS IPC transport uses a lazy dynamic import with a `__setInvokeForTests` seam instead of a top-level `@tauri-apps/api` import | Vitest in jsdom doesn't ship the Tauri runtime; a seam keeps tests runnable without global module mocks while production builds still tree-shake (lesson #41) |
+| 2026-04-23 | Phase 6.0 backend ships `fs` commands only; `hash_bytes`/`decode_protobuf`/`tls_inspect` deferred to their owning sub-phases | Avoid designing against imagined consumer requirements; avoid dragging in `prost-reflect`/`rustls`/RustCrypto crates before any code uses them (lesson #49) |
+| 2026-04-23 | Rust→TS error transport is a flat `{ kind, message }` shape (hand-rolled Serialize) rather than serde's externally-tagged enum | TS side gets a discriminated string-literal union to switch on instead of having to deserialize variant-keyed objects (lesson #47) |
+| 2026-04-23 | TS IPC transport uses a lazy dynamic import with a `__setInvokeForTests` seam instead of a top-level `@tauri-apps/api` import | Vitest in jsdom doesn't ship the Tauri runtime; a seam keeps tests runnable without global module mocks while production builds still tree-shake (lesson #48) |
 
 ## Errors Encountered
 | Date | Error | Resolution |
@@ -126,3 +136,7 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
 | 2026-04-20 | `packages.metadata does not exist` warning during `cargo tauri dev` | Harmless; legacy Cargo.toml section Tauri 2 no longer uses. Ignored. |
 | 2026-04-20 | Linux sandbox can't follow pnpm node_modules symlinks (I/O error) | Typecheck verification must run on Windows host; bash sandbox is only useful for non-node tooling. |
 | 2026-04-23 | `pnpm build` failed during Phase 4/5 verification: esbuild error "Transforming destructuring to the configured target environment ('safari14' + 2 overrides) is not supported yet" on ThemeContext (99 errors total, all parameter destructuring / arrow patterns). | Switched `apps/desktop/vite.config.ts` `build.target` from browser-specific (`chrome105`/`safari14`) to syntax-level `es2020`. esbuild's Safari compat table has a recurring false-positive pattern where it flags destructuring as "needs transpilation" but can't transpile it; we'd hit the same bug on safari13 previously. ES-syntax target sidesteps the browser table entirely. Logged as lesson #46. |
+| 2026-04-24 | `cargo test -p hyperspanner` failed: `FileBytes` / `FileText` don't implement `Debug`, which blocks `.expect_err("should fail")` on `Result<FileBytes, _>` at five test sites in `commands/fs.rs`. | Added `#[derive(Debug, Serialize)]` on both structs. Logged as lesson #50 — serde payload structs should always derive `Debug` + `Serialize` together; `.expect_err` / `.unwrap_err` on any `Result<ThisStruct, _>` requires it and the cost is zero. |
+| 2026-04-24 | `pnpm --filter @hyperspanner/desktop test` failed: 7 of the 22 `lib.test.ts` cases errored on Node 22 V8. Root cause: newer V8 changed the `JSON.parse` error-message format mid-version — `Unexpected token '}', "{"a":}" is not valid JSON` carries no `position N` or `line X column Y` info, so the normalizer's two regex branches both missed it and returned null offset/line/column. | Added two more probes to `normalizeParseError`: (a) extract the offending character from `Unexpected token 'X'` and recover offset via `text.indexOf(char)`; (b) `Unexpected end of JSON input` → position at `text.length`. Tightened the `cleanMessage` suffix regex to strip V8's source-quote fragment regardless of nested quotes or literal `...` ellipsis prefixes. Logged as lesson #51. |
+| 2026-04-24 | `pnpm --filter @hyperspanner/desktop test` failed: 6 of the 7 `JsonValidator.test.tsx` cases errored with `Found multiple elements with the text of: JSON input buffer`. Root cause: `@testing-library/react`'s `render()` appends to `document.body` and doesn't auto-clean up under Vitest without `@testing-library/jest-dom` wired up; previous tests' DOM trees leaked into subsequent tests. | Imported `cleanup` from `@testing-library/react` and called it in the `afterEach` hook alongside `clearToolState`. Logged as lesson #52. Rule captured in `docs/tool-pattern.md` §6 as a component-test invariant every Phase 6 tool has to honor. |
+| 2026-04-24 | `pnpm --filter @hyperspanner/desktop typecheck` failed with 2 errors in `ipc.test.ts`: (a) `InvokeFn` is generic `<T>(...) => Promise<T>`, can't be satisfied by a concrete `async () => 'pong'` arrow; (b) `err` from `.catch((e) => e)` on `invoke('X')` is `unknown`, so `err.kind` fails TS2345 even though `expect(err).toBeInstanceOf(HyperspannerError)` above runs fine. | (a) cast the test fake through `unknown` to `InvokeFn`, with a type-only `import type { InvokeFn }`; (b) wrap the `.kind` access in an `if (err instanceof HyperspannerError)` narrowing block — the preceding `toBeInstanceOf` assertion still guards runtime, so the `if` is purely a compile-time device. Logged as lesson #53. |

@@ -1,18 +1,227 @@
 ---
 type: status
-updated: 2026-04-23
-current_phase: "Phase 6.0 in progress — backend command scaffolding scaffolded. Rust `HyperspannerError` + `commands::fs::{read_file_bytes, read_text_file}` implemented with unit tests; TS IPC layer at `apps/desktop/src/ipc/` (errors.ts, invoke.ts, fs.ts, index.ts) with Vitest coverage. Waiting on Windows host to run `cargo test` + `pnpm test` + `pnpm build` to close 6.0."
+updated: 2026-04-24
+current_phase: "Phase 6.0 + 6.1 verified on Windows host. Backend scaffolding (Rust error module + fs commands + TS IPC) and the JSON Validator vertical slice (shared `ToolFrame` / `ToolStatusPill` + `docs/tool-pattern.md`) are both fully green: cargo test, vitest, typecheck, and build all pass. Four small fixes during verification — all logged in `plan.md` Errors and as lessons #50–#53. Ready to start Phase 6.2 (seven text/data tools on the pattern)."
 blockers: []
 next_actions:
-  - "Host-side `cargo test -p hyperspanner` (from `apps/desktop/src-tauri`) to confirm the seven `commands::fs` unit tests pass and `tempfile` resolves"
-  - "Host-side `pnpm --filter @hyperspanner/desktop test` to run the new `src/ipc/ipc.test.ts` — exercises the error normalizer + invoke transport seam + fs wrappers"
-  - "Host-side `pnpm --filter @hyperspanner/desktop typecheck && pnpm --filter @hyperspanner/desktop build` — the IPC module uses a dynamic `import('@tauri-apps/api/core')`; make sure Vite tree-shakes cleanly and no new lint errors slipped in"
-  - "Dev smoke: `pnpm tauri dev` in apps/desktop, then from the browser devtools run `window.__TAURI__.core.invoke('ping')` (sanity), then spot-check the new commands against a known file"
-  - "Proceed to Phase 6.1 (JSON Validator) once 6.0 verifies — the JSON validator establishes the per-tool scaffold + tool-pattern doc the other twelve tools will land on"
-  - "Phase 7 on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)"
+  - "Dev smoke (low-stakes, can happen alongside 6.2 work): `pnpm tauri dev`, open JSON Validator, paste sample, test Format / Minify / Indent 2→4, drag to inspector/bottom and confirm compact form + state persistence, paste `{\"a\":}` and confirm line/col pill. Automated tests already cover every logical path."
+  - "Phase 6.2: seven text/data tools on the pattern — Case Transform, Whitespace Clean, Base64 Pad, URL Codec, CIDR Calc, Regex Tester, YAML Validator. Each tool is a single folder under `apps/desktop/src/tools/<id>/` following `tool-pattern.md`. Target: land all seven in one sub-phase, verify on host, then 6.3."
+  - "Phase 7 on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)."
 ---
 
 # Status Log
+
+## Session: 2026-04-24 (Phase 6.0 + 6.1 verification pass — host-side)
+**Phase:** 6.0 + 6.1 — Windows host verification (Tasks #68 and #69, both
+now completed).
+
+**Goal:** run the cargo + vitest + typecheck + build chain against the code
+that landed on 2026-04-23 and drive anything red back to green. Four things
+surfaced; all four were narrow and fixable in place.
+
+**Fix 1 — Rust: `FileBytes` / `FileText` missing `Debug` derive.**
+`cargo test -p hyperspanner` refused to compile the five `.expect_err` sites
+in `commands/fs.rs::tests` because `Result::expect_err` requires `T: Debug`.
+Added `#[derive(Debug, Serialize)]` to both payload structs. Green.
+
+**Fix 2 — TS lib: Node 22 V8 `JSON.parse` format drift.**
+7 of the 22 `json-validator/lib.test.ts` cases failed; the normalizer was
+returning null offset/line/column for valid parse errors. Root cause: newer
+V8 emits `Unexpected token '}', "{"a":}" is not valid JSON` with no
+`position N` and no `line X column Y` — both of the normalizer's original
+regex branches missed. Added two more probes:
+  1. `Unexpected token 'X'` → extract the offending char, recover offset via
+     `text.indexOf(char)`. Imperfect when the char appears earlier in
+     legal context, but correct for the 99% common case; the UI
+     degrades gracefully to "error without pointer" when indexOf returns
+     -1.
+  2. `Unexpected end of JSON input` → by definition at `text.length`.
+Also tightened `cleanMessage` to strip V8's verbose trailing source-quote
+suffix (`, "..." is not valid JSON`) regardless of nested quotes, literal
+`...` ellipsis prefix, or embedded newlines — anchor on the trailing
+phrase rather than trying to model the internals.
+Verified against six representative inputs via a standalone node probe
+before committing the regex.
+
+**Fix 3 — TS component tests: Vitest + RTL auto-cleanup gap.**
+6 of the 7 `JsonValidator.test.tsx` cases failed with `Found multiple
+elements with the text of: JSON input buffer`. Root cause: `@testing-
+library/react`'s `render()` appends to `document.body` and relies on
+`@testing-library/jest-dom` to register the auto-cleanup afterEach hook.
+We don't ship jest-dom (per tool-pattern doc §6 — plain vitest matchers),
+so previous tests' DOM leaked forward. Fixed by importing `cleanup` from
+`@testing-library/react` and calling it in the existing `afterEach`. Rule
+is now load-bearing for every Phase 6 tool's component tests; will add a
+call-out to `docs/tool-pattern.md` §6 in 6.2 alongside the first new
+tool's tests.
+
+**Fix 4 — TS typecheck: two strict-mode snags in `ipc.test.ts`.**
+  (a) `__setInvokeForTests(async () => 'pong')` — `InvokeFn` is generic
+      `<T>(...) => Promise<T>`, and a concrete arrow returning
+      `Promise<string>` can't satisfy it (the caller picks `T`, not the
+      implementer). Cast through `unknown` to `InvokeFn`; added a
+      `import type { InvokeFn }` at the top.
+  (b) `err.kind` after `const err = await invoke('X').catch((e) => e)` —
+      `err` is `unknown` and `expect(err).toBeInstanceOf(...)` is a
+      runtime check that doesn't narrow the compile-time type. Wrapped
+      the `.kind` access in an `if (err instanceof HyperspannerError)`
+      block. The preceding `expect(...).toBeInstanceOf(...)` still guards
+      runtime, so the `if` is purely a compile-time device and no failure
+      mode is masked.
+
+**All gates green after fixes:**
+- `cargo test -p hyperspanner` — 7 `commands::fs` tests pass.
+- `pnpm --filter @hyperspanner/desktop test` — 80 / 80 passing:
+  13 IPC + 20 json-validator/lib + 7 json-validator/component + 40
+  pre-existing (state, workspace, favorites, recents, useTool).
+- `pnpm --filter @hyperspanner/desktop typecheck` — clean.
+- `pnpm --filter @hyperspanner/desktop build` — clean.
+
+**Files changed (verification pass):**
+- `apps/desktop/src-tauri/src/commands/fs.rs` — `#[derive(Debug)]` on
+  `FileBytes` + `FileText`.
+- `apps/desktop/src/tools/json-validator/lib.ts` — `normalizeParseError`
+  gained two fallback probes (Unexpected-token indexOf, Unexpected-end
+  position); `cleanMessage` suffix regex broadened to tolerate nested
+  quotes / ellipsis prefix / multi-line source fragments.
+- `apps/desktop/src/tools/json-validator/JsonValidator.test.tsx` —
+  `cleanup()` in `afterEach`.
+- `apps/desktop/src/ipc/ipc.test.ts` — `import type { InvokeFn }`,
+  `InvokeFn` cast on the test fake, `instanceof` narrowing on the
+  rejection path.
+
+**Lessons logged:** #50 (Debug+Serialize pairing for Rust IPC structs),
+#51 (cross-runtime text parsers need layered fallbacks), #52 (RTL
+auto-cleanup isn't automatic under Vitest), #53 (generic function types
+at test seams need `unknown` casts). All four appended to
+`docs/lessons.yaml`.
+
+**Plan deltas:**
+- Plan frontmatter: `version: 3 → 4`, `updated: 2026-04-23 → 2026-04-24`.
+- Phase 6.0 + 6.1 bullets now read "verified 2026-04-24" rather than
+  "awaiting Windows-host verification."
+- Four new rows in the `Errors Encountered` table (one per fix above).
+
+**Next:** Task #68 and #69 are `completed`. On to #70 (Phase 6.2 — seven
+text/data tools on the pattern).
+
+---
+
+## Session: 2026-04-23 (Phase 6.1 — JSON Validator vertical slice + tool-pattern doc)
+**Phase:** 6.1 — first real Phase 6 tool; establishes the scaffolding for
+the remaining twelve (Task #69).
+
+**Scope landed this session:**
+- **Pure JSON logic** — `apps/desktop/src/tools/json-validator/lib.ts`.
+  Discriminated-union result types (`JsonValidateOk | JsonValidateError |
+  JsonValidateEmpty`) for `validateJson`, `formatJson`, `minifyJson`. Line/
+  column/offset normalization across V8 vs. SpiderMonkey vs. JavaScriptCore
+  error-message formats — we parse whichever fields the runtime gave us
+  and compute the others ourselves so the UI never has to know which
+  engine it's running against. `byteLength` uses `TextEncoder` so the
+  status bar shows a correct UTF-8 byte count. Indent clamped into [0, 8].
+  Minify refuses invalid input (no silent "best-effort" output). Empty
+  input returns `kind: 'empty'` so the status pill reads "Idle" instead of
+  the misleading "Unexpected end of JSON input".
+- **Lib tests** — `lib.test.ts`, 22 cases across node env: happy paths for
+  object / array / primitives, whitespace collapse, error normalization,
+  line-col math (including round-trip), clamping bounds, UTF-8 byte
+  counting, refusal to minify broken input.
+- **Shared tool scaffolding** — `apps/desktop/src/tools/components/`:
+  - `ToolFrame.tsx` — standard tool chrome. Eyebrow + title header, body
+    slot, optional actions cluster (right-aligned), optional status
+    footer with a top-border separator. Zone-responsive: `right` /
+    `bottom` docks render a compact variant (tighter padding, smaller
+    title, single-line) sharing one DOM tree with the full form so React
+    state and scroll position survive a dock drag.
+  - `ToolStatusPill.tsx` — four-color semantic pill
+    (ok/error/warn/neutral) with an optional detail slot. Deliberately
+    text-only — LCARS has strong opinions against iconography.
+  - `index.ts` — barrel for the shared components.
+- **JSON Validator component** — `JsonValidator.tsx` on top of
+  `ToolFrame`. `<textarea>` body with a monospace stack, LCARS-orange
+  focus ring, `white-space: pre` so long lines scroll horizontally
+  instead of wrapping (line/col errors would lie otherwise). Action
+  pills: Format / Minify / Indent (hidden in compact) / Sample↔Clear.
+  Format and Minify are disabled on invalid input so clicking can't
+  destroy the user's buffer. Status footer: ok pill with "N lines ·
+  N.N KB" detail, error pill with "line N, col N" detail plus the
+  runtime message (truncated-with-ellipsis in the footer). Persists via
+  `useTool` so buffer + indent preference survive tab switches.
+- **Component tests** — `JsonValidator.test.tsx`, 7 jsdom integration
+  cases exercising every state transition (idle → valid → error), the
+  disabled-button states, Format end-to-end, Sample/Clear swap. Uses
+  plain vitest matchers — we don't ship `@testing-library/jest-dom` yet
+  (noted in tool-pattern doc §6).
+- **Registry wiring** — `apps/desktop/src/tools/registry.ts`:
+  `json-validator` entry now maps to the real `JsonValidator` instead
+  of `PlaceholderTool`; description refined, `supportedZones` unchanged.
+  Entry carries a comment pointing at `tool-pattern.md` so the next
+  tool maintainer lands on the doc before the code.
+- **Tool-pattern doc** — `docs/tool-pattern.md`. Codifies the five
+  rules:
+    1. Component knows React; `lib.ts` doesn't (pure, testable in node).
+    2. Errors are discriminated unions, not exceptions.
+    3. State lives in `useTool`, not `useState`.
+    4. Zone-responsive layout is a render-time decision (same DOM tree).
+    5. Filesystem/network/crypto go through `@/ipc` only.
+  Plus: tests come in two layers (node-env lib tests + jsdom component
+  tests), anti-patterns to avoid, a file-by-file reference to the JSON
+  Validator implementation, and a numbered checklist for adding the next
+  tool.
+- **Index updated** — `docs/index.yaml` now references `tool-pattern.md`
+  as an active reference doc.
+
+**Design decisions made:**
+- **Parse result is derived, not stored.** `useMemo(() => validateJson(state.text), [state.text])` on every render. Alternative (store `{text, validation}` in tool state, update together) adds a race surface for no benefit at Phase 6.1 data sizes. Revisit if Hex Inspector (6.4) streams buffers large enough that parse times become a drop-frame concern — then memoizing isn't enough, the parse should move to a web worker or the backend.
+- **Compact form shares the DOM with the full form.** Dragging a tool between zones triggers a class-modifier change, not a remount. Keeps textarea state, caret, and scroll offset stable across the drag. Alternative (two separate components + conditional render) was tried mentally and rejected because the user-visible glitch of mid-drag state loss costs more than the CSS complexity of variant modifiers.
+- **Format/Minify disabled on invalid input.** Rather than "best-effort format the parseable prefix" or "format and silently drop trailing garbage", we refuse. Matches VS Code's Format Document behavior on an unparseable file. The status pill already surfaces the exact line+col of the error — that's the actionable feedback; destroying the buffer would not be.
+- **Tool-pattern doc lives at `docs/tool-pattern.md`, not inside the `tools/` folder.** Keeping cross-cutting reference docs under `docs/` matches the project-docs skill's index convention and makes the doc discoverable via `docs/index.yaml`. In-tree READMEs fragment attention.
+
+**Files added (Phase 6.1):**
+- `apps/desktop/src/tools/components/ToolFrame.tsx`
+- `apps/desktop/src/tools/components/ToolFrame.module.css`
+- `apps/desktop/src/tools/components/ToolStatusPill.tsx`
+- `apps/desktop/src/tools/components/ToolStatusPill.module.css`
+- `apps/desktop/src/tools/components/index.ts`
+- `apps/desktop/src/tools/json-validator/lib.ts`
+- `apps/desktop/src/tools/json-validator/lib.test.ts`
+- `apps/desktop/src/tools/json-validator/JsonValidator.tsx`
+- `apps/desktop/src/tools/json-validator/JsonValidator.module.css`
+- `apps/desktop/src/tools/json-validator/JsonValidator.test.tsx`
+- `apps/desktop/src/tools/json-validator/index.ts`
+- `docs/tool-pattern.md`
+
+**Files changed (Phase 6.1):**
+- `apps/desktop/src/tools/registry.ts` — imports `JsonValidator`, swaps
+  the `json-validator` entry's `component` from `PlaceholderTool` to
+  `JsonValidator`, refines `description`, adds a comment pointing at
+  the tool-pattern doc.
+- `docs/index.yaml` — registers `docs/tool-pattern.md`.
+- `docs/plan.md` — Phase 6.1 description updated to reflect what
+  landed; no phase-status flip yet (awaiting Windows host).
+
+**Verification planned (blocked on Windows host):**
+- `pnpm --filter @hyperspanner/desktop test` covers everything new.
+  Expected additional test count: 22 (lib) + 7 (component) = 29 new
+  cases on top of the 12 IPC tests from 6.0.
+- `typecheck` should catch the usual strict-mode / verbatimModuleSyntax
+  issues. I used `import type` for all type-only imports in the new
+  files, but host will tell.
+- `build` should reveal any CSS Module path mismatch or circular import
+  the dev server doesn't flag.
+- Manual smoke in `pnpm tauri dev`: open the JSON Validator from the
+  left nav, verify: paste a doc → Valid pill; break one character →
+  Parse error + line/col; drag to inspector → compact header + editor
+  shrinks; drag back to center → full header restored and buffer
+  preserved; toggle Indent 2 → 4, click Format → buffer reindents with
+  4 spaces.
+
+**Next:** Task #69 stays in_progress until host verification. On green,
+flip to completed alongside Task #68 and start #70 (Phase 6.2 — seven
+text/data tools on the same pattern).
+
+---
 
 ## Session: 2026-04-23 (Phase 6.0 — backend command surface + TS IPC layer)
 **Phase:** 6.0 — backend command surface design + scaffolding (Task #68).
@@ -115,7 +324,7 @@ next_actions:
 - `pnpm --filter @hyperspanner/desktop typecheck && pnpm --filter @hyperspanner/desktop build` — catches verbatimModuleSyntax / strict-mode regressions, confirms Vite produces a clean bundle with the dynamic import.
 - `pnpm tauri dev` + devtools ping to confirm nothing in the handler list breaks registration.
 
-**Lessons logged:** #40, #41, #42 (see lessons.yaml).
+**Lessons logged:** #47, #48, #49 (see lessons.yaml). Originally drafted as #40/#41/#42 but renumbered to avoid colliding with the existing chrome-stability sequence (#40–#46) — the new Phase 6.0/6.1 lessons slot in after.
 
 **Next:** Task #68 stays in_progress until the host runs pass; on green, flip to completed and start Task #69 (Phase 6.1 JSON Validator vertical slice).
 

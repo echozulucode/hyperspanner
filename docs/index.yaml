@@ -30,3 +30,7 @@ docs:
   - file: docs/lessons.yaml
     type: lessons
     status: active
+  - file: docs/tool-pattern.md
+    type: reference
+    status: active
+    note: "The shape every Phase 6 tool follows — established by the JSON Validator vertical slice (6.1). Read before starting a new tool."

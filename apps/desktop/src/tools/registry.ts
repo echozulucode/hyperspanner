@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import type { Zone } from '../state';
 import { PlaceholderTool } from './PlaceholderTool';
+import { JsonValidator } from './json-validator';
 
 /**
  * Tool registry — Phase 3 placeholder version.
@@ -95,11 +96,14 @@ const entries: ToolDescriptor[] = [
     id: 'json-validator',
     name: 'JSON Validator',
     category: 'validation',
-    description: 'Parse, pretty-print, and validate JSON against schemas.',
+    description: 'Parse, pretty-print, and validate JSON with line/column errors.',
     defaultZone: 'center',
     // Pretty-printed JSON is tall; inspector column would force wrapping.
     supportedZones: ['center', 'bottom'],
-    component: PlaceholderTool,
+    // First real Phase 6 tool. See `docs/tool-pattern.md` — the shape
+    // here (component + useTool + pure-function lib) is the template
+    // the remaining twelve tools follow.
+    component: JsonValidator,
   },
   {
     id: 'yaml-validator',
