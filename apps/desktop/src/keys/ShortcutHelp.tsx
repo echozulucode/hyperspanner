@@ -69,6 +69,14 @@ const HELP_CATALOG: Array<{ group: string; entries: Shortcut[] }> = [
         shift: true,
         run: () => {},
       },
+      {
+        id: 'zone.toggleTop',
+        description: 'Toggle top chrome (banner + nav)',
+        key: 't',
+        mod: true,
+        shift: true,
+        run: () => {},
+      },
     ],
   },
 ];

@@ -31,8 +31,14 @@
  */
 
 .container {
-  padding-top: 10px;
-  padding-left: 5px;
+  /* Paddings exposed as CSS vars so a consumer (e.g. AppShell) can zero
+   * them to sit flush against the window edges. Defaults preserve the
+   * original LCARS-24.2 look for the primitive gallery and de-risk
+   * screens, which want the small black breathing gap around the rails. */
+  padding-top: var(--lcars-layout-container-padding-top, 10px);
+  padding-left: var(--lcars-layout-container-padding-left, 5px);
+  padding-right: var(--lcars-layout-container-padding-right, 0);
+  padding-bottom: var(--lcars-layout-container-padding-bottom, 0);
   /* No background. The parent (DerisScreen.host / AppShell / PrimitiveGallery's
    * layoutFrame) supplies the black backdrop that shows through the
    * elbow's transparent disc area. Anything painted here would hide
@@ -49,8 +55,10 @@
   display: flex;
   align-items: stretch;
   margin-inline: auto;
-  padding-left: 5px;
-  padding-right: 15px;
+  /* Exposed as CSS vars so AppShell can flush the Inspector against the
+   * right window edge. Defaults match the original LCARS-24.2 gutters. */
+  padding-left: var(--lcars-layout-wrap-padding-left, 5px);
+  padding-right: var(--lcars-layout-wrap-padding-right, 15px);
   overflow: hidden;
   width: 100%;
   /* Pin the TOP row to its intrinsic (content) height. Without this,
@@ -107,6 +115,45 @@
 .wrap.gap {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* Top-collapsed state — controlled by the primitive's `topCollapsed` prop.
+ * Applied to the container so .wrap.topRow inside it can hide entirely:
+ * when collapsed, the whole top row (banner + nav + top rail + top bar +
+ * top elbow) goes `display: none`, the bottom row's flex: 1 expands to
+ * fill the viewport, and the bottom rail's top-left rounded corner
+ * naturally sits at the window's top edge thanks to its existing
+ * `border-radius: 160px 0 0 0`. No geometry changes needed on the
+ * bottom side — it was already built for "I live at top: 0 when there's
+ * no top row above me."
+ *
+ * We use display:none (not height:0) so the absolutely-positioned
+ * .elbowTop inside .rightFrameTop goes away entirely — zero chance of
+ * a ghost rail-colored strip painting at y=0 when the top row is
+ * hidden. */
+.topCollapsed .wrap.topRow {
+  display: none;
+}
+
+/* When collapsed, zero the container's top padding so the bottom rail's
+ * rounded arch sits flush against the window's top edge. The 10px of
+ * breathing room above the top row is dead weight once the top row is
+ * gone — and the arch was specifically designed to be the visual anchor
+ * at y=0 when there's nothing above it. Left/right/bottom paddings stay
+ * at their consumer-provided values. */
+.topCollapsed {
+  padding-top: 0;
+}
+
+/* Also kill .wrap.gap's top margin when the top row is hidden. That
+ * margin (default 0.5rem from --lcars-spacing-divider-height) normally
+ * separates the bottom row from the top row visually, but with the top
+ * row `display: none` it becomes dead space above the arch — exactly
+ * the "tiny margin above the collapsed arch" the user reports seeing.
+ * Scoped to `.topCollapsed .wrap.gap` so non-collapsed consumers
+ * keep their divider breathing room untouched. */
+.topCollapsed .wrap.gap {
+  margin-top: 0;
 }
 
 /* ── LEFT COLUMN (rails) ────────────────────────────────────────────── */
@@ -461,10 +508,15 @@
 /* ── MAIN CONTENT ───────────────────────────────────────────────────── */
 
 .main {
-  padding-top: 1.5rem;
-  padding-bottom: 0.5rem;
-  padding-left: clamp(20px, 3vw, 50px);
-  padding-right: clamp(12px, 2vw, 24px);
+  padding-top: var(--lcars-layout-main-padding-top, 1.5rem);
+  padding-bottom: var(--lcars-layout-main-padding-bottom, 0.5rem);
+  padding-left: var(--lcars-layout-main-padding-left, clamp(20px, 3vw, 50px));
+  /* Right padding exposed as a CSS var so AppShell can zero it — the
+   * Inspector (workspace's right column) needs to sit flush against the
+   * window's right edge, not with a ~24px gutter. Other consumers
+   * (DerisScreen, PrimitiveGallery) keep the clamp default for the
+   * canonical LCARS look. */
+  padding-right: var(--lcars-layout-main-padding-right, clamp(12px, 2vw, 24px));
   flex: 1 1 auto;
   min-height: 0;
   color: var(--lcars-color-text, #eae4d6);
@@ -472,7 +524,15 @@
    * framing bars stay locked to the viewport. */
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
+  /* Gutter exposed as a var so a flush-edge consumer (e.g. AppShell's
+   * Inspector-anchored-to-the-right-edge mode) can set it to `auto`.
+   * Default `stable` reserves ~15px on the right whether or not a
+   * scrollbar is currently visible, which is the right call for
+   * canonical LCARS consumers (no content jump when a scrollbar
+   * appears/disappears) but reads as phantom right-margin when the
+   * consumer has deliberately zeroed padding-right to flush something
+   * against the viewport edge. */
+  scrollbar-gutter: var(--lcars-layout-main-scrollbar-gutter, stable);
 }
 
 .main > *:first-child {

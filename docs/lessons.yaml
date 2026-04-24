@@ -1158,3 +1158,77 @@ lessons:
       place where the cast lives.
     applied: true
 
+  - id: 54
+    date: 2026-04-24
+    source: "session"
+    category: tooling
+    lesson: |
+      File tool (`Edit` / `Write`) operations against a WSL-mounted
+      Windows filesystem occasionally report success but don't
+      actually flush to disk. Caught during UX-1 work on three
+      separate files (`LcarsStandardLayout.tsx`, `AppShell.tsx`,
+      `AppShell.module.css`): the tool's post-edit view matched the
+      intent, but `wc -l` via bash against the same path showed the
+      original pre-edit line count, and the TypeScript compiler was
+      reporting errors that only made sense against the stale
+      content. Diagnosis is cheap: compare the Read tool's reported
+      line count to `wc -l` over the bash mount of the same path —
+      if they disagree, the file tool hasn't synced. Recovery: rewrite
+      the file via a bash heredoc (`cat > /path/to/file << 'EOF' ...
+      EOF`), which writes through the sandbox's native path and
+      lands reliably. Not worth trying to retry the file tool edit
+      repeatedly — in observed cases the sync doesn't recover on its
+      own, and re-running a failed Edit sometimes reports "string
+      already present" because the file tool's in-memory view has
+      the edit even though the disk doesn't. Signature of the
+      failure mode: a file edit you're confident landed, followed by
+      a compiler/test error that complains about code you just
+      replaced. Rule for future sessions: when an edit touches a
+      file the typechecker or test runner will consult, spot-check
+      with `wc -l` or `head -N` before handing back to the user.
+      Keep this lesson distinct from lesson #2 — that one's about
+      pnpm symlinks being unreadable from the sandbox; this one's
+      about plain-file writes from the file tool not always
+      reaching the mounted disk. Different failure surface, same
+      underlying root (WSL ↔ Windows filesystem boundary), different
+      workaround.
+    applied: true
+
+  - id: 55
+    date: 2026-04-24
+    source: "decision"
+    category: architecture
+    lesson: |
+      When a single consumer needs to retheme a padding, margin,
+      gap, or color on a shared layout primitive, prefer a CSS
+      custom property over a new TS prop. The UX-1 flush-right work
+      is the canonical example: AppShell needs
+      `padding-right: 0` on both the primitive's `.wrap` and its
+      `.main` so the Inspector sits flush against the window edge,
+      but every other consumer (DerisScreen, PrimitiveGallery, the
+      gallery sub-screens) wants the canonical LCARS clamp. A prop
+      like `flushRight?: boolean` would have worked for this one
+      case, but the next consumer will want "flush top", then
+      "flush left on narrow viewports", then "custom main-right
+      clamp," and the prop surface grows without bound. The
+      primitive instead exposes the knobs as
+      `var(--lcars-layout-*, <default>)` declarations; consumers
+      override by setting the variable in their own style object
+      (AppShell's `layoutStyle` map). Zero changes to the
+      primitive's TS signature, inherits cleanly for every non-
+      overriding consumer, and the vars are trivially discoverable
+      — grep for `--lcars-layout-` in the primitive's CSS to see
+      the full knob set. Rule: new layout-tuning knobs land as CSS
+      vars first, get promoted to props only if a prop offers
+      something CSS vars can't (e.g. it triggers other TS-level
+      behavior in the primitive, or the value is structural rather
+      than presentational). Adjacent corollary: chrome-density
+      states like "collapse the top row" should live as entries in
+      the workspace's `CollapsibleZone` / `ZoneCollapseState` data
+      model, toggled through the same `toggleZone` verb the rest
+      of the shortcut registry already speaks, rather than as a
+      prop on the primitive plus a bespoke handler. Same rationale
+      — one state machine, one shortcut grammar, persist-middleware
+      picks it up automatically when that phase lands.
+    applied: true
+

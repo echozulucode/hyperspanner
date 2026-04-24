@@ -50,6 +50,13 @@ export interface LcarsStandardLayoutProps {
   /** Hide the fixed black head/base trim (useful when embedded). */
   trim?: boolean;
 
+  /** Collapse the entire top row (banner + nav + top rail + top bar +
+   *  top elbow). The bottom row's flex grows to fill the viewport and
+   *  its rail's top-left rounded corner sits at the window's top edge.
+   *  Intended for AppShell's low-profile mode on laptop-short screens;
+   *  the consumer is responsible for the restore affordance. */
+  topCollapsed?: boolean;
+
   children?: ReactNode;
   footer?: ReactNode;
   className?: string;
@@ -109,6 +116,7 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
   topBarSegments,
   bottomBarSegments,
   trim = true,
+  topCollapsed = false,
   children,
   footer,
   className = '',
@@ -142,8 +150,16 @@ export const LcarsStandardLayout: FC<LcarsStandardLayoutProps> = ({
       </>
     ) : null;
 
+  const containerClasses = [
+    styles.container,
+    topCollapsed ? styles.topCollapsed : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className={`${styles.container} ${className}`} style={rootStyle}>
+    <div className={containerClasses} style={rootStyle}>
       {trim && <div className={styles.headtrim} aria-hidden="true" />}
 
       <div className={`${styles.wrap} ${styles.topRow}`}>

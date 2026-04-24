@@ -32,13 +32,20 @@ export interface ZoneCollapseState {
   bottom: boolean;
   /** Left navigator — not a workspace zone, but tracked here for convenience. */
   left: boolean;
+  /** Top chrome (banner + nav pill row + top rail + top elbow). When true
+   *  the entire top row is hidden so the workspace fills the viewport —
+   *  intended for laptop-short screens where banner chrome is wasted
+   *  vertical real-estate. The restore affordance is an edge chevron
+   *  rendered at the top of the viewport by AppShell. */
+  top: boolean;
 }
 
 /** The zones that can be collapsed. Excludes center (which can't) but
- *  includes `left` (the navigator chrome, tracked on `collapsed` for
- *  convenience). Used on action signatures so TypeScript refuses a
- *  `toggleZone('center')` at the call site. */
-export type CollapsibleZone = Exclude<Zone, 'center'> | 'left';
+ *  includes `left` (the navigator chrome) and `top` (shell top row),
+ *  both tracked on `collapsed` for convenience. Used on action
+ *  signatures so TypeScript refuses a `toggleZone('center')` at the
+ *  call site. */
+export type CollapsibleZone = Exclude<Zone, 'center'> | 'left' | 'top';
 
 export interface WorkspaceState {
   open: OpenTool[];

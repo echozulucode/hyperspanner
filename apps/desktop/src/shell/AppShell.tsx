@@ -136,6 +136,20 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
       whenTyping: 'block',
       run: () => setHelpOpen((prev) => !prev),
     },
+    {
+      // Low-profile toggle — collapses the entire top row (banner +
+      // nav pills + top bar + elbow) for small-screen / laptop-short
+      // workflows. An edge chevron hugs the top of the viewport as
+      // the restore affordance; the nav-row chevron pill also
+      // toggles.
+      id: 'zone.top',
+      description: 'Toggle top chrome',
+      key: 't',
+      mod: true,
+      shift: true,
+      whenTyping: 'block',
+      run: () => toggleZone('top'),
+    },
   ]);
 
   // Rail color hand-off — the bottom rail's quarter-circle lands on the
@@ -184,12 +198,21 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
       </LcarsPill>
       <LcarsPill
         size="small"
-        rounded="right"
+        rounded="none"
         color={theme.colors.red}
         onClick={onOpenScreens}
         aria-label="Open de-risk screens hub"
       >
         SCREENS
+      </LcarsPill>
+      <LcarsPill
+        size="small"
+        rounded="right"
+        color={theme.colors.lilac}
+        onClick={() => toggleZone('top')}
+        aria-label="Collapse top chrome (Cmd/Ctrl+Shift+T)"
+      >
+        ▲
       </LcarsPill>
     </>
   );
@@ -253,6 +276,23 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
     // rounding without blowing the row.
     '--lcars-layout-top-row-height': '170px',
     '--lcars-font-size-banner': '3rem',
+    // Flush the workspace against the right edge of the window. The
+    // Inspector should not sit behind any decorative breathing margin —
+    // it's a vertical edge panel, anchored to the viewport edge. We
+    // zero the primitive's wrap-right + main-right padding here; the
+    // 5px container-left / 10px container-top remain intact so the
+    // rounded left rail still has its black-strip breathing room.
+    '--lcars-layout-wrap-padding-right': '0',
+    '--lcars-layout-main-padding-right': '0',
+    // Release the stable scrollbar gutter — without this, .main reserves
+    // ~15px on the right even when no scrollbar is visible, which reads
+    // as a phantom margin beside the (already flush) Inspector stub. We
+    // accept the canonical LCARS tradeoff (a tiny content shift if a
+    // scrollbar appears) in exchange for the edge-flush look the user
+    // specifically asked for. Per-zone scrolling in the workspace grid
+    // keeps the "scrollbar appears on .main" case to a minimum anyway —
+    // .main itself rarely overflows.
+    '--lcars-layout-main-scrollbar-gutter': 'auto',
   } as CSSProperties;
 
   return (
@@ -271,6 +311,7 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
       topRailColor={topRailColor}
       bottomRailColor={bottomRailColor}
       trim={false}
+      topCollapsed={collapsed.top}
       className={styles.layoutRoot}
       style={layoutStyle}
     >
@@ -325,6 +366,16 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
           )}
         </div>
       </div>
+      {collapsed.top && (
+        <button
+          type="button"
+          className={styles.topRestoreButton}
+          onClick={() => toggleZone('top')}
+          aria-label="Expand top chrome (Cmd/Ctrl+Shift+T)"
+        >
+          ▼
+        </button>
+      )}
       <CommandPalette
         open={paletteOpen}
         onClose={handleClosePalette}

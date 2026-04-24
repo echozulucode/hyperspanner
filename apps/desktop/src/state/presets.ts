@@ -21,6 +21,7 @@ export const DEFAULT_COLLAPSED: ZoneCollapseState = {
   left: false,
   right: false,
   bottom: true,
+  top: false,
 };
 
 function presetState(

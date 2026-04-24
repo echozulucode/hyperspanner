@@ -168,6 +168,66 @@
   outline-offset: -2px;
 }
 
+/* Top restore — a small LCARS pill hugging the TOP edge of the viewport.
+ * Only rendered by AppShell when `collapsed.top` is true; the layout
+ * primitive's `topCollapsed` prop pulls the entire top row (banner + nav
+ * + top bar + elbow) out of the flow via `display: none` and the bottom
+ * rail's existing rounded corner lands right at y=0. This button sits on
+ * top of that curved corner's straight edge so it reads as a pull-tab —
+ * a deliberate break from the rail's curve, matching the right/bottom
+ * restore buttons' visual grammar (short edge, rounded on the free side,
+ * flat against the viewport edge it hugs).
+ *
+ * z-index: above the layout (which has stacking contexts for the elbow
+ * overlay), but below modal overlays (scrim 1000+). The rail's concrete
+ * elbow is position: absolute inside .rightFrameTop; with topCollapsed
+ * the whole .wrap.topRow is display:none so the elbow is gone — nothing
+ * to compete with here.
+ */
+/* Faint overlay pill — invisible by default so it doesn't compete with
+ * the LCARS arch for visual weight, but reveals on hover/focus. The
+ * user discovers it either by mousing near the top of the window or by
+ * recalling the ⌘⇧T shortcut; the faint trace is a hint that something
+ * interactive lives up here without dragging the eye. Background is
+ * transparent rather than lilac-at-low-alpha so the color on hover
+ * isn't surprising.
+ */
+.topRestoreButton {
+  position: fixed;
+  top: 0;
+  right: 2rem;
+  z-index: 500;
+  min-width: 72px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--lcars-color-lilac, #cc55ff);
+  color: black;
+  font-weight: bold;
+  font-size: 0.7rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  border: none;
+  border-bottom-left-radius: 128px;
+  border-bottom-right-radius: 128px;
+  cursor: pointer;
+  padding: 0 1rem;
+  opacity: 0.18;
+  transition: opacity 160ms ease, filter 140ms ease, transform 140ms ease;
+}
+
+.topRestoreButton:hover {
+  opacity: 1;
+  filter: brightness(1.1);
+}
+
+.topRestoreButton:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--lcars-color-almond-creme, #fff);
+  outline-offset: -2px;
+}
+
 /* Responsive breakpoints — workspace tightens at narrower widths. */
 
 @media (max-width: 1100px) {

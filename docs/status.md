@@ -1,15 +1,163 @@
 ---
 type: status
 updated: 2026-04-24
-current_phase: "Phase 6.0 + 6.1 verified on Windows host. Backend scaffolding (Rust error module + fs commands + TS IPC) and the JSON Validator vertical slice (shared `ToolFrame` / `ToolStatusPill` + `docs/tool-pattern.md`) are both fully green: cargo test, vitest, typecheck, and build all pass. Four small fixes during verification — all logged in `plan.md` Errors and as lessons #50–#53. Ready to start Phase 6.2 (seven text/data tools on the pattern)."
+current_phase: "UX-1 landed on top of Phase 6.0 + 6.1. Low-profile top-collapse mode (⌘⇧T), faint-until-hover overlay restore chevron, and flush-right Inspector are all shipped and host-verified (typecheck green, user visual pass green). Phase 6.0 + 6.1 back-end scaffolding and JSON Validator vertical slice remain green. Ready to start Phase 6.2 (seven text/data tools on the pattern)."
 blockers: []
 next_actions:
-  - "Dev smoke (low-stakes, can happen alongside 6.2 work): `pnpm tauri dev`, open JSON Validator, paste sample, test Format / Minify / Indent 2→4, drag to inspector/bottom and confirm compact form + state persistence, paste `{\"a\":}` and confirm line/col pill. Automated tests already cover every logical path."
   - "Phase 6.2: seven text/data tools on the pattern — Case Transform, Whitespace Clean, Base64 Pad, URL Codec, CIDR Calc, Regex Tester, YAML Validator. Each tool is a single folder under `apps/desktop/src/tools/<id>/` following `tool-pattern.md`. Target: land all seven in one sub-phase, verify on host, then 6.3."
+  - "Dev smoke (low-stakes, can happen alongside 6.2 work): `pnpm tauri dev`, open JSON Validator, paste sample, test Format / Minify / Indent 2→4, drag to inspector/bottom and confirm compact form + state persistence, paste `{\"a\":}` and confirm line/col pill. Automated tests already cover every logical path."
   - "Phase 7 on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)."
 ---
 
 # Status Log
+
+## Session: 2026-04-24 (UX-1 — low-profile top-collapse + flush-right Inspector)
+
+**Phase:** UX-1 (chrome-density improvements for small screens). Four
+sub-tasks — #75 (store), #76 (primitive), #77 (shell wiring), #78
+(verify) — all green. User confirmed the final visual pass ("all
+checks pass").
+
+**Goal:** two related asks from the user —
+  1. A low-profile mode that hides the entire top chrome (banner + nav
+     + top rail + top bar + top elbow) so the bottom rail's existing
+     rounded arch lands at the window's top edge. Intended for short
+     laptop screens where the banner was eating ~170px for marginal
+     value.
+  2. Flush the Inspector (right zone) against the right edge of the
+     viewport — no decorative gutter or scrollbar reserve on the right.
+
+**Design decisions (with rationale for future-me):**
+
+1. **Collapse is a data-driven zone, not a prop on the primitive.**
+   Added `'top'` to the `CollapsibleZone` union and a `top: boolean`
+   field to `ZoneCollapseState` (default false). This makes the
+   collapse reachable through the same `toggleZone` verb the rest of
+   the workspace uses (⌘B, ⌘J, ⌘⇧E), so ⌘⇧T fits into the existing
+   shortcut registry without bespoke plumbing. The persistence
+   middleware picks it up for free once that phase lands.
+
+2. **LcarsStandardLayout exposes `topCollapsed?: boolean`, not a prop
+   per paddings.** The actual hide is one line of CSS — `.topCollapsed
+   .wrap.topRow { display: none }` — and the bottom row's `flex: 1`
+   already fills the viewport without any geometry edits. The bottom
+   rail's existing `border-radius: 160px 0 0 0` drops its arch at y=0
+   automatically. Zero new math. Also added `.topCollapsed {
+   padding-top: 0 }` so the primitive's 10px container-top doesn't
+   leave a black stripe above the arch.
+
+3. **Restore affordance is a faint-until-hover overlay pill, not a
+   rail element.** When the top row is `display: none`, there's no
+   frame to hang a restore button on. AppShell renders a
+   `position: fixed; top: 0; right: 2rem` pill at `opacity: 0.18`,
+   transitioning to `opacity: 1` on hover/focus. Pattern copied from
+   the Home Automation de-risk screen's overlay buttons — the user
+   explicitly requested this visual language. The faint trace is a
+   discoverability hint (something interactive lives up here) without
+   dragging the eye away from the content. ⌘⇧T is the primary entry
+   point; the pill is the fallback for users who don't recall the
+   shortcut.
+
+4. **Flush-right via CSS vars, not a `flushRight` prop.** The
+   primitive already exposed
+   `--lcars-layout-wrap-padding-right` and
+   `--lcars-layout-main-padding-right` as part of its progressive-
+   disclosure surface. AppShell zeroes both in `layoutStyle`. No
+   changes to the primitive's TS signature; other consumers
+   (DerisScreen, PrimitiveGallery) keep the clamp defaults for the
+   canonical LCARS look. This is the preferred pattern going forward
+   — padding/margin knobs that a single consumer needs to retheme
+   should be CSS vars, not new props.
+
+5. **Screens pill + new chevron pill both live in the top-bar nav.**
+   Changed SCREENS from `rounded="right"` to `rounded="none"` so the
+   new lilac "▲" pill can sit to its right with `rounded="right"` and
+   provide the curved terminus. Mirrors the existing LCARS grammar of
+   "pill cluster ending in a rounded cap."
+
+**Files changed (UX-1):**
+
+Package primitive:
+- `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.tsx` —
+  added `topCollapsed?: boolean` prop; builds `containerClasses` from
+  `styles.container + (topCollapsed ? styles.topCollapsed : '')`.
+- `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css` —
+  added `.topCollapsed .wrap.topRow { display: none }` and
+  `.topCollapsed { padding-top: 0 }`; exposed the wrap + main padding
+  CSS vars with fallbacks so default consumers are unaffected.
+
+Shell:
+- `apps/desktop/src/state/workspace.types.ts` — `'top'` added to
+  `CollapsibleZone`; `top: boolean` on `ZoneCollapseState`.
+- `apps/desktop/src/state/presets.ts` — `top: false` in
+  `DEFAULT_COLLAPSED`.
+- `apps/desktop/src/shell/AppShell.tsx` — new lilac chevron pill
+  (⌘⇧T) after SCREENS; `layoutStyle` zeroes wrap-right + main-right
+  padding; `topCollapsed={collapsed.top}` threaded to the layout;
+  conditional `topRestoreButton` rendered when collapsed.
+- `apps/desktop/src/shell/AppShell.module.css` — `.topRestoreButton`
+  styles (fixed-position lilac pill, opacity 0.18 → 1 on hover/focus).
+- `apps/desktop/src/shell/useShellShortcuts.ts` (via global shortcuts) —
+  `zone.top` binding with `key: 't', mod: true, shift: true,
+  whenTyping: 'block'`.
+- `apps/desktop/src/keys/ShortcutHelp.tsx` — `zone.toggleTop` entry in
+  HELP_CATALOG under "Workspace".
+
+**Gates after fixes (host-side, user confirmed):**
+- `pnpm --filter @hyperspanner/desktop typecheck` — clean.
+- Visual pass — user confirmed "all checks pass" after the final
+  padding tweaks (flush right + flush top in collapsed mode).
+- Unit tests blocked in the Linux sandbox by the pre-existing pnpm
+  symlink I/O issue (lesson #2); Windows host runs remain the
+  verification path for this project. No test files changed in UX-1
+  so existing coverage is unaffected.
+
+**Snags encountered along the way (all resolved):**
+
+- **File-tool writes not flushing to the WSL mount.** Several times,
+  `Edit`/`Write` reported success but the on-disk file stayed at its
+  pre-edit size (checked via `wc -l` against the line count the Read
+  tool reported). Happened to `LcarsStandardLayout.tsx`, `AppShell.tsx`,
+  and `AppShell.module.css`. Workaround: rewrite the file via a bash
+  heredoc (`cat > file << 'EOF' ... EOF`), which goes through the
+  sandbox's native write path and lands reliably. Captured as lesson
+  #54.
+
+- **1300px-width hardcoded `.main` padding-top.** While chasing the
+  final "tiny padding left on top" the user reported, found that
+  `LcarsStandardLayout.module.css` had a `@media (max-width: 1300px) {
+  .main { padding-top: 1rem } }` override that bypassed the CSS var.
+  At common desktop-window widths that rule was winning over any
+  consumer override. The rule stays (it's still right for non-
+  topCollapsed consumers), but in topCollapsed mode the user isn't
+  seeing .main's top padding anyway — the visual top is now the
+  bottom-rail arch, and the remaining perceived padding was actually
+  the container's 10px breathing room, which `.topCollapsed {
+  padding-top: 0 }` eliminates. So the 1300px rule didn't need to
+  change; the container-top zero was the real fix. Lesson: when
+  chasing "why is there still padding," walk the full stack (fixed
+  trim → container padding → wrap padding → rail gap → main padding
+  → scrollbar gutter) rather than jumping to the first likely
+  culprit.
+
+**Why this is worth the bookkeeping:** UX-1 introduced two load-
+bearing conventions for the shell going forward —
+
+  1. Chrome collapses flow through the zone state machine, not
+     through primitive props. Any future collapse (e.g. hide the
+     whole bottom rail for a zen-writing mode) should be another
+     entry in `CollapsibleZone`, a boolean on `ZoneCollapseState`,
+     and a class toggle on the primitive — not a new prop surface.
+
+  2. When a single consumer needs to retheme a piece of the layout
+     primitive, do it through a CSS var, not a new prop. The flush-
+     right work is exhibit A: zero code changes to the primitive's
+     TS signature, clean inheritance for every other consumer.
+
+These conventions ride into Phase 6 tool development (the tool
+pattern doc will get a cross-reference).
+
+---
 
 ## Session: 2026-04-24 (Phase 6.0 + 6.1 verification pass — host-side)
 **Phase:** 6.0 + 6.1 — Windows host verification (Tasks #68 and #69, both
