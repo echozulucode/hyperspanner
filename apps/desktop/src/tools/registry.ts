@@ -1,7 +1,14 @@
 import type { ComponentType } from 'react';
 import type { Zone } from '../state';
 import { PlaceholderTool } from './PlaceholderTool';
+import { Base64Pad } from './base64-pad';
+import { CaseTransform } from './case-transform';
+import { CidrCalc } from './cidr-calc';
 import { JsonValidator } from './json-validator';
+import { RegexTester } from './regex-tester';
+import { UrlCodec } from './url-codec';
+import { WhitespaceClean } from './whitespace-clean';
+import { YamlValidator } from './yaml-validator';
 
 /**
  * Tool registry — Phase 3 placeholder version.
@@ -82,7 +89,7 @@ const entries: ToolDescriptor[] = [
     category: 'text',
     description: 'Convert between camel/snake/kebab/pascal/upper/lower.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: CaseTransform,
   },
   {
     id: 'whitespace-clean',
@@ -90,7 +97,7 @@ const entries: ToolDescriptor[] = [
     category: 'text',
     description: 'Normalize whitespace, tabs, newlines, BOM.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: WhitespaceClean,
   },
   {
     id: 'json-validator',
@@ -112,7 +119,7 @@ const entries: ToolDescriptor[] = [
     description: 'Parse YAML, surface errors, round-trip to JSON.',
     defaultZone: 'center',
     supportedZones: ['center', 'bottom'],
-    component: PlaceholderTool,
+    component: YamlValidator,
   },
   {
     id: 'regex-tester',
@@ -120,7 +127,7 @@ const entries: ToolDescriptor[] = [
     category: 'validation',
     description: 'Test regex patterns against sample input with match groups.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: RegexTester,
   },
   {
     id: 'hash-workbench',
@@ -136,7 +143,7 @@ const entries: ToolDescriptor[] = [
     category: 'data',
     description: 'Encode/decode base64 with URL-safe variant.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: Base64Pad,
   },
   {
     id: 'url-codec',
@@ -144,7 +151,7 @@ const entries: ToolDescriptor[] = [
     category: 'data',
     description: 'Percent-encode and decode URL components.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: UrlCodec,
   },
   {
     id: 'hex-inspector',
@@ -171,7 +178,7 @@ const entries: ToolDescriptor[] = [
     category: 'network',
     description: 'Split CIDR ranges, compute masks, test membership.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: CidrCalc,
   },
   {
     id: 'tls-inspector',

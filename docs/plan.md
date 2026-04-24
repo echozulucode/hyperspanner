@@ -2,7 +2,7 @@
 type: plan
 project: "Hyperspanner"
 status: active
-version: 4
+version: 5
 updated: 2026-04-24
 phases:
   - id: 0
@@ -106,8 +106,21 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
     `docs/tool-pattern.md` — the five rules (component-vs-lib split, discriminated-
     union errors, `useTool` for state, zone-responsive layout, IPC-only OS access)
     set the template for the remaining twelve tools.
-  - **6.2 Text + data tools (no backend)** — Case Transform, Whitespace Clean, Base64
-    Pad, URL Codec, CIDR Calc, Regex Tester, YAML Validator (js-yaml). ~7 tools.
+  - **6.2 Text + data tools (no backend)** (verified 2026-04-24) — seven
+    tools landed on the tool-pattern (each a single folder under
+    `apps/desktop/src/tools/<id>/` with pure `lib.ts` + `useTool` state +
+    shared `ToolFrame` chrome + discriminated-union results + both lib
+    and component tests): `case-transform`, `whitespace-clean`, `base64-pad`,
+    `url-codec`, `cidr-calc`, `regex-tester`, `yaml-validator`. Registry
+    flipped each from `PlaceholderTool` to the real component; `yaml-validator`
+    gained `supportedZones: ['center', 'bottom']` because pretty-printed YAML
+    is tall. Added `js-yaml ^4.1.0` + `@types/js-yaml ^4.0.9`. Gates green on
+    Windows host: typecheck clean, 234 tests passing (80 pre-existing + 154
+    new), build clean. Small follow-up: RegexTester's flag toggles use
+    inline styled buttons instead of LcarsPill — off-grammar but functionally
+    correct, punt to polish. Lessons #56 (shape lockdown via reference-impl
+    reads) and #57 (parallel-fanout build orchestration contract) captured
+    the working approach for 6.3–6.5.
   - **6.3 Text Diff** — separate sub-phase because of the two-pane layout work and
     diff-library evaluation (jsdiff vs diff-match-patch).
   - **6.4 Binary + hashing** — Hash Workbench (SubtleCrypto for small inputs, backend
@@ -128,6 +141,7 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
 | 2026-04-23 | Phase 6.0 backend ships `fs` commands only; `hash_bytes`/`decode_protobuf`/`tls_inspect` deferred to their owning sub-phases | Avoid designing against imagined consumer requirements; avoid dragging in `prost-reflect`/`rustls`/RustCrypto crates before any code uses them (lesson #49) |
 | 2026-04-23 | Rust→TS error transport is a flat `{ kind, message }` shape (hand-rolled Serialize) rather than serde's externally-tagged enum | TS side gets a discriminated string-literal union to switch on instead of having to deserialize variant-keyed objects (lesson #47) |
 | 2026-04-23 | TS IPC transport uses a lazy dynamic import with a `__setInvokeForTests` seam instead of a top-level `@tauri-apps/api` import | Vitest in jsdom doesn't ship the Tauri runtime; a seam keeps tests runnable without global module mocks while production builds still tree-shake (lesson #48) |
+| 2026-04-24 | Phase 6.2 used a parallel-fanout build approach: read the JSON-Validator reference impl in full, brief N subagents on the same pattern, enforce exclusive ownership of package.json and registry at the parent | One pattern pass shipped seven tools on the first try with zero registry churn and zero test-harness regressions; generalizes to 6.3–6.5 unchanged (lessons #56, #57) |
 
 ## Errors Encountered
 | Date | Error | Resolution |

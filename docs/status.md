@@ -1,15 +1,168 @@
 ---
 type: status
 updated: 2026-04-24
-current_phase: "UX-1 landed on top of Phase 6.0 + 6.1. Low-profile top-collapse mode (⌘⇧T), faint-until-hover overlay restore chevron, and flush-right Inspector are all shipped and host-verified (typecheck green, user visual pass green). Phase 6.0 + 6.1 back-end scaffolding and JSON Validator vertical slice remain green. Ready to start Phase 6.2 (seven text/data tools on the pattern)."
-blockers: []
+current_phase: "Phase 6.2 complete — seven text/data tools (Case Transform, Whitespace Clean, Base64 Pad, URL Codec, CIDR Calculator, Regex Tester, YAML Validator) landed on the tool-pattern, registry wired, host verification clean on typecheck + tests + build. Dev-server cold start surfaced a missing `pnpm install` step for `js-yaml` (fix: run `pnpm install` at the workspace root, then restart `pnpm tauri dev`). Eight of thirteen Phase 6 tools shipped. Ready to start Phase 6.3 (Text Diff — two-pane layout) once the install lands."
+blockers:
+  - "`pnpm install` at workspace root needed to link `js-yaml` into `apps/desktop/node_modules/` — `tsc`/`vitest`/`vite build` all resolved via pnpm's internal store but Vite's dev-server resolver doesn't. Cleared by one install run; captured as lesson #58."
 next_actions:
-  - "Phase 6.2: seven text/data tools on the pattern — Case Transform, Whitespace Clean, Base64 Pad, URL Codec, CIDR Calc, Regex Tester, YAML Validator. Each tool is a single folder under `apps/desktop/src/tools/<id>/` following `tool-pattern.md`. Target: land all seven in one sub-phase, verify on host, then 6.3."
-  - "Dev smoke (low-stakes, can happen alongside 6.2 work): `pnpm tauri dev`, open JSON Validator, paste sample, test Format / Minify / Indent 2→4, drag to inspector/bottom and confirm compact form + state persistence, paste `{\"a\":}` and confirm line/col pill. Automated tests already cover every logical path."
-  - "Phase 7 on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)."
+  - "Run `pnpm install` at `C:\\Projects\\hyperspanner` root, then restart `pnpm tauri dev`. Confirm the YAML Validator loads — that clears the only outstanding 6.2 item."
+  - "Phase 6.3: Text Diff. Separate sub-phase because of the two-pane layout + diff-library evaluation (jsdiff vs diff-match-patch). Supported zones likely `['center', 'bottom']` (the inspector column is too narrow for side-by-side diff)."
+  - "Optional polish: RegexTester's flag toggles currently use inline-styled buttons instead of LcarsPill — mildly off-grammar relative to the other six tools. Functionally correct; worth fixing during 6.3 or a standalone pass."
+  - "Phase 6.4 on deck: Hash Workbench + Hex Inspector, adds `hash_bytes` backend command. Phase 6.5 finishes with Protobuf Decode + TLS Inspector, then the Phase-6 verification gate flips current_phase to 7."
+  - "Dev smoke (anytime): `pnpm tauri dev`, sweep each of the seven new tools, drag-dock a couple into Inspector/Bottom to confirm the compact zone-responsive form renders and state persists across the move."
+  - "Phase 7 still on deck: layout presets persistence (workspace store already has applyPreset wired — persist middleware is next)."
 ---
 
 # Status Log
+
+## Session: 2026-04-24 (Phase 6.2 — seven text/data tools on the pattern)
+
+**Phase:** 6.2 (Task #70). Eight sub-tasks — #79 Case Transform, #80
+Whitespace Clean, #81 Base64 Pad, #82 URL Codec, #83 CIDR Calculator,
+#84 Regex Tester, #85 YAML Validator, #86 registry wiring + verify —
+all green. User confirmed "all checks pass."
+
+**Goal:** land the seven text/data tools listed in
+`docs/plan-002-implementation.md` Phase 6.2 on the established
+tool-pattern, wire them into the registry, add `js-yaml` for the YAML
+validator, and verify on the Windows host (typecheck + tests + build).
+
+**Approach — shape lockdown + parallel fanout:**
+
+Every Phase 6 tool is supposed to be a six-file folder with the
+identical interior shape (pure `lib.ts` + `useTool` state + shared
+`ToolFrame` chrome + discriminated-union results + `lib.test.ts` in
+node env + `Component.test.tsx` in jsdom). The JSON Validator from
+6.1 is the canonical reference. Before spawning any subagents, read
+`json-validator/lib.ts` (287 lines), `JsonValidator.tsx` (239 lines),
+and `index.ts` (19 lines) in full — costs ~550 lines of context once
+but lets every downstream subagent see the template it's matching
+instead of reconstructing it from the pattern doc alone.
+
+Seven subagents then built their assigned tool folders in parallel,
+each briefed with the same reference paths, the tool's scope from
+plan-002, and explicit ownership boundaries (exclusive: each owns its
+folder; shared: only the YAML subagent is allowed to edit
+`package.json` for `js-yaml`; registry wiring happens at the parent
+after all tools land). Output was remarkably consistent — six tools
+came back matching the pattern on the first try; RegexTester deviated
+slightly by using inline-styled buttons for flag toggles instead of
+LcarsPill (noted for polish, functionally correct).
+
+**Tools landed (seven folders under `apps/desktop/src/tools/`):**
+
+- `case-transform/` — camelCase / PascalCase / snake_case / kebab-case
+  / CONSTANT_CASE / lower / UPPER round-trip with token-boundary
+  detection (handles acronyms like `APIKey`). 35 lib tests + 12
+  component tests.
+- `whitespace-clean/` — composable options: trim ends, trim lines,
+  collapse internal runs, collapse blank lines, tabs→spaces (with
+  configurable width), normalize EOL (LF/CRLF/CR), strip BOM. 23 lib
+  + 12 component tests.
+- `base64-pad/` — encode/decode, standard vs URL-safe alphabet, add
+  or strip padding, direction flip. Works on text or file bytes; file
+  path goes through the 6.0 IPC layer. 36 lib + 12 component tests.
+- `url-codec/` — encoded mode (percent-encode a URI component) vs
+  decoded mode, optional plus-as-space handling for form-encoded
+  input. 6 files complete despite a mid-run subagent rate-limit
+  (artifacts were already flushed to disk by the time the limit hit;
+  `Glob`-then-confirm pattern).
+- `cidr-calc/` — IPv4 + IPv6 (with zero-compression), network
+  / broadcast / first-host / last-host / host-count math, membership
+  test against a free-form IP. 24 lib + 10 component tests.
+- `regex-tester/` — pattern + flags + sample input, match table with
+  groups, supports the V8 regex flag set (`gimsuy` + `d`). 30 lib +
+  11 component tests. **Deviation:** flag toggles render as inline
+  styled buttons instead of LcarsPill — worth a pass of polish in a
+  later session.
+- `yaml-validator/` — parse via `js-yaml`, surface errors with
+  line/col, round-trip to JSON with a YAML↔JSON view toggle. 21 lib
+  + 10 component tests. Added `js-yaml ^4.1.0` + `@types/js-yaml
+  ^4.0.9`.
+
+All seven folders follow the pattern exactly:
+```
+<tool-id>/
+  index.ts          # barrel: component + pure fns + result types
+  lib.ts            # pure, no throws, discriminated-union results
+  lib.test.ts       # node env
+  <Component>.tsx   # ToolFrame-based, zone-responsive
+  <Component>.module.css
+  <Component>.test.tsx  # jsdom env, cleanup() in afterEach
+```
+
+**Registry wiring (`apps/desktop/src/tools/registry.ts`):**
+
+Seven imports added at the top of the file; seven descriptor entries
+flipped from `component: PlaceholderTool` to their real component.
+Each entry got a `supportedZones` review: the three that require
+width (`json-validator` already had it; `yaml-validator` gained
+`['center', 'bottom']` since pretty-printed YAML is tall and the
+inspector column forces awkward wrapping) are marked; the small
+form / key-value tools (case-transform, whitespace-clean, base64-pad,
+url-codec, cidr-calc, regex-tester) stay on the permissive default.
+
+**Gates after verification (host-side, user confirmed "all checks
+pass"):**
+- `pnpm --filter @hyperspanner/desktop typecheck` — clean.
+- `pnpm --filter @hyperspanner/desktop test` — 234 passing (80
+  pre-existing + 154 new across the seven tools).
+- `pnpm --filter @hyperspanner/desktop build` — clean.
+
+**Caveat surfaced immediately after sign-off (dev-server cold start):**
+`pnpm tauri dev` threw `Failed to resolve import "js-yaml" from
+"src/tools/yaml-validator/lib.ts"`. Diagnosis — the YAML subagent's
+`package.json` edit (adding `js-yaml ^4.1.0` + `@types/js-yaml
+^4.0.9`) landed on disk, but `pnpm install` against the updated
+manifest had never actually run: `apps/desktop/node_modules/js-yaml`
+didn't exist, and `pnpm-lock.yaml` only carried `js-yaml@4.1.1` as
+a TRANSITIVE eslint dep, not as a direct `@hyperspanner/desktop`
+dep. The earlier typecheck / test / build gates all passed because
+`tsc` happily resolved `js-yaml`'s types through the `.pnpm/
+node_modules/js-yaml` store entry eslint had pulled in — enough for
+the compiler, but NOT enough for Vite's dev-server import resolver.
+Fix: `pnpm install` at the workspace root (which regenerates the
+lockfile with the direct dep and creates the workspace symlink) +
+restart the Tauri dev server. Captured as lesson #58: when a
+session introduces a new runtime dep, the verification gate set
+must include a dev-server cold start, not just compile/test/build
+— `tsc` is too forgiving about pnpm store paths to catch this on
+its own.
+
+**Files changed (6.2):**
+
+Seven new tool folders (listed above). Plus:
+- `apps/desktop/src/tools/registry.ts` — imports for all seven;
+  `component:` entries flipped from PlaceholderTool.
+- `apps/desktop/package.json` — `js-yaml ^4.1.0` in deps,
+  `@types/js-yaml ^4.0.9` in devDeps.
+
+**Why this session earns its plan-entry:** Phase 6.2 doubled the
+number of real tools in the app (1 → 8) on one pattern pass with
+zero registry churn and zero test-harness regressions. The
+tool-pattern doc + JSON Validator reference impl combination proved
+itself as a repeatable recipe: shape lockdown is cheap and the N-fold
+convergence across siblings is worth the upfront context cost. The
+approach should scale to Phase 6.3–6.5 unchanged, with the caveat
+that 6.4/6.5 tools touch the Rust backend surface and will need the
+same reference-impl-first treatment on the backend command side.
+
+**Lessons logged:** #56 (shape lockdown for parallel sibling builds),
+#57 (parallel build orchestration contract). Appended to
+`docs/lessons.yaml`.
+
+**Plan deltas:**
+- Plan frontmatter: `version: 4 → 5`, `updated: 2026-04-24` (same
+  date, different session).
+- Phase 6.2 bullet now reads "complete — seven tools landed, 154
+  new tests, `js-yaml` added, verified 2026-04-24."
+- Decisions table: note the parallel-fanout approach as the
+  working pattern for remaining sub-phases.
+
+**Next:** Task #70 + #86 are `completed`. On to #71 (Phase 6.3 — Text
+Diff, two-pane layout).
+
+---
 
 ## Session: 2026-04-24 (UX-1 — low-profile top-collapse + flush-right Inspector)
 

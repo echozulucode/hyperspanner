@@ -1232,3 +1232,144 @@ lessons:
       picks it up automatically when that phase lands.
     applied: true
 
+  - id: 56
+    date: 2026-04-24
+    source: "session"
+    category: process
+    lesson: |
+      Before fanning out N parallel subagents to build sibling-shaped
+      artifacts (tools, screens, commands — anything where the set shares
+      an interior pattern), invest the context tokens to read the full
+      reference implementation yourself first, then brief every subagent
+      with the same reference paths. Don't rely on a pattern doc plus the
+      task description — subagents read it and converge on nearby-but-not-
+      identical shapes, which means merging their output costs more than
+      the upfront reads would have. For Phase 6.2 we read JSON Validator's
+      `lib.ts` (287 lines), `JsonValidator.tsx` (239), and `index.ts` (19)
+      before spawning seven tool-building subagents. Result: six of seven
+      tools came back matching the six-file template on the first try; the
+      one deviation (RegexTester flag toggles using inline buttons instead
+      of LcarsPill) was minor and functionally correct. The cost was ~550
+      lines of context paid once; the benefit was seven tools that slotted
+      into the registry with only the four-Edit wiring pass the pattern
+      predicts. Rule: when you notice you're about to produce more than
+      two artifacts on the same shape, read the canonical instance in
+      full before spawning. Pattern docs are reference material for
+      humans; reference impls are reference material for subagents.
+    applied: true
+
+  - id: 57
+    date: 2026-04-24
+    source: "session"
+    category: process
+    lesson: |
+      Parallel subagent builds need an explicit ownership contract, or
+      shared resources (package.json, registries, install lockfiles)
+      become a race. The working contract for Phase 6.2's seven-tool
+      fanout — reuse for 6.3–6.5 and any similar N-way build:
+
+        (a) EXCLUSIVE OWNERSHIP: each subagent owns one folder and
+            creates only files within it. Never two subagents writing
+            into the same subtree.
+        (b) SHARED-FILE DESIGNATED EDITOR: for files every subagent
+            might need to touch (package.json for new deps, a shared
+            types file, a tsconfig), pick one subagent as the sole
+            editor per dep/change. Phase 6.2 let the YAML subagent
+            add `js-yaml` to package.json; no other subagent was
+            allowed to touch package.json. This prevents lost-update
+            races where two subagents independently add different
+            dependency lines and one's change gets clobbered.
+        (c) PARENT-OWNED WIRING: the final integration step (registry
+            flip-over, `pnpm install`, typecheck/test runs) happens
+            at the parent, AFTER all subagents complete. The parent
+            has the global view; subagents don't.
+        (d) PARALLEL SPAWN DISCIPLINE: "parallel" isn't a narration
+            word, it's a message-shape constraint — spawning happens
+            by sending one message with N Agent tool_use blocks.
+            Saying "I'll spawn these in parallel" and then emitting
+            one Agent call per message is serial, no matter what
+            the prose claims. Before sending a batch, eyeball the
+            outgoing message and confirm it contains multiple
+            tool_use entries.
+        (e) RATE-LIMIT RECOVERY: if a subagent fails mid-run (rate
+            limit, tool error), DON'T immediately respawn. First,
+            `Glob` or `Read` the subagent's target folder to see what
+            already landed — agents often complete the bulk of file
+            writes before the failure and only the tail is missing.
+            Phase 6.2's URL Codec subagent rate-limited after all six
+            files had flushed to disk; checking artifacts before
+            respawning avoided a redundant rerun. General principle:
+            treat subagent failures like crashes of a streaming
+            writer — the partial output is almost always usable, and
+            the recovery plan starts with "what's on disk?"
+
+      Pair this with lesson #56 (shape lockdown via reference-impl
+      reads). Together they're the repeatable recipe for N-way
+      convergent builds: read the reference yourself, then fan out
+      with an ownership contract, then wire up and verify at the
+      parent. Lesson #25 covers a narrower case (two subagents
+      editing the same registry file with non-overlapping Edit
+      regions) — this lesson generalizes that to whole shared files
+      via single-editor designation.
+    applied: true
+
+  - id: 58
+    date: 2026-04-24
+    source: "error"
+    category: tooling
+    lesson: |
+      TypeScript's module resolver is too permissive about pnpm's
+      internal store to catch a missing workspace-level dep install on
+      its own. When you add a new runtime dep to a workspace package's
+      `package.json` but don't actually run `pnpm install` against the
+      updated manifest, `tsc` can still resolve the types (it finds
+      them at `node_modules/.pnpm/node_modules/<pkg>/` if any other
+      package in the workspace has pulled them in transitively), AND
+      `vitest` + `vite build` both inherit enough of tsc's resolution
+      to pass too — so the whole typecheck / test / build chain can
+      go green while `apps/desktop/node_modules/<pkg>` is literally
+      not on disk. Then the first `pnpm tauri dev` or `pnpm dev`
+      throws `Failed to resolve import "<pkg>" from "..."` because
+      Vite's dev-server import resolver uses the strict Node algorithm
+      (walk the consumer's own node_modules tree) and doesn't consult
+      the pnpm store.
+
+      We hit this exactly at Phase 6.2 sign-off: YAML Validator's
+      subagent added `js-yaml ^4.1.0` to `apps/desktop/package.json`,
+      typecheck + test + build all passed, I marked verification
+      green, user confirmed, then the dev-server cold start died on
+      the js-yaml import. `js-yaml@4.1.1` was in the lockfile — but
+      only as a transitive eslint dep at line 2159, not as an
+      importer of `@hyperspanner/desktop`. One `pnpm install` run at
+      the workspace root fixed it.
+
+      Concrete rule: when a session introduces a new runtime dep
+      (not a devDep, not a transitive bump — an actual new import in
+      product code), the verification gate set MUST include a
+      dev-server cold start against the tool that uses the dep, not
+      just typecheck / test / build. For this repo: `pnpm tauri dev`
+      + click through to the affected tool is the canonical smoke.
+      For pure-web projects, `vite dev` + load the consuming route is
+      equivalent. The smoke doesn't need to be exhaustive — just a
+      cold Vite boot, because that's where the import resolver
+      actually flexes against the workspace's own node_modules.
+
+      Related pitfall: marking a verification task "complete" based
+      on the user's "all checks pass" confirmation without being
+      crisp about which checks ran. The user ran typecheck / test /
+      build; they didn't cold-start the dev server. If a session
+      surfaces a new runtime dep, either explicitly ask "did you also
+      start the dev server?" or put that smoke in the next-actions
+      list so it happens on the next session instead of tripping the
+      user up.
+
+      Meta: adjacent to lesson #18 (Linux sandbox can't run `pnpm
+      install`) and lesson #2 (can't traverse pnpm symlinks from the
+      sandbox) — both of which are why dev-server-adjacent
+      verification has to run on the host. Sandbox-side claims of
+      "install succeeded" should be treated with suspicion when
+      there's no evidence of a working node_modules tree on the
+      host; prefer letting the user run `pnpm install` themselves
+      and report back over claiming a sandbox install worked.
+    applied: true
+
