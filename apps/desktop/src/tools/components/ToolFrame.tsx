@@ -71,7 +71,22 @@ export const ToolFrame: FC<ToolFrameProps> = ({
       <header className={styles.header}>
         <div className={styles.headerTitles}>
           <div className={styles.eyebrow}>
-            {(zone ?? 'TOOL').toUpperCase()} · {toolId.toUpperCase()}
+            <span className={styles.eyebrowId}>{toolId.toUpperCase()}</span>
+            {/* In compact docks the subtitle is hidden to save vertical
+              * space — surface it via an info icon next to the eyebrow so
+              * the description is still one hover away. The native
+              * `title` attribute provides the tooltip without pulling in
+              * a popover library. */}
+            {subtitle && isCompact ? (
+              <span
+                className={styles.infoIcon}
+                title={subtitle}
+                role="img"
+                aria-label={`Tool description: ${subtitle}`}
+              >
+                ⓘ
+              </span>
+            ) : null}
           </div>
           <h2 className={styles.title}>{title}</h2>
           {subtitle && !isCompact ? (

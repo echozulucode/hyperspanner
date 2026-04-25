@@ -92,8 +92,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     const splitSide: SplitSide | undefined =
       targetZone === 'center' && state.centerSplit !== 'none' ? 'a' : undefined;
 
+    // Inspector (right) holds a single tool — opening into it evicts
+    // anything that's already there and clears its tool-state slot so
+    // a re-open later starts fresh.
+    let baseOpen = state.open;
+    if (targetZone === 'right') {
+      const evicted = state.open.filter((t) => t.zone === 'right');
+      if (evicted.length > 0) {
+        baseOpen = state.open.filter((t) => t.zone !== 'right');
+        evicted.forEach((t) => clearToolState(t.id));
+      }
+    }
+
     const nextOpen: OpenTool[] = [
-      ...state.open,
+      ...baseOpen,
       { id, zone: targetZone, splitSide, pulseId: makePulse() },
     ];
 
@@ -140,7 +152,25 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     if (!existing) return;
     if (existing.zone === zone && existing.splitSide === splitSide) return;
 
-    const nextOpen = state.open.map((t) =>
+    // Inspector (right) holds a single tool. Moving a different tool in
+    // evicts whatever already lives there. The eviction list excludes
+    // the tool being moved (in case it's already in the inspector and
+    // we're just changing its splitSide — though splitSide doesn't
+    // apply outside the center split, this guard is defensive).
+    let baseOpen = state.open;
+    let evictedIds: string[] = [];
+    if (zone === 'right') {
+      evictedIds = state.open
+        .filter((t) => t.zone === 'right' && t.id !== id)
+        .map((t) => t.id);
+      if (evictedIds.length > 0) {
+        baseOpen = state.open.filter(
+          (t) => !(t.zone === 'right' && t.id !== id),
+        );
+      }
+    }
+
+    const nextOpen = baseOpen.map((t) =>
       t.id === id
         ? {
             ...t,
@@ -157,7 +187,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     const activeByZone: Record<Zone, string | null> = { ...state.activeByZone };
     // Source zone may lose its active tool; destination zone adopts it.
     if (activeByZone[existing.zone] === id) {
-      activeByZone[existing.zone] = nextActiveForZone(state.open, existing.zone, id);
+      activeByZone[existing.zone] = nextActiveForZone(baseOpen, existing.zone, id);
     }
     activeByZone[zone] = id;
 
@@ -167,6 +197,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       collapsed: ensureUncollapsed(state.collapsed, zone),
       pulseCounter: state.pulseCounter + 1,
     });
+
+    evictedIds.forEach((evictedId) => clearToolState(evictedId));
   },
 
   splitCenter: (direction) => {

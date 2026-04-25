@@ -109,14 +109,28 @@ export const PaneDropTarget: FC<PaneDropTargetProps> = ({
       setDragActive(false);
       setHover(null);
     };
+    /*
+     * Watchdog: `dragend` is supposed to fire after every drag operation,
+     * but it's dispatched on the original drag source. When that source
+     * unmounts before `dragend` reaches the window — which is exactly
+     * what happens when a tool's tab is moved out of its zone (the
+     * source `PulsingTab` is gone before the dispatcher gets there) —
+     * the event never reaches our window-level handler and `dragActive`
+     * gets stuck `true`, leaving the drop overlay visible. `mouseup`
+     * fires reliably after every pointer release (HTML5 drag suppresses
+     * mouse events during the drag, so this listener only sees the
+     * final release), making it a safe last-resort cleanup.
+     */
     window.addEventListener('dragstart', onDragStart);
     window.addEventListener('dragend', onDragEndOrDrop);
     window.addEventListener('drop', onDragEndOrDrop);
+    window.addEventListener('mouseup', onDragEndOrDrop);
     return () => {
       aliveRef.current = false;
       window.removeEventListener('dragstart', onDragStart);
       window.removeEventListener('dragend', onDragEndOrDrop);
       window.removeEventListener('drop', onDragEndOrDrop);
+      window.removeEventListener('mouseup', onDragEndOrDrop);
     };
   }, []);
 
@@ -128,8 +142,12 @@ export const PaneDropTarget: FC<PaneDropTargetProps> = ({
       : ['center'];
 
   const handleDragOver = (region: DropRegion) => (event: DragEvent) => {
+    // `preventDefault` is required to mark this element as a valid drop
+    // target (otherwise the browser disallows the drop). We deliberately
+    // do NOT call `stopPropagation` — React's `stopPropagation` calls
+    // through to the native event, which would prevent the bubble from
+    // reaching our window-level cleanup listeners.
     event.preventDefault();
-    event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     if (hover !== region) setHover(region);
   };
@@ -140,7 +158,12 @@ export const PaneDropTarget: FC<PaneDropTargetProps> = ({
 
   const handleDrop = (region: DropRegion) => (event: DragEvent) => {
     event.preventDefault();
-    event.stopPropagation();
+    // No `stopPropagation` here — see comment in `handleDragOver`. The
+    // window-level `drop` listener installed in the `useEffect` above
+    // is how every *other* `PaneDropTarget` learns the drag has ended,
+    // and stopping propagation here was the actual cause of the
+    // "drop overlay sometimes stays visible" bug we previously chased
+    // through `dragend` / `mouseup` watchdogs.
     const toolId = event.dataTransfer?.getData(TAB_MIME);
     setDragActive(false);
     setHover(null);

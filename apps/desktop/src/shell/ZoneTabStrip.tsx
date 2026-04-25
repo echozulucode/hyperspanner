@@ -133,21 +133,13 @@ export const ZoneTabStrip: FC<ZoneTabStripProps> = ({
     el.scrollBy({ left: direction * step, behavior: 'smooth' });
   };
 
+  // Render nothing when the zone has no docked tools. The previous
+  // "ZONE · 0 TABS" empty banner ate 52px of vertical space and was
+  // sitting on top of the launchpad / empty state below — the host zone
+  // already conveys "nothing here" through its own empty state, the
+  // strip doesn't need to redundantly announce it.
   if (displayTools.length === 0) {
-    return (
-      <div className={styles.strip}>
-        <div
-          ref={scrollAreaRef}
-          className={styles.scrollArea}
-          role="tablist"
-          aria-orientation="horizontal"
-        >
-          <span className={styles.empty}>
-            {zone.toUpperCase()} · 0 TABS
-          </span>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

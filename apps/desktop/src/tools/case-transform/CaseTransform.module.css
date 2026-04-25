@@ -37,10 +37,10 @@
 
 /* Tighter font + padding in compact dock forms. */
 .editorCompact {
-  padding: 0.5rem 0.6rem;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  min-height: 4rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  min-height: 3.5rem;
 }
 
 .editorContainer {

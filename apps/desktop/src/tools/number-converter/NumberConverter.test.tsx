@@ -251,13 +251,17 @@ describe('NumberConverter', () => {
     const { container } = render(
       <NumberConverter toolId={TOOL_ID} zone="right" />,
     );
-    expect(container.querySelector('[class*="controlsCompact"]')).not.toBeNull();
+    // `containerCompact` is the load-bearing compact-mode hook (gap, plus
+    // it gates `inputCompact` / `binaryValueCompact` on the same isCompact
+    // flag in the component). Checking for it is enough to confirm the
+    // tool registered the dock as compact.
+    expect(container.querySelector('[class*="containerCompact"]')).not.toBeNull();
   });
 
   it('does not apply compact class when zone="center"', () => {
     const { container } = render(
       <NumberConverter toolId={TOOL_ID} zone="center" />,
     );
-    expect(container.querySelector('[class*="controlsCompact"]')).toBeNull();
+    expect(container.querySelector('[class*="containerCompact"]')).toBeNull();
   });
 });

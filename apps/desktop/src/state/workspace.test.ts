@@ -135,6 +135,79 @@ describe('workspace.moveTool', () => {
     moveTool('json-validator', 'center');
     expect(snapshot().pulseCounter).toBe(counter);
   });
+
+  it('inspector (right zone) is single-tool — moving a new tool in evicts the old one', () => {
+    const { openTool, moveTool } = snapshot();
+    openTool('json-validator', 'right');
+    expect(snapshot().open.filter((t) => t.zone === 'right')).toHaveLength(1);
+
+    openTool('hash-workbench', 'center');
+    moveTool('hash-workbench', 'right');
+    const s = snapshot();
+    const inRight = s.open.filter((t) => t.zone === 'right');
+    expect(inRight).toHaveLength(1);
+    expect(inRight[0].id).toBe('hash-workbench');
+    // The evicted tool is gone entirely (not relocated to another zone).
+    expect(s.open.find((t) => t.id === 'json-validator')).toBeUndefined();
+    expect(s.activeByZone.right).toBe('hash-workbench');
+  });
+
+  it('inspector eviction also fires when openTool targets the right zone', () => {
+    const { openTool } = snapshot();
+    openTool('json-validator', 'right');
+    openTool('yaml-validator', 'right');
+    const s = snapshot();
+    const inRight = s.open.filter((t) => t.zone === 'right');
+    expect(inRight).toHaveLength(1);
+    expect(inRight[0].id).toBe('yaml-validator');
+    expect(s.open.find((t) => t.id === 'json-validator')).toBeUndefined();
+  });
+
+  it('moving a sole-tool-in-source-zone into the inspector leaves the source zone empty and active=null', () => {
+    // The user-visible regression risk is "I dragged my one center tool
+    // into the inspector and the center now thinks something is still
+    // active." Verify the source side reconciles: no leftover tools, no
+    // dangling activeByZone pointer.
+    const { openTool, moveTool } = snapshot();
+    openTool('json-validator', 'center');
+    expect(snapshot().activeByZone.center).toBe('json-validator');
+    moveTool('json-validator', 'right');
+    const s = snapshot();
+    expect(s.open.filter((t) => t.zone === 'center')).toHaveLength(0);
+    expect(s.activeByZone.center).toBeNull();
+    expect(s.activeByZone.right).toBe('json-validator');
+    expect(s.open.filter((t) => t.zone === 'right')).toHaveLength(1);
+  });
+
+  it('moving the active center tool into the inspector promotes the next center tool to active', () => {
+    // Multi-tool source case: the moved tool was active in center; after
+    // the move the remaining center tool should become active.
+    const { openTool, moveTool } = snapshot();
+    openTool('json-validator', 'center');
+    openTool('yaml-validator', 'center');
+    expect(snapshot().activeByZone.center).toBe('yaml-validator');
+    moveTool('yaml-validator', 'right');
+    const s = snapshot();
+    const inCenter = s.open.filter((t) => t.zone === 'center');
+    expect(inCenter).toHaveLength(1);
+    expect(inCenter[0].id).toBe('json-validator');
+    expect(s.activeByZone.center).toBe('json-validator');
+    expect(s.activeByZone.right).toBe('yaml-validator');
+  });
+
+  it('inspector eviction with a non-active source tool leaves the source active untouched', () => {
+    // If the moved tool wasn't the active one, the source zone's active
+    // pointer should NOT change. This guards against an off-by-one in the
+    // activeByZone reconcile path.
+    const { openTool, moveTool, setActive } = snapshot();
+    openTool('json-validator', 'center');
+    openTool('yaml-validator', 'center');
+    setActive('center', 'json-validator'); // active is now json
+    moveTool('yaml-validator', 'right'); // move the non-active one
+    const s = snapshot();
+    expect(s.activeByZone.center).toBe('json-validator'); // unchanged
+    expect(s.activeByZone.right).toBe('yaml-validator');
+  });
 });
 
 describe('workspace.splitCenter / mergeCenter', () => {

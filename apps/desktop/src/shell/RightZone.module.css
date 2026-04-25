@@ -36,3 +36,55 @@
 .dropHost {
   position: relative;
 }
+
+/*
+ * Inline title wrapper for the inspector zone header.
+ * Hosts the literal "INSPECTOR" text plus an inline close × when a tool
+ * is docked. Putting the × inline with the title keeps the controls slot
+ * narrow (just the HIDE pill) and sizes the button to the title's text
+ * height instead of fighting against it — so the header band stays at
+ * the LcarsPill's natural 40px and never grows.
+ */
+.headerTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  /* Cursor hint that the title region is hoverable for the
+     "Active tool: ..." tooltip. */
+  cursor: default;
+}
+
+/*
+ * Dismiss button — tiny round × that lives inside the title text. Sized
+ * to the title's font, so it never drives the header's height. With the
+ * tab strip gone in this zone, this is the only path to close the lone
+ * inspector tool without dragging it out.
+ */
+.dismissBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 1.05em;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 120ms ease, background-color 120ms ease;
+  flex: 0 0 auto;
+}
+
+.dismissBtn:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.18);
+}
+
+.dismissBtn:focus-visible {
+  outline: 1px solid var(--lcars-color-orange, #d88463);
+  outline-offset: 1px;
+}

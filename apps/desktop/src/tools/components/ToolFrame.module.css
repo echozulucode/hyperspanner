@@ -15,10 +15,25 @@
 }
 
 /* Compact frame: tighter everything, matches the PlaceholderTool compact
- * form so dragging between docks doesn't flash a different density. */
+ * form so dragging between docks doesn't flash a different density.
+ * Padding and gap dropped from earlier values so a tool's actual content
+ * gets more of the inspector / bottom-dock room. */
 .frameCompact {
-  padding: 0.75rem 0.85rem;
-  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  gap: 0.4rem;
+}
+
+/* Compact docks hide the eyebrow entirely — at inspector / bottom width
+ * the truncated tool id (e.g. `NUMBER-CONVERT…`) reads as broken chrome.
+ * The host zone identifies the tool another way (inspector header
+ * tooltip, bottom-zone tab label), so the eyebrow's only useful job —
+ * giving the panel a stable identifier — is already covered there. */
+.frameCompact .eyebrow {
+  display: none;
+}
+
+.frameCompact .actions {
+  gap: 0.25rem;
 }
 
 .header {
@@ -37,6 +52,9 @@
 }
 
 .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.7rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -44,7 +62,32 @@
   font-weight: bold;
   white-space: nowrap;
   overflow: hidden;
+  min-width: 0;
+}
+
+.eyebrowId {
+  overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Hover-tooltip affordance for the subtitle in compact docks. Plain
+   ⓘ glyph keeps the dependency surface tiny — no icon library —
+   while still giving the user a discoverable target. */
+.infoIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+  color: var(--lcars-color-african-violet, #8a7aa8);
+  opacity: 0.7;
+  cursor: help;
+  user-select: none;
+}
+
+.infoIcon:hover {
+  opacity: 1;
 }
 
 .title {
@@ -58,8 +101,16 @@
   text-overflow: ellipsis;
 }
 
+/*
+ * Compact docks (right inspector, bottom console) hide the title entirely —
+ * the eyebrow line above (`ZONE · TOOL-ID`) plus the tab label already
+ * identify the tool, so the bigger title is redundant and steals vertical
+ * room that's especially tight in the inspector. The title still renders
+ * in `frameFull` (center zone), where there's room and the larger label
+ * helps anchor the panel.
+ */
 .frameCompact .title {
-  font-size: 1.05rem;
+  display: none;
 }
 
 .subtitle {
@@ -100,4 +151,11 @@
   color: var(--lcars-color-sand, #eae4d6);
   flex-shrink: 0;
   flex-wrap: wrap;
+}
+
+.frameCompact .status {
+  padding-top: 0.4rem;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
 }

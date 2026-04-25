@@ -14,6 +14,189 @@ next_actions:
 
 # Status Log
 
+## Session: 2026-04-24 (UX-3.3 — HomeView clip + inspector trim + redundant title)
+
+Three follow-ups from this round:
+
+1. **HomeView first-row clipping** — `.contentEmpty` (used when no tools
+   are docked in the center zone) added `align-items: center;
+   justify-content: center; padding: 1.25rem` to `.content`. With
+   HomeView taller than `.content`, that flexbox centering positioned
+   HomeView with a NEGATIVE top offset that scrolling can't reach
+   (flex centering happens in layout space, not scroll space). Even
+   when scrolled all the way up, the top of HomeView's first row of
+   tool cards was permanently clipped at the scroll origin. Fix: stop
+   applying `.contentEmpty` in CenterZone's single-pane no-tools case.
+   The default `.content` (`align-items: stretch`) lets HomeView fill
+   the area; HomeView's `.root` keeps its own `overflow-y: auto` for
+   internal scrolling. The split-pane empty case still uses
+   `.contentEmpty` because there it correctly centers a tiny
+   `SIDE A · EMPTY` badge. Captured in plan.md as a new Errors row —
+   pattern to remember: **flexbox `align-items: center` +
+   `overflow: auto` + child taller than container = top of child is
+   permanently scroll-clipped**.
+
+2. **Inspector zone header height stability** — even with the close ×
+   moved into the title prop in UX-3.2, user reported the band was
+   still drifting in height. Identified the `LcarsZoneHeader` blue-dot
+   indicator (`hasIndicator::before` pseudo with a `box-shadow: 0 0 8px`
+   halo) as the contributor — its rendered footprint nudged the band's
+   effective height when present vs. absent. User suggested removing
+   the dot OR removing the "RGT-00" eyebrow. Did both: dropped both
+   `indicatorColor` and `eyebrow` props from the inspector's
+   `LcarsZoneHeader`. Neither carried user-discernible information
+   ("is something docked" is already conveyed by the title's hover
+   tooltip + the body content; "RGT-00" is internal id chrome). The
+   band height is now driven exclusively by the LcarsPill in
+   `controls` and stays at the pill's natural ~40px regardless of
+   whether a tool is docked.
+
+3. **Redundant HYPERSPANNER title** — user noticed the home view's
+   `LcarsBanner>HYPERSPANNER</LcarsBanner>` duplicated the AppShell's
+   top rail title. Removed the LcarsBanner from HomeView's
+   `heroBannerRow`. The eyebrow `HOME · HME-00` and the lead paragraph
+   stay so the launchpad still grounds itself as a deliberate page,
+   but the workspace-level brand label only appears once now (in the
+   top rail, where it belongs).
+
+---
+
+## Session: 2026-04-24 (UX-3.2 — followup follow-ups)
+
+User flagged five things after UX-3.1 landed:
+
+1. **Inspector zone-header height grew when the close × button mounted.** I'd put the × in the `LcarsZoneHeader.controls` slot next to the HIDE pill — the wider slot was forcing the band into a slightly taller row on some widths. Moved the × *into* the title prop so it sits inline on the title text's baseline; the controls slot is back to just the HIDE pill, and the band stays at the LcarsPill's natural ~40px. The button is now sized in `em` (`width 1.1em`, `font-size 1.05em`) so it scales with the title font instead of forcing its own height.
+
+2. **Purple eyebrow truncates in the inspector.** The `NUMBER-CONVERTER` text was getting ellipsis'd in the narrow inspector column, reading as broken chrome. Added `.frameCompact .eyebrow { display: none }` to ToolFrame's CSS — eyebrow is hidden entirely in compact docks, including its info-icon child (which is fine; the description was always nice-to-have).
+
+3. **Tool name discoverable on hover.** Without the eyebrow visible, the only chrome left in the inspector that identifies the tool is the literal "INSPECTOR" header text. Added `title` attribute on the inspector header title span: hovering "INSPECTOR" surfaces "Active tool: <Name>" as a native tooltip when a tool is docked. The close × also keeps its own tooltip.
+
+4. **Stuck drop overlay — actual root cause found.** The `mouseup` watchdog from UX-3.1 didn't fix the bug; user re-reproduced cleanly (open Number Converter, drag tab to inspector, dashed overlay on center stays). Real culprit was `event.stopPropagation()` in `PaneDropTarget`'s React `handleDrop` and `handleDragOver`. React's `stopPropagation` calls `nativeEvent.stopPropagation()` under the hood, so the native `drop` event never bubbles to the `window` listener that's supposed to clear sibling targets. Removed both calls; native bubbling now reaches the window listener as the design intended. The `mouseup` watchdog stays in place as belt-and-braces. Captured the React-stopPropagation gotcha as a new Errors row in plan.md — worth remembering whenever we have window-level listeners coexisting with React handlers on the same event type.
+
+5. **"CENTER · 0 TABS" banner blocking HomeView's launchpad.** The empty-state banner inside `ZoneTabStrip` was eating 52px at the top of the center zone and visually competing with the HomeView grid below it. Made `ZoneTabStrip` return `null` when `displayTools.length === 0` — the host zone already conveys "nothing here" via its own empty state (HomeView for center, LcarsEmptyState for the right inspector, the BottomZone restore-stub when collapsed); a dedicated banner was redundant chrome. With the strip gone in the empty state, HomeView gets the full center area and its first row of tool cards is no longer pushed below the fold.
+
+---
+
+## Session: 2026-04-24 (UX-3.1 — fixes after UX-3 landed)
+
+**Three follow-ups to the UX-3 pass:**
+
+1. **Inspector header pinned to "INSPECTOR".** Reverted the
+   `computedTitle = title ?? activeDescriptor?.name?.toUpperCase() ?? 'INSPECTOR'`
+   line in `RightZone.tsx` to just `title ?? 'INSPECTOR'`. The
+   "rename on every dock change" behavior competed visually with
+   the eyebrow + tab the tool itself contributes; "INSPECTOR" as a
+   fixed label is the same role-noun the inspector is supposed to
+   convey.
+
+2. **Drop-overlay watchdog.** Bug surfaced in user testing: drop
+   overlays sometimes stayed visible after a successful drag into
+   the inspector. Root cause: HTML5 `dragend` dispatches on the
+   original drag-source DOM node; when a tab is moved out of its
+   zone, the source `PulsingTab` unmounts before `dragend` reaches
+   the bubble path to `window` — the event fires on a detached
+   subtree and our window-level handler never sees it, leaving
+   `dragActive` stuck `true` on every `PaneDropTarget`. Fix: added
+   a `mouseup` window listener to `PaneDropTarget` as a watchdog.
+   HTML5 drag suppresses pointer events during the drag, so the
+   listener only fires after the user actually releases the
+   pointer (drop or cancel). Safe last-resort cleanup that runs
+   even when `dragend` is skipped. The existing `dragend` and
+   `drop` listeners stay; `mouseup` is purely defensive.
+
+3. **Source-zone-cleanup re-verification.** User asked to confirm
+   that moving a tool into the inspector doesn't leave orphans in
+   the source zone. Walked through every move-into-inspector path
+   in `moveTool` and `openTool`; all six scenarios (sole tool in
+   source, multi-tool source, active vs. non-active source tool,
+   eviction of existing inspector tool with empty/non-empty source,
+   `openTool` with eviction) reconcile correctly via the existing
+   `nextActiveForZone` plumbing. Added three explicit tests in
+   `workspace.test.ts` that pin the invariant: (a) sole-tool-source
+   ends up empty with `activeByZone.center === null`, (b) multi-tool
+   source promotes the next tool to active, (c) moving a non-active
+   source tool leaves the source's active pointer untouched.
+
+**No new lessons.** The dragend bug is a known browser-quirk class
+of issue (drag-source unmount detaching the dragend dispatch path);
+the watchdog pattern is a standard mitigation. Worth remembering
+but doesn't generalize beyond this surface.
+
+---
+
+## Session: 2026-04-24 (UX-3 — compact-mode polish across the suite)
+
+**Task:** #92. User asked for five focused changes after seeing the
+Number Converter polish: drop the zone prefix from ToolFrame's
+eyebrow, surface the long subtitle as an info-icon hover in compact,
+make the inspector single-tool (no tab strip), per-tool font-density
+pass, confirm the title-hidden-in-compact rule.
+
+**What landed:**
+
+- **ToolFrame** (`apps/desktop/src/tools/components/ToolFrame.{tsx,module.css}`):
+  - Eyebrow simplified — `{(zone ?? 'TOOL').toUpperCase()} · {toolId.toUpperCase()}`
+    → just `{toolId.toUpperCase()}` wrapped in a `.eyebrowId` span.
+  - In compact mode, when a `subtitle` prop is present, an `ⓘ` info
+    icon renders next to the eyebrow with the subtitle as its native
+    `title` tooltip. Zero-cost discoverability — no popover library,
+    accessible via `aria-label`. The icon is tagged `cursor: help`.
+  - Eyebrow now `display: inline-flex` so the icon sits inline with
+    the id; `.eyebrowId` carries the `text-overflow: ellipsis`.
+  - Compact frame chrome tightened further: padding `0.55rem 0.7rem`,
+    gap `0.4rem`, eyebrow `0.65rem`, action-pill cluster gap
+    `0.25rem`, status footer padding-top `0.4rem` font `0.7rem`.
+  - Title still hidden via `display: none` in `frameCompact` (from
+    UX-2). Confirmed working — no test asserted on title visibility.
+
+- **Inspector single-tool**
+  (`apps/desktop/src/state/workspace.ts`,
+   `apps/desktop/src/shell/RightZone.{tsx,module.css}`):
+  - `openTool(id, 'right')` now evicts any existing tool in the right
+    zone before adding the new one. Eviction calls `clearToolState`
+    on the evicted id so its buffer doesn't linger.
+  - `moveTool(id, 'right')` does the same eviction (skipping the case
+    where the moved tool *is* the inspector tool, which would have
+    already early-returned anyway). State cleanup runs after `set` so
+    the React tree sees the eviction first, then the orphan-state
+    purge.
+  - `RightZone` no longer renders `ZoneTabStrip` — single tool means
+    no tabs. The `LcarsZoneHeader.controls` slot now hosts a small
+    `×` dismiss button alongside the `HIDE` pill (visible only when
+    a tool is docked); it calls `closeTool` with the active id.
+  - Empty-state copy updated to mention the replace-on-drag semantics.
+  - Two new workspace.test.ts cases cover the eviction in both
+    `openTool` and `moveTool` paths.
+
+- **Per-tool compact font-density pass.** Each tool's `Compact`
+  CSS rule(s) tightened to a uniform baseline:
+  - Editor inputs / textareas: `padding 0.5rem 0.6rem` →
+    `0.4rem 0.55rem`, `font-size 0.8rem` → `0.75rem`,
+    `line-height 1.4` → `1.35`, `min-height 4rem` → `3.5rem` where
+    applicable.
+  - Tools touched: `json-validator`, `yaml-validator`, `case-transform`,
+    `base64-pad`, `url-codec`, `whitespace-clean`, `regex-tester`
+    (sample / pattern / preview / matchItem all tightened),
+    `text-diff` (editor + the compact two-column hunk view),
+    `cidr-calc` (compact table cells dropped 0.05rem each).
+  - `hash-workbench` and `hex-inspector` were already tight (started
+    at 0.75rem); no changes needed there.
+  - Number Converter was already on the new baseline from the prior
+    UX-2 revisions.
+
+**Tests:** added two workspace cases for the eviction (move and open
+paths). Removed dependence on the obsolete `controlsCompact` class in
+NumberConverter.test.tsx (replaced with `containerCompact`).
+
+**Net effect on inspector vertical budget,** rough math:
+~32px saved by hiding the title (was 1.05rem font + line-height) +
+~52px saved by removing the tab strip + ~10px saved by tighter
+ToolFrame compact padding / gap = ~94px more body room in the
+inspector, which is the difference between "decimal field below the
+fold" and "everything fits with breathing room."
+
+---
+
 ## Session: 2026-04-24 (Phase 6.6 — Number Converter)
 
 **Phase:** 6.6 (Task #91). Code landed; verification pending the same

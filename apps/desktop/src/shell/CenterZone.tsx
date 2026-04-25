@@ -106,9 +106,22 @@ export const CenterZone: FC<CenterZoneProps> = ({
       {split === 'none' ? (
         <>
           <ZoneTabStrip zone="center" tools={tools} activeId={activeTabId} />
-          <div
-            className={`${styles.content} ${hasTabs ? '' : styles.contentEmpty} ${styles.dropHost}`}
-          >
+          {/*
+            * No `.contentEmpty` modifier in the no-tools case anymore —
+            * the empty-state body here is the full HomeView launchpad,
+            * not a small centered badge. `.contentEmpty`'s
+            * `align-items: center` would (and did) center HomeView
+            * vertically, which under flexbox + overflow-scroll positions
+            * a too-tall child with a negative top offset that scrolling
+            * can't reach. Result: the first row of tool cards rendered
+            * permanently half-clipped at the scroll origin. Default
+            * `.content` (`align-items: stretch`) lets HomeView fill the
+            * area and scroll its own content normally via `.root`'s
+            * `overflow-y: auto`. The split-pane empty-state below still
+            * uses `.contentEmpty` because there it does want to center
+            * a small "SIDE A · EMPTY" badge.
+            */}
+          <div className={`${styles.content} ${styles.dropHost}`}>
             {renderTool(activeTool)}
             <PaneDropTarget
               variant="center-single"

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
-import { LcarsBanner, LcarsPanel, LcarsChip } from '@hyperspanner/lcars-ui';
+import { LcarsPanel, LcarsChip } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFavorites, useRecents } from '../state';
 import { listTools, listToolsByCategory, type ToolCategory, type ToolDescriptor } from '../tools';
@@ -114,9 +114,12 @@ export const HomeView: FC<HomeViewProps> = ({ onOpenTool, onOpenPalette }) => {
   return (
     <div className={styles.root} aria-label="Home view">
       <header className={styles.hero}>
+        {/* HYPERSPANNER LcarsBanner removed — the AppShell's top rail
+          * already carries the product name; repeating it here on the
+          * launchpad was redundant chrome. The eyebrow + lead remain
+          * to ground the page as the home/launchpad surface. */}
         <div className={styles.heroBannerRow}>
           <span className={styles.heroEyebrow}>HOME · HME-00</span>
-          <LcarsBanner>HYPERSPANNER</LcarsBanner>
         </div>
         <p className={styles.heroLead}>
           Developer instrument panel. Pick a tool from the rail, pin favorites,

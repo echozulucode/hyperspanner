@@ -196,7 +196,7 @@ export const NumberConverter: FC<NumberConverterProps> = ({ toolId, zone }) => {
       <div
         className={`${styles.container} ${isCompact ? styles.containerCompact : ''}`}
       >
-        <div className={`${styles.controls} ${isCompact ? styles.controlsCompact : ''}`}>
+        <div className={styles.controls}>
           <label className={styles.controlGroup}>
             <span className={styles.controlLabel}>Endianness</span>
             <select
@@ -233,40 +233,42 @@ export const NumberConverter: FC<NumberConverterProps> = ({ toolId, zone }) => {
           </label>
         </div>
 
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>Hex</span>
-          <input
-            type="text"
-            className={`${styles.input} ${isCompact ? styles.inputCompact : ''} ${
-              state.lastEdited === 'hex' && derived.error ? styles.inputError : ''
-            }`}
-            value={displayHex}
-            onChange={handleHexChange}
-            placeholder={`${BYTE_COUNT[state.type]}-byte hex (e.g. ${exampleHex(state.type)})`}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            aria-label="Hex value input"
-          />
-        </div>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Hex</span>
+            <input
+              type="text"
+              className={`${styles.input} ${isCompact ? styles.inputCompact : ''} ${
+                state.lastEdited === 'hex' && derived.error ? styles.inputError : ''
+              }`}
+              value={displayHex}
+              onChange={handleHexChange}
+              placeholder={`${BYTE_COUNT[state.type]}-byte hex`}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              aria-label="Hex value input"
+            />
+          </div>
 
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>Decimal</span>
-          <input
-            type="text"
-            className={`${styles.input} ${isCompact ? styles.inputCompact : ''} ${
-              state.lastEdited === 'decimal' && derived.error
-                ? styles.inputError
-                : ''
-            }`}
-            value={displayDecimal}
-            onChange={handleDecimalChange}
-            placeholder={exampleDecimalPlaceholder(state.type)}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            aria-label="Decimal value input"
-          />
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Decimal</span>
+            <input
+              type="text"
+              className={`${styles.input} ${isCompact ? styles.inputCompact : ''} ${
+                state.lastEdited === 'decimal' && derived.error
+                  ? styles.inputError
+                  : ''
+              }`}
+              value={displayDecimal}
+              onChange={handleDecimalChange}
+              placeholder={exampleDecimalPlaceholder(state.type)}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              aria-label="Decimal value input"
+            />
+          </div>
         </div>
 
         <div className={styles.binaryRow}>
