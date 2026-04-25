@@ -7,6 +7,7 @@ import { CidrCalc } from './cidr-calc';
 import { HashWorkbench } from './hash-workbench';
 import { HexInspector } from './hex-inspector';
 import { JsonValidator } from './json-validator';
+import { NumberConverter } from './number-converter';
 import { RegexTester } from './regex-tester';
 import { TextDiff } from './text-diff';
 import { UrlCodec } from './url-codec';
@@ -172,6 +173,18 @@ const entries: ToolDescriptor[] = [
     // PAGE_ROWS window at a time so a 1 GB file doesn't push DOM.
     supportedZones: ['center'],
     component: HexInspector,
+  },
+  {
+    id: 'number-converter',
+    name: 'Number Converter',
+    category: 'binary',
+    description:
+      'Bidirectional hex ↔ decimal editor for fixed-width numeric types, with endianness toggle and binary read-out.',
+    defaultZone: 'center',
+    // Three short rows (controls, hex, decimal, binary) — fits any zone;
+    // CSS `controlsCompact` stacks the dropdowns when the inspector or
+    // bottom dock is too narrow for them side by side.
+    component: NumberConverter,
   },
   {
     id: 'protobuf-decode',

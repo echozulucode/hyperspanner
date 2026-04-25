@@ -1,10 +1,10 @@
 ---
 type: status
 updated: 2026-04-24
-current_phase: "Phase 6.4 verification — TS sweep done, re-run pending. `cargo test -p hyperspanner` green (19 Rust unit tests). `pnpm typecheck` surfaced 22 errors across 11 files; all swept in place (see Session entry below for the grouped root-cause map). The sweep touched six Phase 6 tools (base64-pad, case-transform, cidr-calc, hash-workbench, hex-inspector, regex-tester, text-diff) — mostly strict-mode unused-variable cleanup plus three real bugs: a bigint `>>> 0` (not supported on BigInt), a `RegexCompileError | RegexCompileEmpty` narrowing mis-use in regex-tester/lib.ts, and a functional-updater in HexInspector that returned Partial instead of full state. All edits in-place, no moves. Next: user re-runs `pnpm typecheck && test && build` to confirm green."
+current_phase: "Phase 6.6 (Number Converter) code landed 2026-04-24. Six-file tool-pattern under `apps/desktop/src/tools/number-converter/` — pure `lib.ts` with `parseHex` / `formatHex` / `formatBinary` / `bytesToDecimal` / `decimalToBytes` / `resizeBytes` plus shared `Endianness` and `NumberType` types and per-type `BYTE_COUNT`; no Rust backend (DataView + BigInt cover every conversion including IEEE-754 round-trips and >`Number.MAX_SAFE_INTEGER` integers); 56 lib tests (every type × both endianness, range edges, round-trips, IEEE-754 vectors for π in float32/float64, NaN/±Infinity) plus 14 component tests; registry entry swapped in (no `supportedZones` restriction — fits any zone). Phase 6.4 still has its TS sweep awaiting your re-run of host-side gates; Phase 6.6 now joins it as another deliverable awaiting the same re-run. Next sub-phase 6.5 (Protobuf Decode + TLS Inspector) is the only Phase 6 work still ahead — heaviest Rust deps yet, will run in a fresh session."
 blockers: []
 next_actions:
-  - "Re-run verification gates: `pnpm --filter @hyperspanner/desktop typecheck` then `test` then `build`. If all green, Phase 6.4 flips from in-progress to verified; if new errors surface, iterate."
+  - "Re-run verification gates with both 6.4 sweep AND 6.6 in tree: `pnpm --filter @hyperspanner/desktop typecheck && test && build`. If all green, both sub-phases flip to verified. The 6.6 lib + component tests add ~70 cases on top of the existing TS suite; expect total to grow accordingly."
   - "Phase 6.5: Protobuf Decode (prost-reflect) + TLS Inspector (rustls). Two new Rust commands, two tool folders, two TS IPC wrappers. Heaviest Rust deps yet — first build will pull descriptor handling + TLS + cert parsing. Apply the parallel-fanout contract with explicit sibling-ownership callouts (lesson #59) AND a new rule surfaced in this sweep: brief each subagent on the canonical test-seam patterns in `ipc.test.ts` before writing Component.test.tsx (the 6.4 subagent reinvented the `InvokeFn` cast from scratch, 5 errors). Candidate future amendment to #56/#57."
   - "Phase 6 verification (after 6.5 lands and passes gates): full typecheck+test+build + visual spot-check in `pnpm tauri dev`. Then flip plan.md `current_phase` to 7 and Phase 6 phases[] row to `complete`."
   - "Optional polish carried from 6.2: RegexTester's flag toggles use inline-styled buttons instead of LcarsPill — off-grammar; fold into the final 6.5 polish pass."
@@ -13,6 +13,109 @@ next_actions:
 ---
 
 # Status Log
+
+## Session: 2026-04-24 (Phase 6.6 — Number Converter)
+
+**Phase:** 6.6 (Task #91). Code landed; verification pending the same
+host-side re-run that's outstanding for the 6.4 TS sweep.
+
+**Why 6.6 before 6.5:** the user said "proceed" right after we
+finished the modernized Number Converter design. 6.5 (Protobuf Decode
++ TLS Inspector) is the heaviest Rust sub-phase of Phase 6 — full
+parallel-fanout territory, prost-reflect + rustls dependencies, and
+deserves its own session. 6.6 is one TS-only tool that fits cleanly
+in this session as a complete deliverable. The plan order (6.5 then
+6.6) was guidance, not a hard sequence; same as 6.4 verification was
+allowed to interleave with 6.5 prep.
+
+**What landed:**
+
+- `apps/desktop/src/tools/number-converter/lib.ts` — pure module.
+  Exports: `Endianness` (`'big' | 'little'`), `NumberType` (the ten
+  fixed-width types: `uint8` ... `int64`, `float32`, `float64`),
+  `TYPES` (ordered list for the dropdown), `BYTE_COUNT` per type,
+  `isEndianAgnostic` (true for 1-byte types). Functions: `parseHex`
+  (lenient strip-prefix-and-whitespace, strict on length and chars,
+  left-pads short input, errors on too-long), `formatHex` (space-
+  separated lowercase pairs), `formatBinary` (nibble-grouped with
+  `_` separator), `bytesToDecimal` (DataView-backed; BigInt for 64-
+  bit, throws on byte-count mismatch as an internal invariant),
+  `decimalToBytes` (range-checks per type, accepts `0x` hex literals
+  on integer types, accepts `Infinity`/`-Infinity`/`NaN` literals on
+  float types), `resizeBytes` (preserves low-order bytes when
+  shrinking, pads zeros on the high-order side when growing —
+  endianness-aware). All conversions client-side; no Rust required.
+- `apps/desktop/src/tools/number-converter/lib.test.ts` — 56 cases
+  across parseHex (12), format helpers (6), bytesToDecimal single-byte
+  (4), bytesToDecimal multi-byte endianness (6), 64-bit BigInt
+  round-trip past `Number.MAX_SAFE_INTEGER` (4), IEEE-754 floats
+  including ±Infinity, NaN, and the canonical π bit patterns
+  (0x40490fdb for float32, 0x400921fb54442d18 for float64),
+  decimalToBytes integers (8), endianness for decimalToBytes (2),
+  64-bit decimalToBytes BigInt (4), float decimalToBytes (6),
+  round-trips across every type/endian combo (11), and resizeBytes
+  (5), plus a BYTE_COUNT sanity check.
+- `apps/desktop/src/tools/number-converter/NumberConverter.tsx` —
+  ToolFrame wrapper. State shape: `{ endianness, type, hexInput,
+  decimalInput, lastEdited }`. `lastEdited` tracks which input is
+  "sticky" (echoes user's typing verbatim); the other field is
+  derived through the canonical Uint8Array on each render. When the
+  sticky input is empty, every dependent display goes blank too —
+  prevents the "empty hex shows derived '0' in decimal" UX glitch.
+  `useMemo` over the canonical-bytes derivation so unrelated
+  re-renders don't re-parse. Endianness dropdown auto-disables for
+  single-byte types (with a tooltip explaining why). Action pills:
+  Swap Endian (one-click flip), Clear (resets both inputs).
+- `apps/desktop/src/tools/number-converter/NumberConverter.module.css` —
+  vertical stack: top-row controls (two dropdowns side-by-side in
+  full, stacked in compact), Hex field, Decimal field, Binary
+  read-out. Binary uses `word-break: break-all` so the wider 64-bit
+  patterns wrap cleanly in narrow zones. Inputs gain a red border
+  via `.inputError` when the parse error is attributable to that
+  specific field; status footer carries the actual message.
+- `apps/desktop/src/tools/number-converter/NumberConverter.test.tsx` —
+  14 component cases: idle on first mount, hex→decimal derivation,
+  decimal→hex derivation, endianness flip preserves sticky side,
+  type widening preserves the value, type narrowing (too-long hex)
+  surfaces the error, out-of-range decimal triggers the range
+  message, endianness disabled for uint8/int8 + re-enabled when
+  switching back to multi-byte, Swap Endian button, Clear button,
+  uint64 max-value round-trip past `MAX_SAFE_INTEGER`, float32 IEEE
+  byte pattern for 1.5, compact class on right zone, no compact
+  class on center zone.
+- `apps/desktop/src/tools/number-converter/index.ts` — barrel.
+- `apps/desktop/src/tools/registry.ts` — added `NumberConverter`
+  import (alphabetical) and a new `binary`-category entry between
+  `hex-inspector` and `protobuf-decode`. No `supportedZones`
+  restriction — the tool fits any zone via the compact CSS variant.
+
+**Design choices captured in plan.md decisions table:**
+
+  - "Big Endian" / "Little Endian" instead of Motorola/Intel.
+  - `uintN`/`intN`/`floatN` instead of byte/short/long/float.
+  - 64-bit signed and unsigned included (was absent in the original
+    legacy tool the user remembered).
+  - Dropped "Raw Hex" from the byte-order menu (it's not an
+    endianness, it's an identity transform — was conflating two
+    orthogonal concepts).
+  - No-Rust JS-only implementation: DataView + BigInt cover every
+    conversion losslessly.
+
+**No new lessons added.** This was a clean tool-pattern application
+— `lib.ts` + `useTool` state + `ToolFrame` chrome, the same template
+6.1 codified. The only non-obvious bit (the `stickyIsEmpty` blank-
+out for the derived field when the sticky side is empty) is captured
+inline in the component's comments; not a generalizable lesson, just
+a UX detail specific to bidirectional bound inputs.
+
+**Next:** verification re-run. Then Phase 6.5 — heaviest Rust
+sub-phase yet (Protobuf Decode + TLS Inspector). Plan to use the
+parallel-fanout contract with the 6.4 amendment (lesson #59 — name
+sibling-owned imports explicitly) plus the new 6.4-sweep insight to
+brief subagents on `ipc.test.ts`'s canonical `as unknown as InvokeFn`
+cast pattern before they write a Component.test.tsx.
+
+---
 
 ## Session: 2026-04-24 (Phase 6.4 verification — TS sweep)
 

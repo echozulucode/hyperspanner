@@ -2,7 +2,7 @@
 type: plan
 project: "Hyperspanner"
 status: active
-version: 8
+version: 10
 updated: 2026-04-24
 phases:
   - id: 0
@@ -177,6 +177,27 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
     briefing needs to name shared-file owners explicitly).
   - **6.5 Network + protocol** — Protobuf Decode (prost-reflect), TLS Inspector
     (rustls). Adds `decode_protobuf` and `tls_inspect` commands. Most involved Rust.
+  - **6.6 Number Converter** (code landed 2026-04-24; verification
+    pending host-side `pnpm typecheck && test && build`) —
+    single-pane bidirectional value/hex editor with
+    a binary read-out, modeled on the classic embedded-engineer "base
+    converter" but rebuilt with modern type vocabulary. Two top-row dropdowns
+    (`Endianness`: big/little — replaces the legacy Motorola/Intel labels;
+    `Type`: uint8/int8/uint16/int16/uint32/int32/uint64/int64/float32/float64
+    — replaces byte/short/long, includes 64-bit which the original lacked).
+    Below: two synced editable fields (`Hex` ↔ `Decimal`) that round-trip
+    losslessly through a Uint8Array stored in `useTool` state — editing
+    either field re-derives the other; changing endianness reinterprets the
+    bytes; changing type adjusts the byte width and preserves as much value
+    as fits. A read-only `Binary` row underneath shows the bit pattern with
+    nibble-grouped underscores for legibility (`0001_0010 0011_0100`).
+    No Rust backend — JS DataView + BigInt handle every conversion in-process,
+    including float32/float64 IEEE-754 round-trips and the >`Number.MAX_SAFE_INTEGER`
+    cases. Validation: hex input rejects non-hex chars (allows `0x` prefix
+    and whitespace), decimal input enforces the chosen type's signed/unsigned
+    range, both surface a `ToolStatusPill error` on out-of-range input.
+    `defaultZone: 'center'`, no `supportedZones` restriction (the layout is
+    narrow enough to fit any zone — text, hex, decimal, binary all stack).
   - **6 verification** — full typecheck+test+build + visual spot-check of every tool,
     flip `current_phase` to 7.
 
@@ -193,6 +214,9 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
 | 2026-04-24 | Phase 6.2 used a parallel-fanout build approach: read the JSON-Validator reference impl in full, brief N subagents on the same pattern, enforce exclusive ownership of package.json and registry at the parent | One pattern pass shipped seven tools on the first try with zero registry churn and zero test-harness regressions; generalizes to 6.3–6.5 unchanged (lessons #56, #57) |
 | 2026-04-24 | Phase 6.4 splits the 6.0-planned `hash_bytes` command into `hash_text` + `hash_file` | `Vec<u8>` serializes as a JSON-array-of-numbers over Tauri IPC (~5× byte overhead — documented caveat from Phase 6.0's `read_file_bytes`). Text input already lives as a `String` on both sides, so `hash_text` sends it without encoding. File input we let Rust read locally, so bytes never cross IPC at all. Raw-bytes hashing (pre-computed binary blobs from TS) has no consumer in Phase 6 — resist building it until something needs it (lesson #49) |
 | 2026-04-24 | Hash Workbench routes all four algorithms through the Rust backend instead of using SubtleCrypto for SHA-* in the browser | SubtleCrypto doesn't support MD5 (W3C deprecated it for security uses), so a SubtleCrypto path would require per-algorithm branching. At Phase 6.4 scale (text inputs typically <1 MB), the Rust round-trip adds ~1-2 ms of IPC latency — imperceptible in the UI — and the code stays single-path. Re-measure if we ever add a "hash this 4 GB blob" use case |
+| 2026-04-24 | Add Number Converter tool as new sub-phase 6.6 (was not in the original 13-tool list) | User remembered a useful "base converter" from a prior tool they had — bidirectional hex ↔ value editor with a binary read-out, byte-order toggle, and data-type dropdown. Slotting it in before the Phase 6 verification gate is cheaper than carrying it as Phase 7+ scope. No Rust required — DataView and BigInt cover every conversion. Doesn't logically belong in 6.5 (which is already two heavy network/protocol tools); separate sub-phase keeps the fanout briefs clean |
+| 2026-04-24 | Number Converter uses "Big Endian" / "Little Endian" instead of the original "Motorola" / "Intel" labels; uses `uint8`/`int16`/`float32` instead of `byte`/`short`/`float (32)`; includes 64-bit signed and unsigned (was absent in the original) | Motorola/Intel are pre-1990s vendor names that read as historical jargon to anyone not steeped in embedded firmware; Big/Little Endian are the standard terms in C/C++ standards, network-byte-order discussions, and language stdlib docs. `byte/short/long` carry per-language-different sizes (Java's long is 64-bit, C's is platform-dependent); the `uintN`/`intN`/`floatN` form maps unambiguously to the underlying byte layout and matches Rust, Go, TypeScript-numeric, protobuf, MessagePack. 64-bit types are now ubiquitous (Unix timestamps in microseconds, snowflake IDs, large monetary integers) and JS BigInt makes them trivial to support |
+| 2026-04-24 | Drop "Raw Hex" from the Number Converter's byte-order options (was the third option alongside Motorola/Intel in the original) | "Raw Hex" isn't an endianness — it's an identity transform on display. Mixing it into the byte-order dropdown conflates two orthogonal concepts (how bytes are laid out vs. how bytes are presented). The modernized design surfaces hex as its own row that always shows bytes in the order the user typed them; endianness only governs how those bytes are interpreted when computing the decimal value and the binary readout for multi-byte types |
 
 ## Errors Encountered
 | Date | Error | Resolution |
