@@ -4,8 +4,11 @@ import { PlaceholderTool } from './PlaceholderTool';
 import { Base64Pad } from './base64-pad';
 import { CaseTransform } from './case-transform';
 import { CidrCalc } from './cidr-calc';
+import { HashWorkbench } from './hash-workbench';
+import { HexInspector } from './hex-inspector';
 import { JsonValidator } from './json-validator';
 import { RegexTester } from './regex-tester';
+import { TextDiff } from './text-diff';
 import { UrlCodec } from './url-codec';
 import { WhitespaceClean } from './whitespace-clean';
 import { YamlValidator } from './yaml-validator';
@@ -77,11 +80,13 @@ const entries: ToolDescriptor[] = [
     id: 'text-diff',
     name: 'Text Diff',
     category: 'text',
-    description: 'Side-by-side diff with inline change highlighting.',
+    description: 'Side-by-side diff with inline word-level change highlighting.',
     defaultZone: 'center',
     // Two-column diff — needs width; refuse the narrow inspector dock.
+    // Stacks vertically when docked in `bottom` (grid-template-rows flip
+    // inside TextDiff.module.css's compact variant).
     supportedZones: ['center', 'bottom'],
-    component: PlaceholderTool,
+    component: TextDiff,
   },
   {
     id: 'case-transform',
@@ -133,9 +138,12 @@ const entries: ToolDescriptor[] = [
     id: 'hash-workbench',
     name: 'Hash Workbench',
     category: 'data',
-    description: 'Compute MD5/SHA-1/SHA-256/SHA-512 on text or files.',
+    description: 'Compute MD5/SHA-1/SHA-256/SHA-512 on text or files — all four at once.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    // Four-row digest panel stays single-line in the inspector by dropping
+    // the digest font size in the compact variant; permissive all-zones
+    // default is fine here.
+    component: HashWorkbench,
   },
   {
     id: 'base64-pad',
@@ -160,9 +168,10 @@ const entries: ToolDescriptor[] = [
     description: 'Dense hex + ASCII viewer with offset navigation.',
     defaultZone: 'center',
     // Dense hex rows ARE the format — any column narrower than 16 bytes
-    // of hex + ASCII breaks the layout.
+    // of hex + ASCII breaks the layout. Pagination renders one
+    // PAGE_ROWS window at a time so a 1 GB file doesn't push DOM.
     supportedZones: ['center'],
-    component: PlaceholderTool,
+    component: HexInspector,
   },
   {
     id: 'protobuf-decode',

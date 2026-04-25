@@ -13,3 +13,4 @@
 //! command name (snake_case on Rust, camelCase on TS) is the IPC contract.
 
 pub mod fs;
+pub mod hash;

@@ -1,13 +1,109 @@
+/*
+ * Strip is a non-scrolling flex container — it holds the scrolling tab area
+ * (`.scrollArea`) plus an optional pair of scroll-control buttons on the
+ * right (`.scrollControls`, only mounted when the inner area overflows).
+ *
+ * Vertical size is *locked* (height + flex-shrink: 0 + overflow: hidden) so
+ * the strip never grows or shrinks based on tab count, scroll-control
+ * mount/unmount, or any per-tab styling quirk. Anything that wants to be
+ * taller is clipped at the strip boundary — that's the contract.
+ */
 .strip {
   display: flex;
-  align-items: center;
-  gap: 0.2rem;
+  align-items: stretch;
+  gap: 0;
+  /* Sized to fit a small `LcarsPill` (40px tall) plus the existing
+     0.25rem vertical padding and the 4px LCARS border-bottom — total
+     40 + 8 + 4 = 52px in border-box. Keeping this exact rather than a
+     `min-height` is what makes the strip visually identical with one
+     tab or twenty: tabs never wrap (the inner `.scrollArea` overflows
+     horizontally instead) and the scroll-control cluster never grows
+     the strip because `align-items: stretch` lays it inside the locked
+     height. */
+  height: 52px;
+  flex-shrink: 0;
   padding: 0.25rem 0.5rem;
   border-bottom: var(--lcars-spacing-bar-border, 0.25rem solid black);
   background-color: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.scrollArea {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Inherit the strip's locked height instead of letting tab content drive
+     it — together with overflow: hidden on the strip this makes any
+     overgrown tab clip cleanly rather than push the strip taller. */
+  height: 100%;
+  /* Tabs never wrap to a second row. Horizontal overflow is silent — the
+     scrollbar is hidden and the user navigates via the scroll-control
+     buttons (or wheel-deltaY converted to scrollLeft by the component). */
   overflow-x: auto;
-  min-height: 40px;
-  flex-wrap: wrap;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  scroll-behavior: smooth;
+  /* Hide native scrollbars in both engine families — the buttons are the
+     only affordance we want to expose. */
+  scrollbar-width: none;
+}
+
+.scrollArea::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Scroll-control cluster: a pair of left/right chevron buttons mounted only
+ * when the scroll area has horizontal overflow. They stay flush with the
+ * right edge of the strip and never scroll with the tabs.
+ */
+.scrollControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  margin-left: 0.4rem;
+  padding-left: 0.4rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scrollBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--lcars-color-text, #eae4d6);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 120ms ease, background-color 120ms ease;
+}
+
+.scrollBtn:hover:not(:disabled) {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.scrollBtn:active:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.scrollBtn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.scrollBtn:focus-visible {
+  outline: 1px solid var(--lcars-color-orange, #d88463);
+  outline-offset: 1px;
 }
 
 .empty {
@@ -25,6 +121,15 @@
   padding: 0.1rem 0.3rem 0.1rem 0;
   border-radius: 100vmax;
   background-color: rgba(255, 255, 255, 0.02);
+  /* Hold tabs at their natural width — flex-wrap: nowrap on the parent
+     plus this guarantees the strip can overflow horizontally instead of
+     squishing tabs unreadably. */
+  flex: 0 0 auto;
+  /* Belt-and-braces: even though the strip clips vertically, cap each
+     tab's height so a primitive that briefly renders taller (active state,
+     focus ring, etc.) can't bias other layout calculations like
+     `scrollWidth` reporting. */
+  max-height: 100%;
 }
 
 .tabWrap.pulsing {
@@ -35,6 +140,13 @@
   opacity: 0.55;
   outline: 1px dashed var(--lcars-color-orange, #d88463);
   outline-offset: 2px;
+}
+
+/* Marker class for the active tab — keeps the close button visible
+   even when the cursor isn't hovering, matching VSCode behavior. The
+   compound rule that uses this lives in the close-button block below. */
+.active {
+  /* Intentionally empty — purely a hook for compound selectors. */
 }
 
 .tabWrap[draggable='true'] {
@@ -65,4 +177,62 @@
   text-overflow: ellipsis;
   overflow: hidden;
   max-width: 16ch;
+}
+
+/*
+ * Quick close button — VSCode-style.
+ *
+ * Default: present in the layout but visually muted (low opacity), so it
+ * doesn't visually clutter a long row of inactive tabs.
+ *
+ * On `.tabWrap:hover` (mouse anywhere over the tab): fades up to a clearly
+ * visible state.
+ *
+ * On hover of the button itself: brightest, with a subtle background so it
+ * reads as a target. The active tab keeps the button visible at all times
+ * (rule below using `.tabWrap.active`) so it's always one click away.
+ */
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 0.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lcars-color-text, #eae4d6);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 120ms ease;
+  flex: 0 0 auto;
+}
+
+.tabWrap:hover .closeBtn,
+.tabWrap.active .closeBtn,
+.closeBtn:focus-visible {
+  opacity: 0.6;
+}
+
+/*
+ * The button's own hover state needs to win over `.tabWrap:hover .closeBtn`
+ * (which is (0,2,1) in specificity). Qualifying with `.tabWrap` brings this
+ * rule to (0,2,1) too, and it's ordered later so it wins via cascade.
+ */
+.tabWrap .closeBtn:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.tabWrap .closeBtn:active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.closeBtn:focus-visible {
+  outline: 1px solid var(--lcars-color-orange, #d88463);
+  outline-offset: 1px;
 }

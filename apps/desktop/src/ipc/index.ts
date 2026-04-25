@@ -21,3 +21,11 @@ export type {
   ReadFileBytesOptions,
   ReadTextFileOptions,
 } from './fs';
+
+export { hashText, hashFile } from './hash';
+export type {
+  HashAlgorithm,
+  HashResult,
+  HashTextOptions,
+  HashFileOptions,
+} from './hash';

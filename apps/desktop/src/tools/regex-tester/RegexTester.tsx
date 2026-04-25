@@ -6,7 +6,6 @@ import type { Zone } from '../../state';
 import { useTool } from '../../state/useTool';
 import { ToolFrame, ToolStatusPill } from '../components';
 import {
-  compileRegex,
   runRegex,
   type RegexFlags,
   type RegexMatch,
@@ -331,11 +330,11 @@ function renderMatchList(
             {match.groups.length > 0 && (
               <div className={styles.groupsList}>
                 {match.groups.map((group, gIdx) => {
-                  const label = group.name ? `?&lt;${group.name}&gt;` : gIdx + 1;
+                  const label = group.name ? `?<${group.name}>` : String(gIdx + 1);
                   return (
                     <div key={gIdx} className={styles.groupItem}>
                       <code>
-                        ${'{label}'}: "{group.value ?? ''}"
+                        {label}: "{group.value ?? ''}"
                       </code>
                     </div>
                   );

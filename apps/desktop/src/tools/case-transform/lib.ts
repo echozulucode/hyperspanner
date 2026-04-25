@@ -77,7 +77,6 @@ export function tokenize(text: string): string[] {
     const isPunctuation = /[_\-\s]/.test(char);
     const isDigit = /\d/.test(char);
     const isPrevDigit = /\d/.test(prev);
-    const isNextDigit = /\d/.test(next);
     const isUpper = /[A-Z]/.test(char);
     const isPrevUpper = /[A-Z]/.test(prev);
     const isNextLower = /[a-z]/.test(next);

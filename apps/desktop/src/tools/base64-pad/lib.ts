@@ -96,12 +96,12 @@ export function decodeBase64(b64: string, options: Base64Options): DecodeResult 
   }
 
   try {
-    // Detect which variant was used and normalize to standard for atob
+    // Detect which variant was used and normalize to standard for atob.
+    // We accept either variant regardless of options.variant (decoder is
+    // permissive); the normalized form always uses standard alphabet.
     let normalized = trimmed;
-    let detectedVariant = options.variant;
 
     if (normalized.includes('-') || normalized.includes('_')) {
-      detectedVariant = 'url-safe';
       normalized = normalized.replace(/-/g, '+').replace(/_/g, '/');
     }
 

@@ -1,0 +1,106 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.inputRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.pathInput {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--lcars-color-gutter, rgba(138, 122, 168, 0.4));
+  border-radius: 4px;
+  background: var(--lcars-color-bg-raised, rgba(16, 16, 24, 0.7));
+  color: var(--lcars-color-sand, #eae4d6);
+  font-family: var(--lcars-font-mono, 'JetBrains Mono', 'SF Mono', Consolas, monospace);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  outline: none;
+}
+
+.pathInput:focus {
+  border-color: var(--lcars-color-orange, #d88463);
+  box-shadow: 0 0 0 1px var(--lcars-color-orange, #d88463);
+}
+
+.pathInput::placeholder {
+  color: var(--lcars-color-sand, #eae4d6);
+  opacity: 0.35;
+}
+
+.dumpContainer {
+  flex: 1;
+  overflow: auto;
+  max-height: 60vh;
+  border: 1px solid var(--lcars-color-gutter, rgba(138, 122, 168, 0.4));
+  border-radius: 4px;
+  background: var(--lcars-color-bg-raised, rgba(16, 16, 24, 0.7));
+  padding: 0.75rem;
+}
+
+.dumpEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--lcars-muted, rgba(234, 228, 214, 0.4));
+  font-family: var(--lcars-font-mono, 'JetBrains Mono', 'SF Mono', Consolas, monospace);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.dump {
+  font-family: var(--lcars-font-mono, 'JetBrains Mono', 'SF Mono', Consolas, monospace);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--lcars-color-sand, #eae4d6);
+  white-space: pre;
+  font-feature-settings: 'tnum'; /* tabular-nums for alignment */
+}
+
+.row {
+  display: flex;
+  gap: 1em;
+  padding: 0.2rem 0;
+  border-radius: 2px;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--lcars-accent-orange) 12%, transparent);
+}
+
+.rowOffset {
+  flex: 0 0 auto;
+  min-width: 8ch;
+  color: var(--lcars-muted, rgba(234, 228, 214, 0.5));
+  font-family: var(--lcars-font-mono, 'JetBrains Mono', 'SF Mono', Consolas, monospace);
+}
+
+.rowHex {
+  flex: 0 0 auto;
+  font-family: var(--lcars-font-mono, 'JetBrains Mono', 'SF Mono', Consolas, monospace);
+  letter-spacing: 0.05em;
+}
+
+.rowAscii {
+  flex: 0 0 auto;
+  min-width: 18ch; /* 16 chars + 2 pipes */
+  font-family: var(--lcars-font-mono, 'JetBrains Mono', 'SF Mono', Consolas, monospace);
+  overflow: hidden; /* Prevent line wrapping inside the ascii column */
+}
+
+.paginationInfo {
+  font-size: 0.75rem;
+  color: var(--lcars-muted, rgba(234, 228, 214, 0.5));
+  font-family: var(--lcars-font-mono, 'JetBrains Mono', 'SF Mono', Consolas, monospace);
+  white-space: nowrap;
+}

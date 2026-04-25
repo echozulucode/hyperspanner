@@ -110,8 +110,14 @@ export function runRegex(
   }
 
   const compiled = compileRegex(pattern, flags);
-  if (compiled.kind !== 'ok') {
+  if (compiled.kind === 'error') {
     return { kind: 'error', message: compiled.message };
+  }
+  if (compiled.kind !== 'ok') {
+    // Defensive: compileRegex only returns 'empty' for a blank pattern,
+    // which we already filtered above. This branch should be unreachable
+    // but TS needs it to narrow `compiled` to RegexCompileOk below.
+    return { kind: 'empty' };
   }
 
   const matchLimit = options?.matchLimit ?? 500;
@@ -163,7 +169,7 @@ export function runRegex(
  * Returns an array with name, value, and start/end offsets for each group.
  */
 function extractGroups(
-  regex: RegExp,
+  _regex: RegExp,
   match: RegExpExecArray,
 ): RegexMatch['groups'] {
   const groups: RegexMatch['groups'] = [];

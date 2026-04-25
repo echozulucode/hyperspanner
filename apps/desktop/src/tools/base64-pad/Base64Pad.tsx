@@ -198,7 +198,7 @@ export const Base64Pad: FC<Base64PadProps> = ({ toolId, zone }) => {
 function renderStatus(
   input: string,
   result: EncodeResult | DecodeResult,
-  direction: string,
+  _direction: string,
 ): ReactNode {
   if (result.kind === 'empty') {
     return (

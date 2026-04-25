@@ -115,7 +115,7 @@ describe('decodeBase64', () => {
   });
 
   it('decodes URL-safe base64 regardless of options.variant', () => {
-    const urlSafe = '8J-qs-='.replace(/=/g, ''); // Emoji in URL-safe
+    // Encoded emoji in URL-safe form — decoder should detect and decode.
     const r = decodeBase64('8J+qs-_=', STANDARD_OPTS);
     expect(r.kind).toBe('ok');
   });

@@ -189,9 +189,6 @@ describe('Base64Pad', () => {
     act(() => {
       fireEvent.change(input, { target: { value: '🚀' } });
     });
-    const output = screen.getByLabelText('Base64 output') as HTMLTextAreaElement;
-    const encoded = output.value;
-
     // Flip to decode
     const directionBtn = screen.getByRole('button', { name: /toggle direction/i });
     act(() => {

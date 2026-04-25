@@ -1,4 +1,35 @@
 lessons:
+  - id: 59
+    date: 2026-04-24
+    source: "session"
+    category: process
+    lesson: |
+      Subagent ownership contracts (lesson #57) need to name the OWNER of every
+      file a subagent touches or imports, not just the files it writes to. In
+      Phase 6.4's parallel fanout, Subagent B (Hash Workbench tool) was given
+      "exclusive ownership" of the hash-workbench directory and was told its
+      imports came from `@/ipc`. B still wrote to `ipc/hash.ts` and
+      `ipc/index.ts` as "additional work" because its brief didn't explicitly
+      say "DO NOT create the IPC module you're importing — Subagent D is
+      creating it." Subagent D's last-writer-wins overwrite saved us (D
+      finished last and put the canonical file on disk), but this is fragile
+      — if B had finished last, D's well-styled fs.ts-mirroring version would
+      have been silently replaced by B's improvised stub.
+
+      Fix going forward: every subagent brief that depends on a sibling's
+      output MUST include a sentence of the form "sibling subagent <X> is
+      creating <file>; you import from it but DO NOT create or modify that
+      file yourself — assume the import will resolve when typecheck runs at
+      the parent." This is now part of the parallel-fanout contract (amends
+      lesson #57 clause (a) "exclusive ownership").
+
+      Secondary observation: subagents spawned with `general-purpose` take
+      initiative. That's usually good, but "helpful" initiative that crosses
+      ownership lines is indistinguishable from a missing handoff — there's
+      no signal until the files collide. Briefs should be prescriptive on
+      the boundary, not just the center.
+    applied: true
+
   - id: 1
     date: 2026-04-20
     source: "session"

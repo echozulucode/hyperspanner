@@ -7,6 +7,7 @@ import {
 import { __setInvokeForTests, invoke } from './invoke';
 import type { InvokeFn } from './invoke';
 import { readFileBytes, readTextFile } from './fs';
+import { hashText, hashFile } from './hash';
 
 /**
  * IPC layer — cover:
@@ -172,5 +173,81 @@ describe('fs wrappers', () => {
     const err = await readTextFile({ path: '/d' }).catch((e) => e);
     expect(err).toBeInstanceOf(HyperspannerError);
     expect(err.kind).toBe('invalid_utf8');
+  });
+});
+
+describe('hash wrappers', () => {
+  let spy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    spy = vi.fn();
+    __setInvokeForTests(spy);
+  });
+
+  afterEach(() => {
+    __setInvokeForTests(null);
+  });
+
+  it('hashText forwards text + algorithm under the hash_text command', async () => {
+    spy.mockResolvedValueOnce({
+      digest: 'abc123',
+      algorithm: 'sha256',
+      size: 11,
+    });
+    const out = await hashText({ text: 'hello world', algorithm: 'sha256' });
+    expect(spy).toHaveBeenCalledWith('hash_text', {
+      text: 'hello world',
+      algorithm: 'sha256',
+    });
+    expect(out.digest).toBe('abc123');
+    expect(out.algorithm).toBe('sha256');
+    expect(out.size).toBe(11);
+  });
+
+  it('hashFile forwards path + algorithm + maxBytes under the hash_file command', async () => {
+    spy.mockResolvedValueOnce({
+      digest: 'def456',
+      algorithm: 'md5',
+      size: 1024,
+    });
+    const out = await hashFile({
+      path: '/tmp/data.bin',
+      algorithm: 'md5',
+      maxBytes: 65536,
+    });
+    expect(spy).toHaveBeenCalledWith('hash_file', {
+      path: '/tmp/data.bin',
+      algorithm: 'md5',
+      maxBytes: 65536,
+    });
+    expect(out.digest).toBe('def456');
+  });
+
+  it('hashFile omits maxBytes when not provided (serializes as undefined)', async () => {
+    spy.mockResolvedValueOnce({
+      digest: 'ghi789',
+      algorithm: 'sha1',
+      size: 2048,
+    });
+    await hashFile({ path: '/tmp/file.txt', algorithm: 'sha1' });
+    expect(spy).toHaveBeenCalledWith('hash_file', {
+      path: '/tmp/file.txt',
+      algorithm: 'sha1',
+      maxBytes: undefined,
+    });
+  });
+
+  it('unsupported_algorithm rejection rehydrates as a typed HyperspannerError', async () => {
+    spy.mockRejectedValueOnce({
+      kind: 'unsupported_algorithm',
+      message: 'algorithm blake2 is not supported',
+    });
+    const err = await hashText({
+      text: 'test',
+      algorithm: 'sha256',
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(HyperspannerError);
+    expect(err.kind).toBe('unsupported_algorithm');
+    expect(err.message).toBe('algorithm blake2 is not supported');
   });
 });

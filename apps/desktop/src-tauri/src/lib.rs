@@ -41,6 +41,8 @@ pub fn run() {
             ping,
             commands::fs::read_file_bytes,
             commands::fs::read_text_file,
+            commands::hash::hash_text,
+            commands::hash::hash_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running hyperspanner");

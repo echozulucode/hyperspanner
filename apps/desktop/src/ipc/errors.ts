@@ -32,6 +32,7 @@ export type HyperspannerErrorKind =
   | 'file_too_large'
   | 'invalid_encoding'
   | 'invalid_utf8'
+  | 'unsupported_algorithm'
   | 'unknown';
 
 /**
@@ -51,6 +52,7 @@ const KNOWN_KINDS: ReadonlySet<HyperspannerErrorKind> = new Set([
   'file_too_large',
   'invalid_encoding',
   'invalid_utf8',
+  'unsupported_algorithm',
   'unknown',
 ]);
 

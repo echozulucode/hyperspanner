@@ -40,6 +40,9 @@ pub enum HyperspannerError {
 
     #[error("file contains invalid UTF-8 starting at byte {offset}")]
     InvalidUtf8 { offset: usize },
+
+    #[error("unsupported hash algorithm: {algorithm}")]
+    UnsupportedAlgorithm { algorithm: String },
 }
 
 impl HyperspannerError {
@@ -53,6 +56,7 @@ impl HyperspannerError {
             Self::FileTooLarge { .. } => "file_too_large",
             Self::InvalidEncoding { .. } => "invalid_encoding",
             Self::InvalidUtf8 { .. } => "invalid_utf8",
+            Self::UnsupportedAlgorithm { .. } => "unsupported_algorithm",
         }
     }
 }

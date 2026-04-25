@@ -301,7 +301,9 @@ function bigintToIpv6(num: bigint): string {
   const groups: string[] = [];
   let val = num;
   for (let i = 0; i < 8; i++) {
-    groups.unshift(((val & 0xffffn) >>> 0).toString(16));
+    // `val & 0xffffn` is already non-negative so we don't need the >>> 0
+    // coerce-to-unsigned trick here (BigInt doesn't support >>> anyway).
+    groups.unshift((val & 0xffffn).toString(16));
     val = val >> 16n;
   }
   // Compress longest run of zeros
