@@ -2,8 +2,8 @@
 type: plan
 project: "Hyperspanner"
 status: active
-version: 18
-updated: 2026-04-24
+version: 19
+updated: 2026-04-25
 phases:
   - id: 0
     name: "Bootstrap (Tauri + React + Vite + pnpm workspace)"
@@ -25,10 +25,10 @@ phases:
     status: complete
   - id: 6
     name: "Vertical-slice tools + backend commands"
-    status: in_progress
+    status: complete
   - id: 7
     name: "Presets + persistence"
-    status: pending
+    status: in_progress
   - id: 8
     name: "Settings + about"
     status: pending
@@ -41,7 +41,7 @@ phases:
   - id: 11
     name: "Testing / packaging / first release"
     status: pending
-current_phase: 6
+current_phase: 7
 ---
 
 # Plan: Hyperspanner
@@ -78,10 +78,15 @@ ship for theme switching. Defined in `apps/desktop/src/themes/`.
   `ShortcutHelp` overlay (Shift+?), and a `Shortcut` / `formatShortcut` helper set. All
   shortcut callers flow through the registry; zone toggles still composed via
   `useShellShortcuts`.
-- **Phase 6 in progress** — decomposed into six sub-phases (user-approved scope on
-  2026-04-23: backend-first, then all 13 tools). Sub-phases 6.0 and 6.1 both
-  verified on Windows host 2026-04-24 (cargo test + pnpm test/typecheck/build
-  green after four small fixes logged in the Errors table below):
+- **Phase 6 COMPLETE (verified 2026-04-25)** — all 14 tools shipped with real
+  implementations; verification gate passed: `cargo test -p hyperspanner` clean,
+  `pnpm --filter @hyperspanner/desktop test` clean (599 passing), `pnpm typecheck`
+  clean (after a final 4-error sweep adding `title?: string` to `LcarsPill`),
+  `pnpm build` clean. The closing-out test sweep across 2026-04-25 fixed ~14
+  behavioral bugs across the suite — see `status.md` for the per-tool detail.
+  Decomposed into seven sub-phases (user-approved scope on 2026-04-23:
+  backend-first, then all 13 tools; 6.6 Number Converter added 2026-04-24 as a
+  14th tool):
   - **6.0 Backend command surface + scaffolding** (verified 2026-04-24) —
     Rust layer: `HyperspannerError` enum
     (thiserror + flat `{ kind, message }` serde transport) at `src-tauri/src/error.rs`;

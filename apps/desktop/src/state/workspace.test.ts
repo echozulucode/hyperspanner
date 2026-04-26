@@ -1,9 +1,10 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useWorkspaceStore } from './workspace';
-import { DEFAULT_WORKSPACE } from './presets';
+import { clearWorkspaceStorage, useWorkspaceStore } from './workspace';
 
 /**
- * workspace store — unit tests covering Phase 3 deliverables:
+ * workspace store — unit tests covering Phase 3 deliverables + Phase 7
+ * persistence:
  *
  *   - single-instance enforcement (openTool on an open id focuses + pulses)
  *   - close reassigns activeByZone
@@ -12,15 +13,19 @@ import { DEFAULT_WORKSPACE } from './presets';
  *   - toggleZone flips collapse
  *   - applyPreset applies a valid preset, ignores unknown names
  *   - resetLayout returns to default
+ *   - localStorage round-trip writes and rehydrates the partial shape
  *
- * Tests run directly against the Zustand store via `getState()` and
- * `setState(DEFAULT_WORKSPACE)` for isolation. No React rendering is
- * involved, keeping the tests fast and decoupled from the DOM.
+ * The test environment is jsdom (rather than node) only because the
+ * persist middleware reaches for `localStorage`. We don't do any
+ * DOM rendering in this file — getState/setState only.
  */
 
 beforeEach(() => {
-  // Reset the store between tests.
-  useWorkspaceStore.setState({ ...DEFAULT_WORKSPACE });
+  // Wipe both the in-memory state and the persisted blob so each test
+  // starts from `DEFAULT_WORKSPACE`. Without the localStorage clear,
+  // a side effect from one test (e.g. opening a tool) would survive
+  // as a rehydration source for the next.
+  clearWorkspaceStorage();
 });
 
 function snapshot() {
@@ -312,5 +317,73 @@ describe('workspace.applyPreset / resetLayout', () => {
     expect(s.activeByZone.center).toBeNull();
     expect(s.activeByZone.right).toBeNull();
     expect(s.activeByZone.bottom).toBeNull();
+  });
+});
+
+describe('workspace persistence (Phase 7)', () => {
+  const STORAGE_KEY = 'hyperspanner/workspace/v1';
+
+  function readPersisted(): {
+    state: {
+      open: Array<{ id: string; zone: string; splitSide?: string }>;
+      activeByZone: Record<string, string | null>;
+      centerSplit: string;
+      collapsed: Record<string, boolean>;
+      layoutPreset: string;
+    };
+    version: number;
+  } | null {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  }
+
+  it('writes a partial of the workspace state to localStorage on update', () => {
+    const { openTool } = snapshot();
+    openTool('json-validator', 'center');
+    const persisted = readPersisted();
+    expect(persisted).not.toBeNull();
+    expect(persisted?.version).toBe(1);
+    expect(persisted?.state.open).toHaveLength(1);
+    expect(persisted?.state.open[0]).toMatchObject({
+      id: 'json-validator',
+      zone: 'center',
+    });
+    expect(persisted?.state.activeByZone.center).toBe('json-validator');
+  });
+
+  it('strips transient fields (pulseId, pulseCounter) from the persisted shape', () => {
+    const { openTool } = snapshot();
+    openTool('json-validator', 'center');
+    const persisted = readPersisted();
+    // Each persisted OpenTool should NOT carry pulseId — it's animation
+    // state with no meaning across sessions.
+    expect(persisted?.state.open[0]).not.toHaveProperty('pulseId');
+    // The top-level pulseCounter should also be excluded.
+    expect(persisted?.state).not.toHaveProperty('pulseCounter');
+  });
+
+  it('persists collapse state and centerSplit', () => {
+    const { toggleZone, splitCenter } = snapshot();
+    toggleZone('bottom'); // bottom default is collapsed=true → flips to false
+    splitCenter('vertical');
+    const persisted = readPersisted();
+    expect(persisted?.state.collapsed.bottom).toBe(false);
+    expect(persisted?.state.centerSplit).toBe('vertical');
+  });
+
+  it('persists the active layout preset id after applyPreset', () => {
+    const { applyPreset } = snapshot();
+    applyPreset('binary-inspection');
+    const persisted = readPersisted();
+    expect(persisted?.state.layoutPreset).toBe('binary-inspection');
+  });
+
+  it('clearWorkspaceStorage removes the localStorage entry', () => {
+    const { openTool } = snapshot();
+    openTool('json-validator', 'center');
+    expect(readPersisted()).not.toBeNull();
+    clearWorkspaceStorage();
+    expect(readPersisted()).toBeNull();
   });
 });

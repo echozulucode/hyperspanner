@@ -2,6 +2,7 @@ export {
   useWorkspaceStore,
   selectZoneTools,
   selectActive,
+  clearWorkspaceStorage,
 } from './workspace';
 
 export type {

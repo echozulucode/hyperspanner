@@ -1,17 +1,172 @@
 ---
 type: status
 updated: 2026-04-25
-current_phase: "Phase 6.5 (Protobuf Decode + TLS Inspector) shipped 2026-04-24. Phase 6 verification gate IN PROGRESS — `cargo test -p hyperspanner` green; `pnpm --filter @hyperspanner/desktop test` is the gate currently being walked through. Cross-tool test-failure sweep landed during 2026-04-25 covering ~10 tools; current sweep entry below logs the second pass after a premature 'all checks pass' claim was retracted (lesson #60 captures the process implication). Remaining failures from `output.txt`: whitespace-clean (3 lib + 2 component — pipeline missing `tabsToSpaces` step, trimLines/trimEnds split, pill `disabled`-vs-`active`), url-codec (off-by-one offset comment), text-diff (multi-line removed+added pairing), yaml-validator (1 lib + 3 component — YAML 1.1 boolean coercion, `aria-label` overrides shadowing visible text), tls-inspector (1 component — duplicated error text in placeholder + status pill). Fixes for all of these are in this commit; re-running the gate is the next step."
+current_phase: "Phase 6 COMPLETE (verified 2026-04-25). All 14 tools shipped with real implementations; full host-side verification gate passed: `cargo test -p hyperspanner`, `pnpm --filter @hyperspanner/desktop test` (599 passing), `pnpm typecheck`, `pnpm build` all green. Verification took two iterations — first run had 13 failing tests across 7 tools; second run cleared 12 of them but still had a BOM-mid-buffer case in whitespace-clean; third run added `title?: string` to `LcarsPill` to clear 4 typecheck errors. Phase 7 (Layout presets and persistence) is now `in_progress`. The presets themselves already exist (`apps/desktop/src/state/presets.ts`, six built-ins: default / text-ops / validation / binary-inspection / minimal-focus / diagnostics) and `applyPreset` is wired into the workspace store; what remains is the persistence layer per plan-002 §Phase 7: serialize selected workspace state to a `workspace.json` in the Tauri app data dir, load it on startup, hydrate the store. Plus a preset selector in the top rail / home view, and a 'Save as preset…' action."
 blockers: []
 next_actions:
-  - "Re-run `pnpm --filter @hyperspanner/desktop test` on the Windows host. Expected to clear the 13 failures called out in `output.txt`. After it's green, also run `pnpm --filter @hyperspanner/desktop typecheck && build` and `cargo test -p hyperspanner` to confirm the full Phase 6 verification gate is passing."
-  - "After all gates pass: flip `plan.md` `current_phase` to 7, mark Phase 6 phases[] row `complete`, mark Phase 7 row `in_progress`, bump plan version. Update this status with a 'Phase 6 verification PASSED' entry and add a session entry summarizing the test-sweep work."
-  - "Phase 7 still on deck: layout presets persistence (workspace store already has `applyPreset` wired — persist middleware is next). Approach: wrap the existing Zustand `create()` in `persist()` from `zustand/middleware`, partialize so we only serialize layout/preset state (NOT runtime per-tool state)."
-  - "Optional polish carried from 6.2: RegexTester's flag toggles use inline-styled buttons instead of LcarsPill — off-grammar. Fold into a Phase 7 polish pass."
-  - "Follow-ups surfaced during 6.4 that we can sweep during Phase 7 polish: (a) `hash-workbench/lib.ts` redefines `HashAlgorithm` and `HashResult` locally instead of re-exporting from `@/ipc`; (b) `HexInspector.tsx` imports `readFileBytes` from `../../ipc/fs` rather than the barrel `../../ipc`; (c) `hash.rs`'s eager-algorithm-check uses a wasted empty-string digest — a const membership array would be tidier."
+  - "Phase 7.1: design the persistence boundary. What gets serialized vs what's ephemeral. Strawman: serialize `open` (tool ids + zones), `activeByZone`, `centerSplit`, `collapsed`, `layoutPreset`, plus favorites and recents (already in their own slices). Do NOT serialize `pulseCounter` (transient), per-tool runtime state (intentionally ephemeral — `useTool` slots clear on close), drag state, or the IPC test seam. Decide between Zustand `persist()` middleware (localStorage, fast, runs in renderer) vs. a Tauri-backed JSON file (cross-window persistence, survives window close/reopen, but needs an IPC round-trip on every save). Plan-002 calls for the Tauri path; localStorage works for now and we can swap the storage adapter without touching call sites."
+  - "Phase 7.2: implement the storage layer. If localStorage path: wrap the workspace `create()` in `persist({ name: 'hyperspanner-workspace', partialize, version: 1, migrate })`. If Tauri path: add a `read_workspace_state` / `write_workspace_state` Rust command pair against `app_data_dir()`, plus a small custom Zustand storage shim that calls them via the IPC layer. Either way, debounce writes (~200ms) so rapid layout changes don't thrash disk."
+  - "Phase 7.3: preset selector UI. A pill cluster or `<select>` in the top rail that calls `applyPreset(id)` from `useWorkspaceStore`. Six built-ins from `state/presets.ts` populate it. Active preset gets visual emphasis. Home view gets a 'Layout presets' card listing the same set with descriptions."
+  - "Phase 7.4: 'Save as preset…' action. A modal or inline form in the top rail that captures a name + (optional) description and writes a custom preset to a new slice (`useCustomPresets` — Zustand+persist, similar shape to `useFavorites`). Custom presets render below the built-ins with a remove affordance."
+  - "Phase 7 verification: apply each built-in preset, confirm zone collapse + center-split state matches the definition; restart the app and confirm last layout + tools survive; save a custom preset, restart, confirm it's still in the selector."
+  - "Optional polish carried from earlier phases: (a) RegexTester's flag toggles use inline-styled buttons instead of LcarsPill — off-grammar; (b) `hash-workbench/lib.ts` redefines `HashAlgorithm` and `HashResult` locally instead of re-exporting from `@/ipc`; (c) `HexInspector.tsx` imports `readFileBytes` from `../../ipc/fs` rather than the barrel `../../ipc`; (d) `hash.rs`'s eager-algorithm-check uses a wasted empty-string digest. Fold into a Phase 7 polish pass once preset persistence lands."
 ---
 
 # Status Log
+
+## Session: 2026-04-25 (Phase 7.1 + 7.2 — workspace persistence layer landed)
+
+Phase 7 entry — picked the simpler-first storage path (Zustand
+`persist()` + `localStorage`) over the Tauri `app_data_dir` JSON file
+that plan-002 §Phase 7 calls for. Three reasons in the response back
+to user, kept here for the record:
+
+  1. `useFavoritesStore` and `useRecentsStore` already use exactly
+     this pattern — same `createJSONStorage(() => localStorage)`
+     shape, versioned keys (`hyperspanner/<store>/v1`). Matching
+     them keeps the persistence story consistent.
+  2. Zero IPC overhead on every layout change. Drag a tool, collapse
+     a zone, change a tab — that's a localStorage write in
+     microseconds vs. a Tauri round-trip in milliseconds.
+  3. The `storage` option is one line. Swap to a Tauri-backed
+     adapter when we need cross-window persistence; no call sites
+     change.
+
+**What landed:**
+
+- **`apps/desktop/src/state/workspace.ts`** — wrapped the existing
+  `useWorkspaceStore` in `persist()`. Added a `partializeWorkspace`
+  fn that strips transient fields before serialization
+  (`pulseCounter` at the top level, `pulseId` per-`OpenTool`).
+  Serialized shape: `{ open, activeByZone, centerSplit, collapsed,
+  layoutPreset }`. Storage key: `hyperspanner/workspace/v1`,
+  version: 1.
+- **`apps/desktop/src/state/workspace.ts`** — added a
+  `clearWorkspaceStorage()` test helper that wipes both the
+  persisted blob in `localStorage` and the in-memory state. Useful
+  in `beforeEach` so each test starts from `DEFAULT_WORKSPACE` and
+  the persist layer doesn't rehydrate stale state from a previous
+  test.
+- **`apps/desktop/src/state/index.ts`** — re-exported
+  `clearWorkspaceStorage`.
+- **`apps/desktop/src/state/workspace.test.ts`** — flipped to
+  `// @vitest-environment jsdom` (the persist middleware reaches for
+  `localStorage`, which only exists under jsdom). Replaced the
+  `beforeEach` setState reset with `clearWorkspaceStorage()`. Added
+  a new `describe('workspace persistence (Phase 7)')` block with
+  five tests:
+   1. `openTool` writes a partial of state to localStorage in the
+      expected shape (with `version: 1`).
+   2. Transient fields (`pulseId`, `pulseCounter`) are stripped from
+      the persisted blob.
+   3. `toggleZone` and `splitCenter` changes survive into the blob.
+   4. `applyPreset` writes the new `layoutPreset` id.
+   5. `clearWorkspaceStorage` removes the entry.
+
+The other tool-component tests were unaffected — they import
+`useTool` directly from `state/useTool` (not via the barrel), so
+they never load `workspace.ts` transitively and don't need a
+localStorage shim.
+
+**Storage adapter swap path** for the eventual Tauri-backed file
+in `app_data_dir`:
+
+  ```ts
+  // Today:
+  storage: createJSONStorage(() => localStorage),
+
+  // Future (one-line replacement):
+  storage: createJSONStorage(() => tauriFsStorage),
+  ```
+
+  The Tauri adapter is a small object that implements the
+  `getItem` / `setItem` / `removeItem` contract via Rust IPC
+  calls. Phase 7.5+ when we add multi-window or want the file
+  visible to the user.
+
+**Still pending in Phase 7:**
+
+  - **7.3 Preset selector UI.** A pill cluster or `<select>` in the
+    top rail that calls `applyPreset(id)`. Six built-ins from
+    `state/presets.ts` populate it. Active preset gets visual
+    emphasis. Home view also gets a "Layout presets" card listing
+    them with descriptions for discoverability.
+  - **7.4 Custom presets.** "Save as preset…" action in the top
+    rail captures a name + (optional) description and writes to a
+    new `useCustomPresets` slice (Zustand + persist, mirroring
+    `useFavorites`'s shape — `hyperspanner/custom-presets/v1`).
+    Custom entries render below the built-ins with a remove
+    affordance.
+  - **7.5 Verification.** Apply each built-in preset, confirm zone
+    state matches the definition; restart the app, confirm last
+    layout + favorites + recents survive; save a custom preset,
+    restart, confirm it's still in the selector.
+
+Re-run `pnpm test && pnpm typecheck` after this commit lands;
+the only files touched were `workspace.ts`, `workspace.test.ts`,
+and `state/index.ts`. Expected delta: +5 new tests in the
+workspace suite, no other test changes.
+
+---
+
+## Session: 2026-04-25 (Phase 6 verification PASSED — Phase 7 starts)
+
+User confirmed: `cargo test`, `pnpm test`, `pnpm typecheck`, `pnpm build`
+all green on the Windows host. The verification arrived in three runs:
+
+1. **First run** (after the cross-tool sweep landed) — 13 test failures
+   across 7 tools. Logged in the session entry below; not repeating here.
+2. **Second run** (after the second sweep) — 1 test failure: a
+   BOM-mid-buffer case in `whitespace-clean/lib.ts`'s all-options
+   integration test. The original `stripBOM` only checked `text.charCodeAt(0)`,
+   but the test input `'  ﻿\nhello…'` puts the BOM at index 2 (after
+   two leading spaces). Fixed by switching to a `text.split(BOM_CHAR).join('')`
+   approach (with `BOM_CHAR = String.fromCharCode(0xfeff)` so the source
+   doesn't carry a literal invisible BOM that some build pipelines strip).
+3. **Third run** — 4 typecheck errors. Two `LcarsPill` usages each in
+   `HexInspector.tsx` and `TlsInspector.tsx` were passing `title="..."` to
+   the primitive, which was silently dropping the prop (no `title` in
+   `LcarsPillProps`, no spread). Added `title?: string` to the prop
+   interface and threaded it through to both `<button>` and `<a>` render
+   paths so the tooltips actually surface on hover (which they weren't
+   doing before — those calls had been dead code).
+
+Phase 6 is officially complete. The plan flips: `current_phase: 7`, Phase
+6 row → `complete`, Phase 7 row → `in_progress`. Plan version bumped to
+19.
+
+**Phase 7 entry plan** (per plan-002 §Phase 7):
+
+The presets themselves already exist (`apps/desktop/src/state/presets.ts`,
+six built-ins: `default`, `text-ops`, `validation`, `binary-inspection`,
+`minimal-focus`, `diagnostics`) and `applyPreset(id)` is wired into the
+workspace store. What's left:
+
+- **Persistence layer.** Serialize a partial of `WorkspaceState`
+  (`open`, `activeByZone`, `centerSplit`, `collapsed`, `layoutPreset`)
+  and the favorites + recents slices. Hydrate on startup. Plan-002
+  calls for a Tauri-backed `workspace.json` in `app_data_dir`;
+  localStorage via Zustand's `persist()` middleware is faster to land
+  and the storage adapter can be swapped without touching call sites.
+  Decide which on the first Phase 7 turn.
+- **Preset selector.** A pill cluster or `<select>` in the top rail
+  that calls `applyPreset(id)`. The home view also gets a card listing
+  the same presets with their descriptions for discoverability.
+- **Custom presets.** A "Save as preset…" action that writes a custom
+  preset to a separate slice (`useCustomPresets`, same shape as
+  `useFavorites` — Zustand + persist), and renders custom entries
+  below the built-ins with a remove affordance.
+
+**Recovery / process notes from this verification cycle.** Lesson #60
+got applied immediately — when the user said "all checks pass" without
+a paste of the test output, my honest first reflex was "trust them."
+I'd already burned trust earlier in the session by writing a "Phase 6
+verification PASSED" entry based on the same kind of user check-in.
+The right move is what we did this time: ask for the actual run output,
+let the user paste it, fix what surfaced, repeat until it's actually
+green. Two extra round-trips beats discovering a regression next week.
+
+---
 
 ## Session: 2026-04-25 (Phase 6 test-sweep — second pass after premature "all checks pass" retracted)
 
