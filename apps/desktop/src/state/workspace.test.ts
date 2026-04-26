@@ -274,37 +274,7 @@ describe('workspace.setActive / toggleZone', () => {
   });
 });
 
-describe('workspace.applyPreset / resetLayout', () => {
-  it('applyPreset applies a known preset and sets layoutPreset', () => {
-    const { applyPreset } = snapshot();
-    applyPreset('minimal-focus');
-    const s = snapshot();
-    expect(s.layoutPreset).toBe('minimal-focus');
-    expect(s.collapsed.left).toBe(true);
-    expect(s.collapsed.right).toBe(true);
-    expect(s.collapsed.bottom).toBe(true);
-  });
-
-  it('applyPreset is a no-op for unknown names', () => {
-    const { applyPreset } = snapshot();
-    const before = { ...snapshot() };
-    applyPreset('does-not-exist');
-    expect(snapshot().layoutPreset).toBe(before.layoutPreset);
-  });
-
-  it('applyPreset demotes side B to side A when leaving a split', () => {
-    const { openTool, splitCenter, moveTool, applyPreset } = snapshot();
-    openTool('json-validator', 'center');
-    splitCenter('horizontal');
-    openTool('yaml-validator', 'center');
-    moveTool('yaml-validator', 'center', 'b');
-    applyPreset('default'); // default: centerSplit='none'
-    const s = snapshot();
-    expect(s.centerSplit).toBe('none');
-    const centerTools = s.open.filter((t) => t.zone === 'center');
-    expect(centerTools.every((t) => t.splitSide === undefined)).toBe(true);
-  });
-
+describe('workspace.resetLayout', () => {
   it('resetLayout returns to the default empty workspace', () => {
     const { openTool, splitCenter, resetLayout } = snapshot();
     openTool('json-validator', 'center');
@@ -329,7 +299,6 @@ describe('workspace persistence (Phase 7)', () => {
       activeByZone: Record<string, string | null>;
       centerSplit: string;
       collapsed: Record<string, boolean>;
-      layoutPreset: string;
     };
     version: number;
   } | null {
@@ -370,13 +339,6 @@ describe('workspace persistence (Phase 7)', () => {
     const persisted = readPersisted();
     expect(persisted?.state.collapsed.bottom).toBe(false);
     expect(persisted?.state.centerSplit).toBe('vertical');
-  });
-
-  it('persists the active layout preset id after applyPreset', () => {
-    const { applyPreset } = snapshot();
-    applyPreset('binary-inspection');
-    const persisted = readPersisted();
-    expect(persisted?.state.layoutPreset).toBe('binary-inspection');
   });
 
   it('clearWorkspaceStorage removes the localStorage entry', () => {

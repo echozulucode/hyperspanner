@@ -16,13 +16,7 @@ export type {
   WorkspaceStore,
 } from './workspace.types';
 
-export {
-  LAYOUT_PRESETS,
-  DEFAULT_COLLAPSED,
-  DEFAULT_WORKSPACE,
-  findPreset,
-} from './presets';
-export type { LayoutPreset } from './presets';
+export { DEFAULT_COLLAPSED, DEFAULT_WORKSPACE } from './presets';
 
 export { useTool } from './useTool';
 export type { UseToolReturn } from './useTool';

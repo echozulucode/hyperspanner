@@ -34,3 +34,7 @@ docs:
     type: reference
     status: active
     note: "The shape every Phase 6 tool follows — established by the JSON Validator vertical slice (6.1). Read before starting a new tool."
+  - file: docs/plan-007-packaging-and-updates.md
+    type: plan
+    status: active
+    note: "NSIS per-user installer + Linux bundle + Tauri updater plugin + GitHub Releases endpoint + in-app update UI. Pulls plan-002 §Phase 11 forward."

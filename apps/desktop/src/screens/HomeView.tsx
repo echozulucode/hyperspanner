@@ -2,12 +2,7 @@ import { useMemo } from 'react';
 import type { FC } from 'react';
 import { LcarsPanel, LcarsChip } from '@hyperspanner/lcars-ui';
 import { useTheme } from '../contexts/ThemeContext';
-import {
-  LAYOUT_PRESETS,
-  useFavorites,
-  useRecents,
-  useWorkspaceStore,
-} from '../state';
+import { useFavorites, useRecents } from '../state';
 import { listTools, listToolsByCategory, type ToolCategory, type ToolDescriptor } from '../tools';
 import styles from './HomeView.module.css';
 
@@ -54,10 +49,6 @@ export const HomeView: FC<HomeViewProps> = ({ onOpenTool, onOpenPalette }) => {
   const { theme } = useTheme();
   const favorites = useFavorites();
   const recents = useRecents();
-  const layoutPreset = useWorkspaceStore((s) => s.layoutPreset);
-  const applyPreset = useWorkspaceStore((s) => s.applyPreset);
-
-  const presetList = useMemo(() => Object.values(LAYOUT_PRESETS), []);
 
   const allTools = useMemo(() => listTools(), []);
   const byId = useMemo(() => {
@@ -144,7 +135,13 @@ export const HomeView: FC<HomeViewProps> = ({ onOpenTool, onOpenPalette }) => {
             ⌘K · PALETTE
           </LcarsChip>
           <LcarsChip variant="secondary" size="small">
-            {allTools.length} TOOLS
+            {/* Visible tool count — hidden system surfaces (Settings,
+              * future About) aren't user-facing tools and would
+              * otherwise produce a count that doesn't match the grid
+              * below. `byId` and the favorites/recents lookups still
+              * resolve hidden ids correctly because they consume the
+              * unfiltered `allTools`. */}
+            {allTools.filter((t) => !t.hidden).length} TOOLS
           </LcarsChip>
         </div>
       </header>
@@ -178,59 +175,6 @@ export const HomeView: FC<HomeViewProps> = ({ onOpenTool, onOpenPalette }) => {
           </div>
         </section>
       )}
-
-      {/* Layout presets section. Lives between Recent and Browse because
-        * it's a workspace-shape control (more like the chrome above) and
-        * shouldn't visually compete with the per-tool grid below. The
-        * card pattern matches the tool cards so the layout reads as the
-        * same launchpad grammar — just with workspace-arrangement
-        * targets instead of tool targets. */}
-      <section className={styles.section} aria-labelledby="home-presets-hd">
-        <LcarsPanel
-          color={theme.colors.lilac}
-          height="2.25rem"
-          className={styles.sectionHeader}
-        >
-          <span id="home-presets-hd">LAYOUT PRESETS</span>
-        </LcarsPanel>
-        <div className={styles.grid}>
-          {presetList.map((preset) => {
-            const isActive = preset.id === layoutPreset;
-            const cardClass = [
-              styles.card,
-              styles.presetCard,
-              isActive ? styles.presetCardActive : '',
-            ]
-              .filter(Boolean)
-              .join(' ');
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                className={cardClass}
-                onClick={() => applyPreset(preset.id)}
-                aria-label={`Apply ${preset.name} layout preset${
-                  isActive ? ' (currently active)' : ''
-                }`}
-                aria-pressed={isActive}
-              >
-                <span
-                  className={styles.cardAccent}
-                  style={{ backgroundColor: theme.colors.lilac }}
-                />
-                <span className={styles.cardBody}>
-                  <span className={styles.cardName}>{preset.name}</span>
-                  <span
-                    className={`${styles.cardDesc} ${styles.cardDescWrap}`}
-                  >
-                    {preset.description}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
 
       <section className={styles.section} aria-labelledby="home-browse-hd">
         <LcarsPanel

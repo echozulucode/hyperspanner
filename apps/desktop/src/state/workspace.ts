@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
-  CenterSplit,
   OpenTool,
   SplitSide,
   WorkspaceState,
@@ -9,7 +8,7 @@ import type {
   Zone,
   ZoneCollapseState,
 } from './workspace.types';
-import { DEFAULT_WORKSPACE, findPreset } from './presets';
+import { DEFAULT_WORKSPACE } from './presets';
 import { clearToolState } from './useTool';
 
 /**
@@ -49,14 +48,13 @@ const STORAGE_KEY = 'hyperspanner/workspace/v1';
  */
 function partializeWorkspace(state: WorkspaceStore): Pick<
   WorkspaceState,
-  'open' | 'activeByZone' | 'centerSplit' | 'collapsed' | 'layoutPreset'
+  'open' | 'activeByZone' | 'centerSplit' | 'collapsed'
 > {
   return {
     open: state.open.map(({ id, zone, splitSide }) => ({ id, zone, splitSide })),
     activeByZone: state.activeByZone,
     centerSplit: state.centerSplit,
     collapsed: state.collapsed,
-    layoutPreset: state.layoutPreset,
   };
 }
 
@@ -77,24 +75,6 @@ function nextActiveForZone(open: OpenTool[], zone: Zone, removedId: string): str
   const remaining = open.filter((t) => t.zone === zone && t.id !== removedId);
   if (remaining.length === 0) return null;
   return remaining[remaining.length - 1].id;
-}
-
-/** Ensure activeByZone entries reference tools that still exist + are in that zone. */
-function reconcileActives(
-  open: OpenTool[],
-  prevActive: Record<Zone, string | null>,
-): Record<Zone, string | null> {
-  const result: Record<Zone, string | null> = { ...prevActive };
-  (['center', 'right', 'bottom'] as Zone[]).forEach((zone) => {
-    const current = result[zone];
-    if (current === null) return;
-    const stillThere = open.some((t) => t.id === current && t.zone === zone);
-    if (!stillThere) {
-      const fallback = open.filter((t) => t.zone === zone).pop();
-      result[zone] = fallback?.id ?? null;
-    }
-  });
-  return result;
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>()(
@@ -271,33 +251,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const state = get();
         if (state.collapsed[zone] === value) return;
         set({ collapsed: { ...state.collapsed, [zone]: value } });
-      },
-
-      applyPreset: (name) => {
-        const preset = findPreset(name);
-        if (!preset) return;
-        const patch = preset.apply();
-        const prev = get();
-        const nextCollapsed = patch.collapsed ?? prev.collapsed;
-        const nextSplit: CenterSplit = patch.centerSplit ?? prev.centerSplit;
-
-        // If we're leaving a split, demote side B tools to side A so they stay visible.
-        const nextOpen =
-          nextSplit === 'none' && prev.centerSplit !== 'none'
-            ? prev.open.map((t) =>
-                t.zone === 'center' ? { ...t, splitSide: undefined } : t,
-              )
-            : prev.open;
-
-        set({
-          ...prev,
-          ...patch,
-          open: nextOpen,
-          collapsed: nextCollapsed,
-          centerSplit: nextSplit,
-          layoutPreset: name,
-          activeByZone: reconcileActives(nextOpen, prev.activeByZone),
-        });
       },
 
       resetLayout: () => {

@@ -77,7 +77,14 @@ export const LeftNavigator: FC<LeftNavigatorProps> = ({
   const recents = useRecents();
 
   const byCategory = useMemo(() => listToolsByCategory(), []);
-  const allTools = useMemo(() => listTools(), []);
+  // Hidden tools (system surfaces like Settings) are deliberately
+  // excluded from the navigator entirely — both the browse-by-category
+  // grid (via `listToolsByCategory`) and the search / favorites /
+  // recents resolution paths below. Listing them here would clutter
+  // the rail with surfaces the user already accesses via dedicated
+  // top-rail pills. The command palette still surfaces hidden tools
+  // by consuming `listTools()` directly.
+  const allTools = useMemo(() => listTools().filter((t) => !t.hidden), []);
   const toolsById = useMemo(() => {
     const map = new Map<string, ToolDescriptor>();
     for (const t of allTools) map.set(t.id, t);

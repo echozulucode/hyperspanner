@@ -53,7 +53,6 @@ export interface WorkspaceState {
   activeByZone: Record<Zone, string | null>;
   centerSplit: CenterSplit;
   collapsed: ZoneCollapseState;
-  layoutPreset: string;
   /** Opaque counter that ticks every time a pulse is dispatched. Consumers
    *  compare pulseId on OpenTool vs the last-rendered id to know when to animate. */
   pulseCounter: number;
@@ -82,8 +81,6 @@ export interface WorkspaceActions {
    *  excluded from the type to force callers to pick a valid target. */
   toggleZone: (zone: CollapsibleZone) => void;
   setZoneCollapsed: (zone: CollapsibleZone, value: boolean) => void;
-  /** Apply a named preset (mutates collapse state + split + optional open set). */
-  applyPreset: (name: string) => void;
   /** Reset to the default workspace (no tools open, default collapse). */
   resetLayout: () => void;
 }

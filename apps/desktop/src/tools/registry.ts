@@ -57,6 +57,15 @@ export interface ToolDescriptor {
    */
   supportedZones?: Zone[];
   /**
+   * Hide this tool from the LeftNavigator and HomeView BROWSE listing.
+   * Used for system surfaces (Settings, About) that have their own
+   * dedicated entry point in the top rail and would otherwise clutter
+   * the browse-by-category grid as a single-item section. Hidden tools
+   * still appear in the command palette so `⌘K → settings` works, and
+   * are still openable via `openTool(id)`.
+   */
+  hidden?: boolean;
+  /**
    * The tool body. Receives the tool id plus the zone it is currently
    * rendered in so responsive-to-dock layout decisions (compact form in
    * the narrow inspector, full form in the center) can happen locally
@@ -232,6 +241,12 @@ const entries: ToolDescriptor[] = [
     // keeps the layout primitives consistent with what the section rendering
     // expects. (Cards in narrow columns wrap awkwardly.)
     supportedZones: ['center'],
+    // Reached via the SETTINGS pill in the top rail (and the command palette).
+    // Hiding from the LeftNavigator + HomeView BROWSE prevents it from
+    // showing up as a single-item "Utilities" category, which read as
+    // navigational noise. Listing it as a system tool keeps the
+    // single-instance / drag-dock / command-palette plumbing intact.
+    hidden: true,
     component: SystemSettings,
   },
 ];
@@ -255,7 +270,13 @@ export function listToolsByCategory(): Record<ToolCategory, ToolDescriptor[]> {
     network: [],
     utilities: [],
   };
+  // Skip hidden entries so system surfaces (Settings, future About) don't
+  // appear in the navigator / browse grid. They remain reachable via
+  // their dedicated top-rail pills and via `listTools()` (which the
+  // command palette consumes). A future `listVisibleTools()` helper
+  // could centralize this if more callers need the same filter.
   for (const entry of entries) {
+    if (entry.hidden) continue;
     result[entry.category].push(entry);
   }
   return result;

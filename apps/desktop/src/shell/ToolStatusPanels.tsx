@@ -28,7 +28,6 @@ import styles from './ToolStatusPanels.module.css';
  */
 
 interface StatusFields {
-  layoutPreset: string;
   openCount: number;
   centerCount: number;
   rightCount: number;
@@ -40,11 +39,10 @@ interface StatusFields {
 }
 
 function useStatusFields(): StatusFields {
-  const { open, centerSplit, layoutPreset, activeByZone } = useWorkspaceStore(
+  const { open, centerSplit, activeByZone } = useWorkspaceStore(
     useShallow((s) => ({
       open: s.open,
       centerSplit: s.centerSplit,
-      layoutPreset: s.layoutPreset,
       activeByZone: s.activeByZone,
     })),
   );
@@ -62,7 +60,6 @@ function useStatusFields(): StatusFields {
     const descriptor = activeId ? getTool(activeId) : undefined;
 
     return {
-      layoutPreset,
       openCount: open.length,
       centerCount,
       rightCount,
@@ -79,7 +76,7 @@ function useStatusFields(): StatusFields {
               ? 'BOTTOM'
               : '—',
     };
-  }, [open, centerSplit, layoutPreset, activeByZone]);
+  }, [open, centerSplit, activeByZone]);
 }
 
 /**
@@ -93,13 +90,6 @@ export const TopRailStatus: FC = () => {
   const s = useStatusFields();
   return (
     <div className={styles.railStack} aria-label="Workspace status">
-      <LcarsTelemetryLabel
-        name="LAYOUT"
-        value={s.layoutPreset.toUpperCase()}
-        size="small"
-        indicatorColor={theme.colors.green}
-        className={styles.railEntry}
-      />
       <LcarsTelemetryLabel
         name="OPEN"
         value={String(s.openCount)}

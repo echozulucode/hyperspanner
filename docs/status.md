@@ -1,6 +1,6 @@
 ---
 type: status
-updated: 2026-04-25
+updated: 2026-04-26
 current_phase: "Phase 6 COMPLETE (verified 2026-04-25). All 14 tools shipped with real implementations; full host-side verification gate passed: `cargo test -p hyperspanner`, `pnpm --filter @hyperspanner/desktop test` (599 passing), `pnpm typecheck`, `pnpm build` all green. Verification took two iterations — first run had 13 failing tests across 7 tools; second run cleared 12 of them but still had a BOM-mid-buffer case in whitespace-clean; third run added `title?: string` to `LcarsPill` to clear 4 typecheck errors. Phase 7 (Layout presets and persistence) is now `in_progress`. The presets themselves already exist (`apps/desktop/src/state/presets.ts`, six built-ins: default / text-ops / validation / binary-inspection / minimal-focus / diagnostics) and `applyPreset` is wired into the workspace store; what remains is the persistence layer per plan-002 §Phase 7: serialize selected workspace state to a `workspace.json` in the Tauri app data dir, load it on startup, hydrate the store. Plus a preset selector in the top rail / home view, and a 'Save as preset…' action."
 blockers: []
 next_actions:
@@ -13,6 +13,164 @@ next_actions:
 ---
 
 # Status Log
+
+## Session: 2026-04-26 (MIT license + NSIS installer config + plan-007 walkthrough)
+
+User confirmed the project is going public as MIT-licensed at
+`https://github.com/echozulucode/hyperspanner` and asked for an
+NSIS per-user installer + GitHub-Releases-driven auto-updater
+walkthrough.
+
+**License — landed:**
+
+  - `LICENSE` at the repo root, MIT template, copyright "Eric
+    Zimmerman" (inferred from `ericjzim@gmail.com` + the
+    `echozulucode` handle — confirm and edit if the legal name
+    differs).
+  - Root `package.json`: added `license: "MIT"`, `author`,
+    `homepage`, `repository`, `bugs`.
+  - `apps/desktop/package.json` + `packages/lcars-ui/package.json`:
+    added `license: "MIT"`.
+  - `apps/desktop/src-tauri/Cargo.toml`: replaced
+    `"Hyperspanner contributors"` author with `"Eric Zimmerman"`,
+    added `license = "MIT"`, `repository`, `homepage`.
+
+**NSIS per-user + Linux bundle config — landed:**
+
+  - `apps/desktop/src-tauri/tauri.conf.json`: replaced
+    `bundle.targets: "all"` with explicit
+    `["nsis", "deb", "rpm", "appimage"]` (macOS dropped per the
+    user's "Windows + Linux" preference). Added
+    `bundle.windows.nsis.installMode: "perUser"` so the installer
+    lands in `%LOCALAPPDATA%\Programs\Hyperspanner` without
+    elevation. Set `publisher`, `licenseFile` (relative path
+    `../../../LICENSE` from `src-tauri/`), and `homepage`.
+  - Stubbed `plugins.updater` with `active: false`, the GitHub
+    Releases endpoint URL, and a `REPLACE_WITH_GENERATED_UPDATER_PUBLIC_KEY`
+    placeholder. Flips to active in 7.7 once the keys are
+    generated.
+
+**plan-007 — written:**
+
+  - `docs/plan-007-packaging-and-updates.md` — the full
+    architecture + step-by-step for sub-phases 7.6 through 7.10:
+    NSIS / Linux installer, signing keys, Tauri updater plugin,
+    GitHub Actions release workflow, in-app update UI, end-to-end
+    verification. Walks through what's hands-on (key generation,
+    GitHub secrets) vs what's code (plugin wiring, UI surfaces).
+  - `docs/index.yaml` — registered plan-007.
+
+**What's hands-on for the user before 7.7 can land:**
+
+  1. Confirm the LICENSE copyright line ("Eric Zimmerman" — adjust
+     if your full legal name is different; this is the only piece
+     of the license that's a name guess).
+  2. Generate the updater signing keypair locally:
+     `pnpm --filter @hyperspanner/desktop tauri signer generate
+     -w ~/.tauri/hyperspanner-updater.key`. Set a passphrase.
+  3. Paste the public key into `tauri.conf.json` →
+     `plugins.updater.pubkey`, flip `active` to `true`.
+  4. Push the private key + passphrase to GitHub Actions secrets
+     (`TAURI_SIGNING_PRIVATE_KEY`,
+     `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
+
+**What's pure code from here (Claude can drive once keys exist):**
+
+  - 7.7: add `tauri-plugin-updater` to Cargo.toml + register in
+    `lib.rs`; add `@tauri-apps/plugin-updater` +
+    `@tauri-apps/plugin-process` to `apps/desktop/package.json`;
+    add capability grants.
+  - 7.8: write `.github/workflows/release.yml` (template is in
+    plan-007).
+  - 7.9: write `useUpdater()` hook + Zustand slice + tests;
+    write `<UpdaterBanner />` component; augment SystemSettings
+    with the Updates section; augment AppShell with the badge +
+    banner mount.
+  - 7.10: bump versions, push v0.0.1 → v0.0.2, watch the flow.
+
+**Verification still to run on the host** for the changes that
+landed this turn:
+
+  - `pnpm typecheck && pnpm test` — should be green; only JSON +
+    text changes this turn.
+  - `pnpm tauri build` — verifies the new bundle config produces
+    the NSIS installer + the Linux bundles cleanly. (Linux .rpm
+    needs `rpmbuild` installed; if you don't have it locally, the
+    .rpm step will fail but .deb + AppImage should still build.
+    On CI we'll install `rpm` explicitly.)
+
+---
+
+## Session: 2026-04-26 (Preset feature removed entirely; Settings hidden from navigator)
+
+User asked to drop preset machinery wholesale and hide system surfaces
+from the navigator. Both done in one pass:
+
+**Preset removal — user surfaces gone, machinery gone:**
+
+  - **`apps/desktop/src/state/presets.ts`** — kept `DEFAULT_COLLAPSED`
+    and `DEFAULT_WORKSPACE` (still used by `resetLayout()` and the
+    store's initial state). Dropped `LayoutPreset` type, `LAYOUT_PRESETS`
+    catalog, `findPreset` lookup. File now ~30 lines.
+  - **`apps/desktop/src/state/workspace.types.ts`** — dropped
+    `layoutPreset: string` from `WorkspaceState`, dropped
+    `applyPreset` from `WorkspaceActions`.
+  - **`apps/desktop/src/state/workspace.ts`** — dropped `applyPreset`
+    action implementation; dropped `findPreset` import; dropped the
+    now-unused `reconcileActives` helper (only `applyPreset` called
+    it); updated `partializeWorkspace` to no longer persist
+    `layoutPreset`. Persist version stays at 1 — extra fields in
+    older localStorage blobs from before the rename are silently
+    ignored on rehydration; no migration needed.
+  - **`apps/desktop/src/state/index.ts`** — dropped re-exports of
+    `LAYOUT_PRESETS`, `findPreset`, `LayoutPreset`.
+  - **`apps/desktop/src/state/workspace.test.ts`** — dropped the
+    three `applyPreset` tests; collapsed the `applyPreset / resetLayout`
+    describe block down to just `resetLayout`; dropped the
+    "persists layoutPreset" assertion + the field from the
+    `readPersisted()` shape.
+  - **`apps/desktop/src/screens/HomeView.tsx`** — dropped the
+    "LAYOUT PRESETS" section and all preset-related imports / state
+    selectors.
+  - **`apps/desktop/src/shell/ToolStatusPanels.tsx`** — dropped the
+    `LAYOUT` row from the rail-stack telemetry readout (it was
+    showing the active preset id; without presets, no payload).
+
+**System tools hidden from the navigator:**
+
+  - **`apps/desktop/src/tools/registry.ts`** — added a
+    `hidden?: boolean` field to `ToolDescriptor`. Marked
+    `system-settings` as `hidden: true`. Updated
+    `listToolsByCategory()` to skip hidden entries (the
+    LeftNavigator browse + HomeView BROWSE both consume it). Left
+    `listTools()` unchanged so the command palette still surfaces
+    hidden tools — `⌘K → settings` continues to work.
+  - **`apps/desktop/src/shell/LeftNavigator.tsx`** — filtered
+    `allTools` to `!t.hidden` so hidden surfaces don't leak into
+    search results, favorites resolution, or recents resolution.
+    They still resolve via `byId` if needed but the navigator's
+    user-facing lists exclude them.
+  - **`apps/desktop/src/screens/HomeView.tsx`** — `X TOOLS` count
+    chip now filters to non-hidden so it matches the visible browse
+    grid below it.
+
+**Orphan files** still pending manual deletion (the cowork sandbox
+doesn't permit `rm` on the workspace mount):
+
+  - `apps/desktop/src/shell/PresetSelector.tsx`
+  - `apps/desktop/src/shell/PresetSelector.module.css`
+  - `apps/desktop/src/shell/PresetSelector.test.tsx`
+
+These are now stubbed out (the .tsx file just `export {}`s, the
+test has a single `describe.skip(...)`) so typecheck + test stay
+clean. Delete by hand at your convenience; no other code
+references them.
+
+**Style residue** in `HomeView.module.css` — the
+`.cardDescWrap`, `.presetCard`, `.presetCardActive` classes are
+now dead CSS. Harmless, but a future styling pass could prune them.
+
+---
 
 ## Session: 2026-04-26 (Top-rail menu redesign — preset dropdown removed, Settings stub landed)
 
