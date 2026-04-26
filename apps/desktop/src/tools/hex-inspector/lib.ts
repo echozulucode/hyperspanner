@@ -96,17 +96,26 @@ export function formatHexRows(
       hex = hex.padEnd(expectedHexLength, ' ');
     }
 
-    // Format ASCII: printable chars (0x20..0x7e) as-is, others as '.'
+    // Format ASCII: printable chars (0x20..0x7e) as-is, others as '.'.
+    // Insert a single-space gap between byte 7 and byte 8 so the ASCII
+    // column visually mirrors the hex column's middle-gap divider.
+    // Partial rows that don't reach byte 8 don't carry the gap (and pad
+    // to the 16-char width), so trailing-byte rows align cleanly with
+    // their truncated hex counterparts.
     let ascii = '';
-    for (const byte of rowBytes) {
+    for (let i = 0; i < rowBytes.length; i++) {
+      if (i === 8) ascii += ' ';
+      const byte = rowBytes[i];
       if (byte >= 0x20 && byte <= 0x7e) {
         ascii += String.fromCharCode(byte);
       } else {
         ascii += '.';
       }
     }
-    // Pad to 16 chars with spaces
-    ascii = ascii.padEnd(16, ' ');
+    // Target width: 17 chars when the row crossed the middle gap
+    // (= row has 9+ bytes), otherwise 16 chars (no gap was inserted).
+    const targetWidth = rowBytes.length > 8 ? 17 : 16;
+    ascii = ascii.padEnd(targetWidth, ' ');
 
     result.push({
       offset: byteOffset,

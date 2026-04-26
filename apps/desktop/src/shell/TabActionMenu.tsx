@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
-import type { CSSProperties, FC, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Zone } from '../state';
 import { useIsFavorite, useToggleFavorite } from '../state';
 import styles from './TabActionMenu.module.css';
@@ -19,6 +27,18 @@ export interface TabActionMenuProps {
   onMaximize: (id: string) => void;
   onResetLayout: () => void;
   onClose: (id: string) => void;
+}
+
+/**
+ * Imperative handle exposed to parents — lets the tab wrapper open the
+ * menu at arbitrary viewport coordinates (used for the right-click /
+ * `contextmenu` path so the menu lands at the cursor instead of below
+ * the `⋮` trigger).
+ */
+export interface TabActionMenuHandle {
+  /** Open the menu anchored at the given viewport (clientX/clientY)
+   *  point. The menu still clamps itself inside the viewport. */
+  openAt: (x: number, y: number) => void;
 }
 
 type EntryId =
@@ -50,24 +70,52 @@ interface Entry {
  * Style is minimal — a dark pill column with LCARS eyebrow labels.
  * Visual polish lands in Phase 9.
  */
-export const TabActionMenu: FC<TabActionMenuProps> = ({
-  toolId,
-  currentZone,
-  centerSplit,
-  onFocus,
-  onMove,
-  onSplit,
-  onMerge,
-  onMaximize,
-  onResetLayout,
-  onClose,
-}) => {
+export const TabActionMenu = forwardRef<TabActionMenuHandle, TabActionMenuProps>(
+  function TabActionMenu(
+    {
+      toolId,
+      currentZone,
+      centerSplit,
+      onFocus,
+      onMove,
+      onSplit,
+      onMerge,
+      onMaximize,
+      onResetLayout,
+      onClose,
+    },
+    forwardedRef,
+  ) {
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
+  // Optional cursor-anchor used when the menu is opened via the imperative
+  // `openAt(x, y)` handle (right-click path). When set, positioning code
+  // anchors the menu at the cursor instead of below the ⋮ trigger.
+  const [anchorPoint, setAnchorPoint] = useState<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
+
+  // Expose `openAt(x, y)` to parents — the right-click handler in
+  // PulsingTab calls this with the event's `clientX/Y` so the menu
+  // appears at the cursor.
+  useImperativeHandle(
+    forwardedRef,
+    () => ({
+      openAt: (x: number, y: number) => {
+        setAnchorPoint({ x, y });
+        setOpen(true);
+      },
+    }),
+    [],
+  );
+
+  // Whenever the menu closes, clear the anchor so the next open from the
+  // ⋮ button reverts to trigger-based positioning.
+  useEffect(() => {
+    if (!open) setAnchorPoint(null);
+  }, [open]);
 
   // Favorite state — sourced directly from the store so TabActionMenu owns
   // the pin/unpin affordance without AppShell / ZoneTabStrip having to
@@ -137,21 +185,37 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
     if (open) setCursor(0);
   }, [open]);
 
-  /** Position the portaled menu below the trigger. `position: fixed` is
-   *  measured in viewport coords from the trigger's bounding rect so it
-   *  escapes every ancestor `overflow` clip. Recomputed on scroll/resize. */
+  /** Position the portaled menu. `position: fixed` is measured in viewport
+   *  coords so it escapes every ancestor `overflow` clip. Two anchor modes:
+   *   - `anchorPoint` set (right-click path): pin the menu's top-left at
+   *     the cursor, clamped inside the viewport.
+   *   - `anchorPoint` null (⋮ click path): right-align the menu under the
+   *     trigger, the original behavior.
+   *  Recomputed on scroll/resize. */
   useLayoutEffect(() => {
     if (!open) return;
+    const MENU_W = 240;
+    const ESTIMATED_H = 320; // rough ceiling for clamp; menu is ~11 rows
+    const GAP = 6;
     const recompute = () => {
-      const trigger = triggerRef.current;
-      if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      const MENU_W = 240;
-      const GAP = 6;
-      // Right-align the menu under the trigger; clamp to viewport.
-      let left = rect.right - MENU_W;
+      let left: number;
+      let top: number;
+      if (anchorPoint) {
+        left = anchorPoint.x;
+        top = anchorPoint.y;
+      } else {
+        const trigger = triggerRef.current;
+        if (!trigger) return;
+        const rect = trigger.getBoundingClientRect();
+        left = rect.right - MENU_W;
+        top = rect.bottom + GAP;
+      }
+      // Clamp inside the viewport — flip upward / leftward as needed so a
+      // right-click near the right or bottom edge still shows the full menu.
       left = Math.max(8, Math.min(left, window.innerWidth - MENU_W - 8));
-      const top = rect.bottom + GAP;
+      if (top + ESTIMATED_H > window.innerHeight - 8) {
+        top = Math.max(8, window.innerHeight - ESTIMATED_H - 8);
+      }
       setMenuStyle({
         position: 'fixed',
         top: `${top}px`,
@@ -166,7 +230,7 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
       window.removeEventListener('resize', recompute);
       window.removeEventListener('scroll', recompute, true);
     };
-  }, [open]);
+  }, [open, anchorPoint]);
 
   const dispatch = useCallback(
     (id: EntryId) => {
@@ -333,4 +397,6 @@ export const TabActionMenu: FC<TabActionMenuProps> = ({
       {menu}
     </div>
   );
-};
+  }, // closes the inner `function TabActionMenu(...) {}` that was the
+     // single argument to `forwardRef(...)`.
+);

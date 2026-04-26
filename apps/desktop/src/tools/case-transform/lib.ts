@@ -110,10 +110,17 @@ export function tokenize(text: string): string[] {
       continue;
     }
 
-    // "HELLOWorld" transition: uppercase-run→lowercase (e.g., "HELLO" + "World")
+    // "HELLOWorld" transition: uppercase-run→lowercase (e.g., "HELLO" + "World").
+    //
+    // The boundary lives BETWEEN the previous uppercase char and the
+    // current one — `current` (the accumulated UPPERCASE run, like
+    // `HELLO`) is a complete word; `char` (the uppercase letter that's
+    // the start of the next word, with a lowercase letter following)
+    // begins a new token. Earlier code did `current.slice(0, -1)` here,
+    // which silently dropped the last letter of every uppercase
+    // acronym (`HELLO` → `HELL`, `WORLD` → `WORL`, `HTTPS` → `HTTP`).
     if (isUpper && isPrevUpper && isNextLower && current.length > 1) {
-      // Pop the last uppercase char from current, push the accumulated run
-      tokens.push(current.slice(0, -1));
+      tokens.push(current);
       current = char;
       continue;
     }
@@ -136,7 +143,18 @@ function applyMode(tokens: string[], mode: CaseMode): string {
   switch (mode) {
     case 'camelCase':
       return normalized
-        .map((t, i) => (i === 0 ? t : capitalize(t)))
+        .map((t, i) => {
+          if (i === 0) return t;
+          // Edge case: a leading digits-only token (e.g. input
+          // `123Hello` → tokens `['123', 'Hello']`) shouldn't make the
+          // first letter-token capitalize against it — `123Hello`
+          // semantically reads as a digit-prefix on `hello`, not a
+          // separate "word" needing a `H`. Only applies to the SECOND
+          // token; subsequent tokens (`user_123_name` →
+          // `user123Name`) capitalize normally.
+          if (i === 1 && /^\d+$/.test(normalized[0])) return t;
+          return capitalize(t);
+        })
         .join('');
 
     case 'PascalCase':

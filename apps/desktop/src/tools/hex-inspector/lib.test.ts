@@ -142,21 +142,29 @@ describe('formatHexRows', () => {
   });
 
   it('respects startRow and rowCount pagination parameters', () => {
-    // 1024 bytes = 64 rows
-    const bytes = new Uint8Array(1024);
+    // PAGE_ROWS is currently 64 (= 1024 bytes per page). Allocate two
+    // full pages so the second-page assertion has data to match against.
+    // The earlier version of this test allocated 1024 bytes total
+    // (one page) and then asked for a second page that didn't exist —
+    // it was written when PAGE_ROWS was 32 and the math hadn't been
+    // updated alongside the constant change.
+    const totalRowsWanted = PAGE_ROWS * 2;
+    const bytes = new Uint8Array(totalRowsWanted * 16);
     bytes.fill(0x42); // Fill with 'B'
 
-    // Request rows 0-31 (PAGE_ROWS default)
+    // Request the first page (rows 0..PAGE_ROWS-1).
     const firstPage = formatHexRows(bytes, 0, PAGE_ROWS);
     expect(firstPage).toHaveLength(PAGE_ROWS);
     expect(firstPage[0].offset).toBe(0);
     expect(firstPage[PAGE_ROWS - 1].offset).toBe((PAGE_ROWS - 1) * 16);
 
-    // Request rows 32-63
+    // Request the second page (rows PAGE_ROWS..2*PAGE_ROWS-1).
     const secondPage = formatHexRows(bytes, PAGE_ROWS, PAGE_ROWS);
     expect(secondPage).toHaveLength(PAGE_ROWS);
     expect(secondPage[0].offset).toBe(PAGE_ROWS * 16);
-    expect(secondPage[PAGE_ROWS - 1].offset).toBe((64 - 1) * 16);
+    expect(secondPage[PAGE_ROWS - 1].offset).toBe(
+      (PAGE_ROWS * 2 - 1) * 16,
+    );
   });
 
   it('returns empty array when startRow is past the end', () => {

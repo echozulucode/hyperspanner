@@ -18,6 +18,10 @@ export interface LcarsPillProps {
   className?: string;
   style?: CSSProperties;
   'aria-label'?: string;
+  /** Native HTML `title` attribute → browser tooltip on hover. Useful
+   *  for surfacing a longer hint without changing the accessible name
+   *  (which keeps `getByRole({ name })` queries pinned to visible text). */
+  title?: string;
 }
 
 /**
@@ -37,6 +41,7 @@ export const LcarsPill: FC<LcarsPillProps> = ({
   className = '',
   style = {},
   'aria-label': ariaLabel,
+  title,
 }) => {
   const handleClick = (e: MouseEvent<HTMLElement>) => {
     if (disabled) {
@@ -72,6 +77,7 @@ export const LcarsPill: FC<LcarsPillProps> = ({
         style={pillStyle}
         onClick={handleClick}
         aria-label={ariaLabel}
+        title={title}
       >
         {children}
       </a>
@@ -87,6 +93,7 @@ export const LcarsPill: FC<LcarsPillProps> = ({
       disabled={disabled}
       aria-pressed={active || undefined}
       aria-label={ariaLabel}
+      title={title}
     >
       {children}
     </button>

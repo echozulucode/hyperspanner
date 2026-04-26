@@ -69,14 +69,38 @@ export function formatByteSize(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
   }
-  const kb = bytes / 1024;
-  if (kb < 1024) {
-    return `${kb.toFixed(1)} KB`;
+  return formatScale(bytes / 1024, 'KB', bytes / 1024 / 1024, 'MB',
+    bytes / 1024 / 1024 / 1024, 'GB');
+}
+
+/** Pick the largest applicable unit and round to one decimal — except
+ *  when the value is a whole-number multiple (e.g. exactly 10 MB),
+ *  where the trailing `.0` reads as noise. The doc-examples enshrine
+ *  this: `1048576 → "1.0 MB"` (one decimal), `10485760 → "10 MB"` (no
+ *  decimal because the value is exactly 10).
+ */
+function formatScale(
+  kb: number,
+  kbLabel: string,
+  mb: number,
+  mbLabel: string,
+  gb: number,
+  gbLabel: string,
+): string {
+  if (kb < 1024) return formatRounded(kb, kbLabel);
+  if (mb < 1024) return formatRounded(mb, mbLabel);
+  return formatRounded(gb, gbLabel);
+}
+
+function formatRounded(value: number, unit: string): string {
+  // Convention from the doc-examples: keep one decimal place for
+  // values < 10 (so `1.0 MB` reads as "exactly one"), drop the
+  // trailing `.0` for values >= 10 (so `10 MB` reads cleanly without
+  // the noise of a redundant decimal). Round to one decimal first to
+  // sidestep float-math quirks like `10.000000000001`.
+  const oneDecimal = Math.round(value * 10) / 10;
+  if (oneDecimal >= 10 && Number.isInteger(oneDecimal)) {
+    return `${oneDecimal} ${unit}`;
   }
-  const mb = kb / 1024;
-  if (mb < 1024) {
-    return `${mb.toFixed(1)} MB`;
-  }
-  const gb = mb / 1024;
-  return `${gb.toFixed(1)} GB`;
+  return `${oneDecimal.toFixed(1)} ${unit}`;
 }

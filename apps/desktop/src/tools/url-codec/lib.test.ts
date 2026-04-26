@@ -198,8 +198,10 @@ describe('decodeUrl', () => {
       const r = decodeUrl('hello%20world%ZZmore', componentStandard);
       expect(r.kind).toBe('error');
       if (r.kind === 'error') {
-        // %ZZ starts at offset 12 (after "hello%20world")
-        expect(r.offset).toBe(12);
+        // `hello%20world` is 13 chars (indices 0–12); the malformed `%`
+        // sits at index 13. Consistent with the dangling-% test above
+        // (`'abc%'` → offset 3, the index of the bad `%`).
+        expect(r.offset).toBe(13);
       }
     });
   });

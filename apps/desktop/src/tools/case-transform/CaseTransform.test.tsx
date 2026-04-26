@@ -11,10 +11,14 @@ import { CaseTransform } from './CaseTransform';
  * Coverage intent:
  *   - Empty-state footer reads "Idle" instead of an error.
  *   - Typing text populates both input and output textareas.
- *   - Mode pills toggle the output transformation.
- *   - Mode pill for the currently-selected mode is disabled (visually distinct).
+ *   - Mode dropdown toggles the output transformation.
  *   - Clear button empties the buffer and returns to idle state.
  *   - Zone-responsive layout (compact in right/bottom, full in center).
+ *
+ * UX-3.8 (2026-04-24): the mode picker switched from a 7-pill action
+ * cluster to a single `<select>` in the body. Tests changed from
+ * `getByRole('button', { name: /transform to .../i })` + click to
+ * `getByLabelText('Case transformation mode')` + change.
  */
 
 const TOOL_ID = 'case-transform-test';
@@ -65,7 +69,7 @@ describe('CaseTransform', () => {
     expect(output.value).toBe('helloWorldTest');
   });
 
-  it('toggles mode when a mode pill is clicked', () => {
+  it('toggles mode when the dropdown changes', () => {
     render(<CaseTransform toolId={TOOL_ID} />);
     const input = screen.getByLabelText(
       'Text input for case transformation',
@@ -74,11 +78,11 @@ describe('CaseTransform', () => {
       fireEvent.change(input, { target: { value: 'hello_world' } });
     });
 
-    const snakeCaseButton = screen.getByRole('button', {
-      name: /transform to snake_case/i,
-    });
+    const modeSelect = screen.getByLabelText(
+      'Case transformation mode',
+    ) as HTMLSelectElement;
     act(() => {
-      fireEvent.click(snakeCaseButton);
+      fireEvent.change(modeSelect, { target: { value: 'snake_case' } });
     });
 
     const output = screen.getByLabelText(
@@ -87,35 +91,19 @@ describe('CaseTransform', () => {
     expect(output.value).toBe('hello_world');
   });
 
-  it('disables the currently-selected mode pill', () => {
+  it('mode dropdown carries the active value as its selected option', () => {
     render(<CaseTransform toolId={TOOL_ID} />);
-    const input = screen.getByLabelText(
-      'Text input for case transformation',
-    ) as HTMLTextAreaElement;
+    const modeSelect = screen.getByLabelText(
+      'Case transformation mode',
+    ) as HTMLSelectElement;
+
+    // camelCase is the default
+    expect(modeSelect.value).toBe('camelCase');
+
     act(() => {
-      fireEvent.change(input, { target: { value: 'test' } });
+      fireEvent.change(modeSelect, { target: { value: 'PascalCase' } });
     });
-
-    // camelCase is the default and should be disabled initially
-    const camelButton = screen.getByRole('button', {
-      name: /transform to camelCase/i,
-    }) as HTMLButtonElement;
-    expect(camelButton.disabled).toBe(true);
-
-    // Switch to PascalCase
-    const pascalButton = screen.getByRole('button', {
-      name: /transform to PascalCase/i,
-    });
-    act(() => {
-      fireEvent.click(pascalButton);
-    });
-
-    // Now camelCase should be enabled and PascalCase disabled
-    expect(camelButton.disabled).toBe(false);
-    const pascalButtonAfter = screen.getByRole('button', {
-      name: /transform to PascalCase/i,
-    }) as HTMLButtonElement;
-    expect(pascalButtonAfter.disabled).toBe(true);
+    expect(modeSelect.value).toBe('PascalCase');
   });
 
   it('transforms through multiple modes', () => {
@@ -126,12 +114,15 @@ describe('CaseTransform', () => {
     const output = screen.getByLabelText(
       'Case-transformed text output',
     ) as HTMLTextAreaElement;
+    const modeSelect = screen.getByLabelText(
+      'Case transformation mode',
+    ) as HTMLSelectElement;
 
     act(() => {
       fireEvent.change(input, { target: { value: 'helloWorld' } });
     });
 
-    // Test each mode
+    // Test each mode by changing the dropdown value.
     const modes: Array<{ name: string; expected: string }> = [
       { name: 'camelCase', expected: 'helloWorld' },
       { name: 'PascalCase', expected: 'HelloWorld' },
@@ -143,11 +134,8 @@ describe('CaseTransform', () => {
     ];
 
     modes.forEach(({ name, expected }) => {
-      const button = screen.getByRole('button', {
-        name: new RegExp(`transform to ${name}`, 'i'),
-      });
       act(() => {
-        fireEvent.click(button);
+        fireEvent.change(modeSelect, { target: { value: name } });
       });
       expect(output.value).toBe(expected);
     });
@@ -205,11 +193,11 @@ describe('CaseTransform', () => {
       fireEvent.change(input, { target: { value: 'hello-world_test' } });
     });
 
-    const snakeCaseButton = screen.getByRole('button', {
-      name: /transform to snake_case/i,
-    });
+    const modeSelect = screen.getByLabelText(
+      'Case transformation mode',
+    ) as HTMLSelectElement;
     act(() => {
-      fireEvent.click(snakeCaseButton);
+      fireEvent.change(modeSelect, { target: { value: 'snake_case' } });
     });
 
     const output = screen.getByLabelText(

@@ -143,7 +143,14 @@ describe('HashWorkbench', () => {
   });
 
   it('Copy button calls navigator.clipboard.writeText with the digest', async () => {
-    const clipboardSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    // jsdom doesn't ship `navigator.clipboard`, so `vi.spyOn` would
+    // bail with "could not find an object to spy upon". Install a
+    // stub object first so the spy has something concrete to wrap.
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
 
     // Mock the IPC to return a digest
     __setInvokeForTests((async () => ({
@@ -172,7 +179,7 @@ describe('HashWorkbench', () => {
       fireEvent.click(copyButtons[0]);
     });
 
-    expect(clipboardSpy).toHaveBeenCalledWith(SAMPLE_MD5);
+    expect(writeText).toHaveBeenCalledWith(SAMPLE_MD5);
   });
 
   it('File mode: entering a path and clicking Compute fires hashFile × 4', async () => {
@@ -288,19 +295,22 @@ describe('HashWorkbench', () => {
 
   it('applies compact class when zone="right"', () => {
     const { container } = render(<HashWorkbench toolId={TOOL_ID} zone="right" />);
-    const layoutDiv = container.querySelector('.layoutCompact');
+    // CSS modules hash class names (e.g. `HashWorkbench_layoutCompact__abc`),
+    // so a literal `.layoutCompact` selector misses them. Match by
+    // substring instead.
+    const layoutDiv = container.querySelector('[class*="layoutCompact"]');
     expect(layoutDiv).not.toBeNull();
   });
 
   it('applies compact class when zone="bottom"', () => {
     const { container } = render(<HashWorkbench toolId={TOOL_ID} zone="bottom" />);
-    const layoutDiv = container.querySelector('.layoutCompact');
+    const layoutDiv = container.querySelector('[class*="layoutCompact"]');
     expect(layoutDiv).not.toBeNull();
   });
 
   it('does not apply compact class when zone="center"', () => {
     const { container } = render(<HashWorkbench toolId={TOOL_ID} zone="center" />);
-    const layoutDiv = container.querySelector('.layoutCompact');
+    const layoutDiv = container.querySelector('[class*="layoutCompact"]');
     expect(layoutDiv).toBeNull();
   });
 

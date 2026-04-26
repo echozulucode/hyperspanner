@@ -159,3 +159,38 @@
   font-size: 0.7rem;
   letter-spacing: 0.04em;
 }
+
+/*
+ * Window-size breakpoint: when the host window is narrower than 1600px
+ * OR shorter than 800px, treat the WHOLE app as "small-screen" and hide
+ * the orange title + descriptive subtitle even in `frameFull` (center
+ * zone). This frees up ~50-80px of vertical header room for the actual
+ * tool body — the dominant failure mode on medium laptops where the
+ * available area falls well below the 1600x800 bar (e.g. 920x447).
+ *
+ * The eyebrow stays visible: it's a single line of small chrome that
+ * carries the tool's identifier (`NUMBER-CONVERTER` etc.) and, with the
+ * title hidden, becomes the only in-body label. The compact-zone rule
+ * above (`.frameCompact .eyebrow { display: none }`) still hides it in
+ * the inspector / bottom dock, where the host zone already labels the
+ * tool another way.
+ *
+ * Comma in the @media list = OR. We hide the title/subtitle when EITHER
+ * dimension is below the threshold; a 1920×600 split-screen window
+ * benefits from the same treatment as a 1280×800 laptop.
+ */
+@media (max-width: 1599px), (max-height: 799px) {
+  .title {
+    display: none;
+  }
+  .subtitle {
+    display: none;
+  }
+  /* The compact-mode info icon (the ⓘ next to the eyebrow that
+     surfaces the subtitle as a tooltip) is also redundant once the
+     subtitle's been deemed too costly to render — a tooltip we're
+     never shown isn't useful. */
+  .infoIcon {
+    display: none;
+  }
+}

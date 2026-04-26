@@ -36,6 +36,10 @@ pub fn run() {
 
     info!("hyperspanner starting");
 
+    // Install rustls's default crypto provider once at startup. Required by
+    // rustls 0.23 — the first ClientConfig builder call panics otherwise.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             ping,
@@ -43,6 +47,8 @@ pub fn run() {
             commands::fs::read_text_file,
             commands::hash::hash_text,
             commands::hash::hash_file,
+            commands::protobuf::decode_protobuf,
+            commands::tls::tls_inspect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running hyperspanner");

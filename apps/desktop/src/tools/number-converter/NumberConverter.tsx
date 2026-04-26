@@ -166,14 +166,14 @@ export const NumberConverter: FC<NumberConverterProps> = ({ toolId, zone }) => {
   const actions = (
     <>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleSwap}
         aria-label="Swap endianness"
       >
         Swap Endian
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleClear}
         aria-label="Clear inputs"
       >
@@ -326,13 +326,11 @@ function renderStatus(
 
 /* ---------- Placeholder helpers ---------- */
 
-/** Example hex string sized to the chosen type — matches the byte width
- *  so the placeholder gives an immediate sense of "what fits here". */
-function exampleHex(type: NumberType): string {
-  const byteCount = BYTE_COUNT[type];
-  const example = ['12', '34', '56', '78', '9a', 'bc', 'de', 'f0'].slice(0, byteCount);
-  return example.join(' ');
-}
+// `exampleHex` was used to seed the hex input's placeholder with a per-
+// type sample string (e.g. `12 34 56 78` for uint32). It got replaced
+// with a shorter `"4-byte hex"`-style hint as part of the small-screen
+// pass so the placeholder fits the half-width input column without
+// truncation; the function is no longer wired up.
 
 function exampleDecimalPlaceholder(type: NumberType): string {
   if (type === 'float32' || type === 'float64') return '3.14159';

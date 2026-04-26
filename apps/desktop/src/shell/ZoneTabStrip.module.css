@@ -130,6 +130,10 @@
      focus ring, etc.) can't bias other layout calculations like
      `scrollWidth` reporting. */
   max-height: 100%;
+  /* Positioning context for the close × overlay. The button is taken out
+     of flex flow and pinned over the right cap of the LcarsPill, so the
+     tab doesn't widen when the × becomes visible on hover. */
+  position: relative;
 }
 
 .tabWrap.pulsing {
@@ -182,34 +186,53 @@
 /*
  * Quick close button — VSCode-style.
  *
- * Default: present in the layout but visually muted (low opacity), so it
- * doesn't visually clutter a long row of inactive tabs.
+ * Default: present but invisible (opacity 0). Doesn't visually clutter a
+ * long row of inactive tabs.
  *
- * On `.tabWrap:hover` (mouse anywhere over the tab): fades up to a clearly
- * visible state.
+ * On `.tabWrap:hover` (mouse anywhere over the tab): fades up to a
+ * clearly visible state. The active tab also keeps the button visible at
+ * all times so it's always one click away.
  *
- * On hover of the button itself: brightest, with a subtle background so it
- * reads as a target. The active tab keeps the button visible at all times
- * (rule below using `.tabWrap.active`) so it's always one click away.
+ * On hover of the button itself: brightest, with a subtle background so
+ * it reads as a target.
+ *
+ * The button is *absolutely positioned* over the right cap of the
+ * LcarsPill — taken out of flex flow, so showing/hiding it doesn't widen
+ * the tab and the cursor never has to move further right than the pill
+ * itself. The `right` offset accounts for the trailing `⋮` action menu
+ * (22px wide + 0.35rem margin-left ≈ 28px) plus a small visual nudge so
+ * the × sits cleanly inside the pill's rounded cap.
  */
 .closeBtn {
+  position: absolute;
+  /* Sits a touch further from the right edge so the button doesn't ride
+     the LcarsPill's rounded cap — the curved cap takes ~half the pill
+     height (≈20px), and we want the × visually inside the flat label
+     area, not on the curve. */
+  right: 38px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-left: 0.25rem;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--lcars-color-text, #eae4d6);
-  font-size: 14px;
+  /* The × overlays the LcarsPill's colored cap (orange when active,
+     violet when inactive). LcarsPill renders text in `--lcars-color-text-dark`
+     against those fills, so the × matches that convention to stay
+     readable on either pill color. */
+  color: var(--lcars-color-text-dark, #000);
+  font-size: 16px;
+  font-weight: bold;
   line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition: opacity 120ms ease, background-color 120ms ease;
-  flex: 0 0 auto;
 }
 
 .tabWrap:hover .closeBtn,
@@ -222,14 +245,18 @@
  * The button's own hover state needs to win over `.tabWrap:hover .closeBtn`
  * (which is (0,2,1) in specificity). Qualifying with `.tabWrap` brings this
  * rule to (0,2,1) too, and it's ordered later so it wins via cascade.
+ *
+ * Hover/active backgrounds use a *dark* tint because the × now overlays
+ * the LcarsPill's bright colored fill — a light tint (the previous
+ * `rgba(255,255,255,…)`) was nearly invisible against orange / violet.
  */
 .tabWrap .closeBtn:hover {
   opacity: 1;
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: rgba(0, 0, 0, 0.18);
 }
 
 .tabWrap .closeBtn:active {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.28);
 }
 
 .closeBtn:focus-visible {

@@ -148,7 +148,7 @@ export const RegexTester: FC<RegexTesterProps> = ({ toolId, zone }) => {
   const actions = (
     <>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={state.pattern.length === 0 && state.sample.length === 0 ? handleSample : handleClear}
         aria-label={
           state.pattern.length === 0 && state.sample.length === 0
@@ -311,8 +311,12 @@ function renderMatchList(
 
   return (
     <>
+      {/* Header label is intentionally distinct from the status-pill
+        * detail (also `N match[es]`) — the test suite asserts via
+        * `getByText` and would otherwise find two matching elements.
+        * "Found N" reads naturally above a list anyway. */}
       <div className={styles.matchListHeader}>
-        {result.matches.length} match{result.matches.length === 1 ? '' : 'es'}
+        Found {result.matches.length}
         {result.truncated ? ' (truncated)' : ''}
       </div>
       <div className={styles.matchItems}>

@@ -52,7 +52,11 @@ const DEFAULT_STATE: HexInspectorState = {
  */
 export const HexInspector: FC<HexInspectorProps> = ({ toolId, zone }) => {
   const { state, setState } = useTool<HexInspectorState>(toolId, DEFAULT_STATE);
-  const isCompact = zone === 'right' || zone === 'bottom';
+  // `isCompact` was used to switch action-pill sizes; UX-3.7 made all
+  // action pills `size="small"` regardless of zone, so the local
+  // dropped along with its consumer. Hex Inspector's body layout is
+  // also `supportedZones: ['center']`-only (16-byte rows are
+  // non-negotiable), so there's no compact CSS variant to gate.
 
   const handlePathChange = useCallback(
     (path: string) => {
@@ -137,24 +141,30 @@ export const HexInspector: FC<HexInspectorProps> = ({ toolId, zone }) => {
 
   const actions = (
     <>
+      {/* No `aria-label` overrides on these — the button text already
+          provides the accessible name, and adding `aria-label="Load the
+          file"` made `getByRole('button', { name: /^Load$/i })` in tests
+          fail (it'd see "Load the file" instead of "Load"). The
+          `title` attribute carries the longer hover hint without
+          changing the accessible name. */}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleLoad}
         disabled={!state.filePath.trim() || state.loading}
-        aria-label="Load the file"
+        title="Load the file"
       >
         Load
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleClear}
         disabled={!state.filePath && !state.bytes}
-        aria-label="Clear the inspector"
+        title="Clear the inspector"
       >
         Clear
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handlePrev}
         disabled={!canGoPrev}
         aria-label="Previous page"
@@ -162,7 +172,7 @@ export const HexInspector: FC<HexInspectorProps> = ({ toolId, zone }) => {
         ← Prev
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleNext}
         disabled={!canGoNext}
         aria-label="Next page"

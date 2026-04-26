@@ -64,8 +64,11 @@ describe('CidrCalc', () => {
     });
     expect(screen.getByText('Network Address')).not.toBeNull();
     expect(screen.getByText('Broadcast Address')).not.toBeNull();
-    expect(screen.getByText(/10\.0\.0\.0/)).not.toBeNull();
-    expect(screen.getByText(/10\.0\.0\.255/)).not.toBeNull();
+    // `10.0.0.0` shows up in multiple table cells (network address +
+    // first host) so a single getByText fails. `getAllByText` confirms
+    // presence without choking on the duplicate.
+    expect(screen.getAllByText(/10\.0\.0\.0/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/10\.0\.0\.255/).length).toBeGreaterThan(0);
   });
 
   it('renders the computed table for valid IPv6 input', () => {

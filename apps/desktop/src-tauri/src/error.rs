@@ -43,6 +43,28 @@ pub enum HyperspannerError {
 
     #[error("unsupported hash algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: String },
+
+    #[error("malformed protobuf wire format at byte {offset}: {detail}")]
+    MalformedProtobuf { offset: usize, detail: String },
+
+    #[error("invalid hex input: {detail}")]
+    InvalidHex { detail: String },
+
+    #[error("network error connecting to {host}:{port}: {detail}")]
+    NetworkError {
+        host: String,
+        port: u16,
+        detail: String,
+    },
+
+    #[error("TLS handshake failed: {detail}")]
+    TlsHandshakeFailed { detail: String },
+
+    #[error("certificate parsing failed: {detail}")]
+    CertificateParseFailed { detail: String },
+
+    #[error("invalid host:port input: {detail}")]
+    InvalidEndpoint { detail: String },
 }
 
 impl HyperspannerError {
@@ -57,6 +79,12 @@ impl HyperspannerError {
             Self::InvalidEncoding { .. } => "invalid_encoding",
             Self::InvalidUtf8 { .. } => "invalid_utf8",
             Self::UnsupportedAlgorithm { .. } => "unsupported_algorithm",
+            Self::MalformedProtobuf { .. } => "malformed_protobuf",
+            Self::InvalidHex { .. } => "invalid_hex",
+            Self::NetworkError { .. } => "network_error",
+            Self::TlsHandshakeFailed { .. } => "tls_handshake_failed",
+            Self::CertificateParseFailed { .. } => "certificate_parse_failed",
+            Self::InvalidEndpoint { .. } => "invalid_endpoint",
         }
     }
 }

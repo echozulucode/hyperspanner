@@ -1,6 +1,5 @@
 import type { ComponentType } from 'react';
 import type { Zone } from '../state';
-import { PlaceholderTool } from './PlaceholderTool';
 import { Base64Pad } from './base64-pad';
 import { CaseTransform } from './case-transform';
 import { CidrCalc } from './cidr-calc';
@@ -8,8 +7,10 @@ import { HashWorkbench } from './hash-workbench';
 import { HexInspector } from './hex-inspector';
 import { JsonValidator } from './json-validator';
 import { NumberConverter } from './number-converter';
+import { ProtobufDecode } from './protobuf-decode';
 import { RegexTester } from './regex-tester';
 import { TextDiff } from './text-diff';
+import { TlsInspector } from './tls-inspector';
 import { UrlCodec } from './url-codec';
 import { WhitespaceClean } from './whitespace-clean';
 import { YamlValidator } from './yaml-validator';
@@ -190,9 +191,10 @@ const entries: ToolDescriptor[] = [
     id: 'protobuf-decode',
     name: 'Protobuf Decode',
     category: 'binary',
-    description: 'Decode protobuf wire format with .proto schema.',
+    description:
+      'Schema-less protobuf wire-format inspector — paste hex, see the field tree.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: ProtobufDecode,
   },
   {
     id: 'cidr-calc',
@@ -206,9 +208,10 @@ const entries: ToolDescriptor[] = [
     id: 'tls-inspector',
     name: 'TLS Inspector',
     category: 'network',
-    description: 'Inspect certificate chains and protocol versions.',
+    description:
+      'Connect to host:port and inspect the negotiated TLS version, cipher suite, and full cert chain.',
     defaultZone: 'center',
-    component: PlaceholderTool,
+    component: TlsInspector,
   },
 ];
 

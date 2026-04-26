@@ -173,14 +173,14 @@ export const HashWorkbench: FC<HashWorkbenchProps> = ({ toolId, zone }) => {
   const actions = (
     <>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleModeToggle}
         aria-label={`Toggle mode (currently ${state.mode})`}
       >
         {state.mode === 'text' ? 'File' : 'Text'}
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleClear}
         aria-label="Clear all inputs and results"
       >
@@ -230,7 +230,7 @@ export const HashWorkbench: FC<HashWorkbenchProps> = ({ toolId, zone }) => {
                   aria-label="File path input"
                 />
                 <LcarsPill
-                  size={isCompact ? 'small' : 'medium'}
+                  size="small"
                   onClick={handleComputeFile}
                   aria-label="Compute hashes for the file"
                 >
@@ -253,7 +253,7 @@ export const HashWorkbench: FC<HashWorkbenchProps> = ({ toolId, zone }) => {
                   {digest}
                 </div>
                 <LcarsPill
-                  size={isCompact ? 'small' : 'medium'}
+                  size="small"
                   onClick={() => {
                     if (result?.digest) {
                       navigator.clipboard.writeText(result.digest);

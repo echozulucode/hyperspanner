@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { FC, ReactNode } from 'react';
+import type { ChangeEvent, FC, ReactNode } from 'react';
 import { LcarsPill } from '@hyperspanner/lcars-ui';
 
 import type { Zone } from '../../state';
@@ -79,27 +79,28 @@ export const CaseTransform: FC<CaseTransformProps> = ({ toolId, zone }) => {
   const outputText =
     transformation.kind === 'ok' ? transformation.text : state.text;
 
+  // Mode selection moved to a body-level `<select>` so the header
+  // `actions` slot stays narrow. The previous 7 case-mode pills + Clear
+  // (8 pills total) was unusable on medium-width screens — even at
+  // `size="small"` the cluster wrapped to multiple header rows and ate
+  // most of the body's vertical room. A single dropdown takes ~120px
+  // and one row in the body, regardless of zone width. Clear stays in
+  // the header as the only action.
+  const handleModeSelect = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      handleModeChange(e.currentTarget.value as CaseMode);
+    },
+    [handleModeChange],
+  );
+
   const actions = (
-    <>
-      {CASE_MODES.map((m) => (
-        <LcarsPill
-          key={m}
-          size={isCompact ? 'small' : 'medium'}
-          onClick={() => handleModeChange(m)}
-          disabled={state.mode === m}
-          aria-label={`Transform to ${m}`}
-        >
-          {m}
-        </LcarsPill>
-      ))}
-      <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
-        onClick={handleClear}
-        aria-label="Clear the buffer"
-      >
-        Clear
-      </LcarsPill>
-    </>
+    <LcarsPill
+      size="small"
+      onClick={handleClear}
+      aria-label="Clear the buffer"
+    >
+      Clear
+    </LcarsPill>
   );
 
   const status = renderStatus(state.text, transformation);
@@ -108,36 +109,54 @@ export const CaseTransform: FC<CaseTransformProps> = ({ toolId, zone }) => {
     <ToolFrame
       toolId={toolId}
       title="Case Transform"
-      subtitle="Convert text between camelCase, snake_case, kebab-case, PascalCase, CONSTANT_CASE, and space-separated forms."
+      subtitle="Transform text between camelCase, PascalCase, snake_case, kebab-case, CONSTANT_CASE, and space-separated forms."
       zone={zone}
       actions={actions}
       status={status}
     >
-      <div className={styles.editorContainer}>
-        <div className={styles.inputSection}>
-          {!isCompact && <div className={styles.sectionLabel}>Input</div>}
-          <textarea
-            className={`${styles.editor} ${isCompact ? styles.editorCompact : ''}`}
-            value={state.text}
-            onChange={(e) => handleTextChange(e.currentTarget.value)}
-            placeholder="Paste or type text to transform..."
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            aria-label="Text input for case transformation"
-          />
-        </div>
+      <div className={`${styles.container} ${isCompact ? styles.containerCompact : ''}`}>
+        <label className={styles.modeRow}>
+          <span className={styles.modeLabel}>Mode</span>
+          <select
+            className={`${styles.modeSelect} ${isCompact ? styles.modeSelectCompact : ''}`}
+            value={state.mode}
+            onChange={handleModeSelect}
+            aria-label="Case transformation mode"
+          >
+            {CASE_MODES.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
 
-        <div className={styles.outputSection}>
-          {!isCompact && <div className={styles.sectionLabel}>Output</div>}
-          <textarea
-            className={`${styles.editor} ${isCompact ? styles.editorCompact : ''}`}
-            value={outputText}
-            readOnly
-            placeholder="Transformed text will appear here..."
-            spellCheck={false}
-            aria-label="Case-transformed text output"
-          />
+        <div className={styles.editorContainer}>
+          <div className={styles.inputSection}>
+            {!isCompact && <div className={styles.sectionLabel}>Input</div>}
+            <textarea
+              className={`${styles.editor} ${isCompact ? styles.editorCompact : ''}`}
+              value={state.text}
+              onChange={(e) => handleTextChange(e.currentTarget.value)}
+              placeholder="Paste or type text to transform..."
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              aria-label="Text input for case transformation"
+            />
+          </div>
+
+          <div className={styles.outputSection}>
+            {!isCompact && <div className={styles.sectionLabel}>Output</div>}
+            <textarea
+              className={`${styles.editor} ${isCompact ? styles.editorCompact : ''}`}
+              value={outputText}
+              readOnly
+              placeholder="Transformed text will appear here..."
+              spellCheck={false}
+              aria-label="Case-transformed text output"
+            />
+          </div>
         </div>
       </div>
     </ToolFrame>

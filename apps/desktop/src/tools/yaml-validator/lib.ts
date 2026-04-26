@@ -43,17 +43,46 @@ export type YamlValidateResult =
  *
  * Returns `empty` for a blank / whitespace-only input so the UI can render
  * a "waiting for input" status rather than a confusing parse error.
+ *
+ * YAML 1.1 boolean spellings (yes/no/on/off) are coerced to YAML 1.2
+ * booleans (true/false) before parsing. js-yaml defaults to the YAML 1.2
+ * `core` schema, which only treats `true`/`false` as booleans — every
+ * other spelling parses as a string. Most users coming from Ansible,
+ * Docker Compose, or older config formats expect `yes`/`no` to be
+ * booleans, so we normalize the source text up front. Quoted values
+ * (`'yes'`, `"no"`) are untouched because the regex requires the value
+ * to be a bare identifier on its own line.
  */
 export function validateYaml(text: string): YamlValidateResult {
   if (text.trim().length === 0) {
     return { kind: 'empty' };
   }
   try {
-    const value: unknown = yaml.load(text);
+    const normalized = normalizeYaml11Booleans(text);
+    const value: unknown = yaml.load(normalized);
     return { kind: 'ok', value };
   } catch (err) {
     return normalizeParseError(err);
   }
+}
+
+/**
+ * Replace `key: yes` / `key: no` / `key: on` / `key: off` (case-insensitive,
+ * unquoted, end-of-line) with their YAML 1.2 boolean equivalents. The
+ * regex is anchored to a line to avoid matching `name: yesterday` or
+ * similar. Quoted values like `name: 'yes'` are left alone because the
+ * value capture requires the bare keyword followed by optional comment +
+ * end-of-line.
+ */
+function normalizeYaml11Booleans(text: string): string {
+  return text.replace(
+    /^(\s*[^\s:#][^:#]*?\s*:\s*)(yes|no|on|off)(\s*(?:#.*)?)$/gim,
+    (_match, prefix: string, value: string, suffix: string) => {
+      const lower = value.toLowerCase();
+      const replacement = lower === 'yes' || lower === 'on' ? 'true' : 'false';
+      return prefix + replacement + suffix;
+    },
+  );
 }
 
 /**

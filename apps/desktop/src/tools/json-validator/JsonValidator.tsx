@@ -114,7 +114,7 @@ export const JsonValidator: FC<JsonValidatorProps> = ({ toolId, zone }) => {
   const actions = (
     <>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleFormat}
         disabled={validation.kind !== 'ok'}
         aria-label="Pretty-print the JSON buffer"
@@ -122,7 +122,7 @@ export const JsonValidator: FC<JsonValidatorProps> = ({ toolId, zone }) => {
         Format
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleMinify}
         disabled={validation.kind !== 'ok'}
         aria-label="Strip whitespace from the JSON buffer"
@@ -139,7 +139,7 @@ export const JsonValidator: FC<JsonValidatorProps> = ({ toolId, zone }) => {
         </LcarsPill>
       ) : null}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={state.text.length === 0 ? handleSample : handleClear}
         aria-label={state.text.length === 0 ? 'Load a sample JSON document' : 'Clear the buffer'}
       >

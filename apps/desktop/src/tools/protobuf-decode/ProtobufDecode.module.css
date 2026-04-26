@@ -1,0 +1,145 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.container::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+.containerCompact {
+  gap: 0.5rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.sectionLabel {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lcars-color-sand, #eae4d6);
+  opacity: 0.65;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--lcars-color-gutter, rgba(138, 122, 168, 0.4));
+  border-radius: 6px;
+  background: var(--lcars-color-bg-raised, rgba(16, 16, 24, 0.7));
+  color: var(--lcars-color-sand, #eae4d6);
+  font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', 'Menlo',
+    'Consolas', monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  height: 5rem;
+  resize: vertical;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--lcars-color-sand, #eae4d6);
+  opacity: 0.3;
+  font-style: italic;
+}
+
+.input:focus {
+  border-color: var(--lcars-color-orange, #d88463);
+  box-shadow: 0 0 0 1px var(--lcars-color-orange, #d88463);
+}
+
+.inputCompact {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.72rem;
+  height: 3.5rem;
+}
+
+/* Decoded-tree readout — monospace, scrollable, with tight per-row chrome
+   so deep structures stay readable in narrow zones. */
+.tree {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 0.5rem 0.6rem;
+  font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', 'Menlo',
+    'Consolas', monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--lcars-color-sand, #eae4d6);
+  /* Allow the tree to scroll horizontally when long values exceed the
+     panel width — wrapping ruins the field/value column alignment. */
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 6rem;
+}
+
+.treeCompact {
+  padding: 0.35rem 0.45rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  min-height: 4rem;
+}
+
+.empty {
+  opacity: 0.5;
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.fieldList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.05rem 0;
+}
+
+/* Two-line layout for a row that has a nested message — the nested
+   FieldList grows below, taking the full width via grid-column: 1 / -1. */
+.fieldRow > .fieldList {
+  grid-column: 1 / -1;
+}
+
+.fieldNumber {
+  color: var(--lcars-color-orange, #d88463);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fieldType {
+  color: var(--lcars-color-african-violet, #8a7aa8);
+  opacity: 0.85;
+  white-space: nowrap;
+  font-size: 0.92em;
+}
+
+.fieldValue {
+  color: var(--lcars-color-sand, #eae4d6);
+  /* Don't ellipsize — the user wants to see the full value. The
+     parent `.tree` has horizontal overflow scroll. */
+  white-space: nowrap;
+}

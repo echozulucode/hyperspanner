@@ -33,6 +33,12 @@ export type HyperspannerErrorKind =
   | 'invalid_encoding'
   | 'invalid_utf8'
   | 'unsupported_algorithm'
+  | 'malformed_protobuf'
+  | 'invalid_hex'
+  | 'network_error'
+  | 'tls_handshake_failed'
+  | 'certificate_parse_failed'
+  | 'invalid_endpoint'
   | 'unknown';
 
 /**
@@ -53,6 +59,12 @@ const KNOWN_KINDS: ReadonlySet<HyperspannerErrorKind> = new Set([
   'invalid_encoding',
   'invalid_utf8',
   'unsupported_algorithm',
+  'malformed_protobuf',
+  'invalid_hex',
+  'network_error',
+  'tls_handshake_failed',
+  'certificate_parse_failed',
+  'invalid_endpoint',
   'unknown',
 ]);
 

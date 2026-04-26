@@ -39,7 +39,9 @@ export const CenterZone: FC<CenterZoneProps> = ({
 }) => {
   const activeTool = tools.find((t) => t.id === activeTabId) ?? null;
   const activeDescriptor = activeTool ? getTool(activeTool.id) : null;
-  const hasTabs = tools.length > 0;
+  // `hasTabs` was used to gate `.contentEmpty` on the wrapper; UX-3.3
+  // dropped that class so the launchpad fills the area cleanly. Local
+  // dropped along with the consumer.
 
   const moveTool = useWorkspaceStore((s) => s.moveTool);
   const splitCenter = useWorkspaceStore((s) => s.splitCenter);

@@ -6,6 +6,7 @@ import type { OpenTool, Zone } from '../state';
 import { useWorkspaceStore } from '../state';
 import { getTool } from '../tools';
 import { TabActionMenu } from './TabActionMenu';
+import type { TabActionMenuHandle, TabActionMenuProps } from './TabActionMenu';
 import { TAB_MIME } from './PaneDropTarget';
 import styles from './ZoneTabStrip.module.css';
 
@@ -154,6 +155,23 @@ export const ZoneTabStrip: FC<ZoneTabStripProps> = ({
           const descriptor = getTool(tool.id);
           const label = descriptor?.name ?? tool.id;
           const isActive = tool.id === activeId;
+          const tabActionMenuProps: TabActionMenuProps = {
+            toolId: tool.id,
+            currentZone: tool.zone,
+            centerSplit,
+            onFocus: focusTool,
+            onMove: (id, z) => moveTool(id, z),
+            onSplit: (dir) => splitCenter(dir),
+            onMerge: () => mergeCenter(),
+            onMaximize: (id) => {
+              // Phase 3 maximize = collapse Right+Bottom and focus the tool.
+              useWorkspaceStore.getState().setZoneCollapsed('right', true);
+              useWorkspaceStore.getState().setZoneCollapsed('bottom', true);
+              focusTool(id);
+            },
+            onResetLayout: resetLayout,
+            onClose: closeTool,
+          };
           return (
             <PulsingTab
               key={tool.id}
@@ -165,25 +183,7 @@ export const ZoneTabStrip: FC<ZoneTabStripProps> = ({
               onClose={() => closeTool(tool.id)}
               activeColor={theme.colors.orange}
               inactiveColor={theme.colors.africanViolet}
-              trailing={
-                <TabActionMenu
-                  toolId={tool.id}
-                  currentZone={tool.zone}
-                  centerSplit={centerSplit}
-                  onFocus={focusTool}
-                  onMove={(id, z) => moveTool(id, z)}
-                  onSplit={(dir) => splitCenter(dir)}
-                  onMerge={() => mergeCenter()}
-                  onMaximize={(id) => {
-                    // Phase 3 maximize = collapse Right+Bottom and focus the tool.
-                    useWorkspaceStore.getState().setZoneCollapsed('right', true);
-                    useWorkspaceStore.getState().setZoneCollapsed('bottom', true);
-                    focusTool(id);
-                  }}
-                  onResetLayout={resetLayout}
-                  onClose={closeTool}
-                />
-              }
+              tabActionMenuProps={tabActionMenuProps}
             />
           );
         })}
@@ -225,7 +225,13 @@ interface PulsingTabProps {
   inactiveColor: string;
   onSelect: () => void;
   onClose: () => void;
-  trailing?: React.ReactNode;
+  /**
+   * Per-tab action-menu wiring. PulsingTab renders the `TabActionMenu`
+   * itself (instead of taking it as a `trailing` ReactNode) so it can
+   * hold the menu's imperative ref and trigger it on right-click. Lift
+   * back to a slot if a tab ever needs a different trailing widget.
+   */
+  tabActionMenuProps: TabActionMenuProps;
 }
 
 /**
@@ -249,11 +255,15 @@ const PulsingTab: FC<PulsingTabProps> = ({
   inactiveColor,
   onSelect,
   onClose,
-  trailing,
+  tabActionMenuProps,
 }) => {
   const [pulsing, setPulsing] = useState(false);
   const [dragging, setDragging] = useState(false);
   const lastPulse = useRef<number | undefined>(undefined);
+  // Imperative handle into the per-tab `TabActionMenu` so the wrapper's
+  // `onContextMenu` can open the menu at the cursor (right-click parity
+  // with the `⋮` button — same menu, just anchored at click coords).
+  const menuRef = useRef<TabActionMenuHandle | null>(null);
 
   useEffect(() => {
     if (pulseId === undefined) return;
@@ -303,6 +313,17 @@ const PulsingTab: FC<PulsingTabProps> = ({
     }
   };
 
+  // Right-click anywhere on the tab wrapper opens the same action menu
+  // the `⋮` button shows — anchored at the cursor instead of below the
+  // trigger. Without this, right-click bubbles to the platform-default
+  // browser context menu (Refresh / Save As / Inspect…), which is never
+  // what the user wants on a tool tab.
+  const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    menuRef.current?.openAt(event.clientX, event.clientY);
+  };
+
   return (
     <div
       className={`${styles.tabWrap} ${isActive ? styles.active : ''} ${
@@ -315,6 +336,7 @@ const PulsingTab: FC<PulsingTabProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onAuxClick={handleAuxClick}
+      onContextMenu={handleContextMenu}
     >
       <LcarsPill
         size="small"
@@ -340,7 +362,7 @@ const PulsingTab: FC<PulsingTabProps> = ({
       >
         ×
       </button>
-      {trailing}
+      <TabActionMenu ref={menuRef} {...tabActionMenuProps} />
     </div>
   );
 };

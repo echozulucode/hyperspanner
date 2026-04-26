@@ -1,4 +1,76 @@
 lessons:
+  - id: 60
+    date: 2026-04-25
+    source: "session"
+    category: process
+    lesson: |
+      Two related process failures showed up in the Phase 6 close-out
+      sweep. Capturing both because the second is the more important
+      lesson:
+
+      (a) Parallel-fanout subagent briefs (lessons #56/#57/#59) need
+      one more clause: "before reporting back, run `pnpm --filter
+      @hyperspanner/desktop test -- <your-tool>` on your own slice and
+      fix any failures." Phase 6's fanouts produced subagents whose
+      work was typecheck-clean but behaviorally broken in ways only
+      visible at test time. Aggregating these into a single closing-out
+      sweep cost roughly an entire conversation window. Examples:
+
+        - `case-transform/lib.ts` had `current.slice(0, -1)` silently
+          dropping the last char of every uppercase acronym
+          (HELLO → HELL).
+        - `cidr-calc/lib.ts` was calling `Number("/24")` (which is
+          `NaN`) and the IPv6 classification masks were 64-bit literals
+          where the algorithm needed 128-bit constants.
+        - `whitespace-clean/lib.ts` had a `tabsToSpaces` option defined
+          on the type and threaded through to the UI but the pipeline
+          never applied it.
+        - `hex-inspector/lib.ts` had an unconditional middle-gap
+          insertion that broke partial-row ASCII alignment.
+        - `hash-workbench/lib.ts` had a formatByteSize threshold off
+          by one decimal place.
+        - `base64-pad/lib.ts` had a fatal-mode TextDecoder that masked
+          adjacent test paths.
+
+      Concrete amendment to the parallel-fanout brief template
+      (cumulative with #56/#57/#59):
+
+        > Before reporting back, run `pnpm --filter
+        > @hyperspanner/desktop test -- <your-tool-name>` and
+        > `pnpm --filter @hyperspanner/desktop typecheck`. Both must
+        > be clean. If a test you don't recognize fails, don't paper
+        > over it — read the test, understand what it asserts, and
+        > fix either the implementation or the test (with a comment
+        > explaining why the test was wrong) before returning. Do
+        > not return a slice with red tests; the parent has many
+        > subagents to integrate and cannot afford to debug N tools.
+
+      (b) **The bigger lesson — never claim "all checks pass" without
+      actually running the checks.** During this session Claude (me)
+      wrote a multi-paragraph "Phase 6 verification gate PASSED" entry
+      to status.md and flipped `current_phase: 7` in plan.md based on
+      a user message that said "all checks pass." The user was
+      reporting their CHECKLIST progress, not that they'd actually
+      re-run the test suite — the previous turn's fixes hadn't been
+      verified at all. The user re-ran tests, found 13 still red,
+      and called it out. Three docs had to be reverted; trust got
+      bruised.
+
+      Rule going forward: a "all green / verification PASSED" status
+      entry needs to be backed by either (i) a test-output paste from
+      the user, or (ii) a fresh `mcp__workspace__bash` run in this
+      session that actually ran the suite. "User said it's done" is
+      not a verification artifact — the user is busy and may be
+      reporting an in-progress state. When in doubt, ask: "have you
+      re-run `pnpm test` since the last fixes? if yes, can you paste
+      the tail?" before writing claims into the project memory.
+
+      Recovery cost when this fails: status.md, plan.md, and
+      lessons.yaml all needed surgical reverts plus a new session
+      entry explaining what happened. That's roughly the same cost
+      as the verification run would have been.
+    applied: true
+
   - id: 59
     date: 2026-04-24
     source: "session"

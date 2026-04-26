@@ -180,17 +180,22 @@ describe('TextDiff', () => {
 
   it('zone-responsive: bottom zone applies compact styling', () => {
     const { container } = render(<TextDiff toolId={TOOL_ID} zone="bottom" />);
-    // Check that the compact class is applied to the edit layout
-    const editLayout = container.querySelector('.editLayoutCompact');
+    // CSS modules hash class names, so a literal `.editLayoutCompact`
+    // selector misses them. Match by substring.
+    const editLayout = container.querySelector(
+      '[class*="editLayoutCompact"]',
+    );
     expect(editLayout).not.toBeNull();
   });
 
   it('zone-responsive: center zone does not apply compact styling', () => {
     const { container } = render(<TextDiff toolId={TOOL_ID} zone="center" />);
-    const editLayout = container.querySelector('.editLayout');
+    const editLayout = container.querySelector('[class*="editLayout"]');
     expect(editLayout).not.toBeNull();
     // Should NOT have the compact variant
-    const editLayoutCompact = container.querySelector('.editLayoutCompact');
+    const editLayoutCompact = container.querySelector(
+      '[class*="editLayoutCompact"]',
+    );
     expect(editLayoutCompact).toBeNull();
   });
 

@@ -103,16 +103,16 @@ export const WhitespaceClean: FC<WhitespaceCleanProps> = ({ toolId, zone }) => {
       {rulesToShow.map((rule) => (
         <LcarsPill
           key={rule}
-          size={isCompact ? 'small' : 'medium'}
+          size="small"
           onClick={() => handleOptionToggle(rule)}
           aria-label={`Toggle ${rule} (currently ${state.options[rule] ? 'on' : 'off'})`}
-          disabled={!state.options[rule]}
+          active={state.options[rule]}
         >
           {ruleLabelShort(rule)}
         </LcarsPill>
       ))}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleClear}
         aria-label="Clear the buffer"
       >

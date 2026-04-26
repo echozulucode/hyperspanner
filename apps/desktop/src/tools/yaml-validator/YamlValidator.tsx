@@ -97,7 +97,7 @@ export const YamlValidator: FC<YamlValidatorProps> = ({ toolId, zone }) => {
   const actions = (
     <>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleFormat}
         disabled={validation.kind !== 'ok'}
         aria-label="Format the YAML buffer"
@@ -105,25 +105,21 @@ export const YamlValidator: FC<YamlValidatorProps> = ({ toolId, zone }) => {
         Format
       </LcarsPill>
       {!isCompact && view === 'yaml' && jsonView ? (
-        <LcarsPill
-          size="medium"
-          onClick={handleToggleView}
-          aria-label="Switch to JSON view"
-        >
+        // No `aria-label` override: the visible text (`View as JSON`) is
+        // already a clean accessible name. Setting it to "Switch to JSON
+        // view" broke `getByRole('button', { name: /view as JSON/i })`
+        // matchers in tests, since aria-label takes precedence over text.
+        <LcarsPill size="small" onClick={handleToggleView}>
           View as JSON
         </LcarsPill>
       ) : null}
       {!isCompact && view === 'json' && jsonView ? (
-        <LcarsPill
-          size="medium"
-          onClick={handleToggleView}
-          aria-label="Switch to YAML view"
-        >
+        <LcarsPill size="small" onClick={handleToggleView}>
           View as YAML
         </LcarsPill>
       ) : null}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={state.text.length === 0 ? handleSample : handleClear}
         aria-label={state.text.length === 0 ? 'Load a sample YAML document' : 'Clear the buffer'}
       >

@@ -91,7 +91,7 @@ export const TextDiff: FC<TextDiffProps> = ({ toolId, zone }) => {
   const actions = (
     <>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleModeToggle}
         aria-label={state.mode === 'edit' ? 'Switch to view mode' : 'Switch to edit mode'}
       >
@@ -107,7 +107,7 @@ export const TextDiff: FC<TextDiffProps> = ({ toolId, zone }) => {
         </LcarsPill>
       )}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={state.left.length === 0 && state.right.length === 0 ? handleSample : handleClear}
         aria-label={
           state.left.length === 0 && state.right.length === 0
@@ -233,7 +233,7 @@ function renderStatus(
 ): ReactNode {
   if (diff.kind === 'empty') {
     return (
-      <ToolStatusPill status="neutral" detail="Idle">
+      <ToolStatusPill status="neutral" detail="Paste text on each side">
         Idle
       </ToolStatusPill>
     );

@@ -29,3 +29,14 @@ export type {
   HashTextOptions,
   HashFileOptions,
 } from './hash';
+
+export { decodeProtobuf } from './protobuf';
+export type {
+  WireField,
+  WireValue,
+  WireTypeCode,
+  DecodeProtobufOptions,
+} from './protobuf';
+
+export { tlsInspect } from './tls';
+export type { TlsCert, TlsInspectResult, TlsInspectOptions } from './tls';

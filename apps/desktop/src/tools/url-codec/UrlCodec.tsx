@@ -125,7 +125,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
     <>
       {/* Direction toggle: encode / decode */}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={() =>
           handleDirectionChange(state.direction === 'encode' ? 'decode' : 'encode')
         }
@@ -135,7 +135,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
         Encode
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={() =>
           handleDirectionChange(state.direction === 'decode' ? 'encode' : 'decode')
         }
@@ -147,7 +147,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
 
       {/* Mode toggle: component / uri */}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={() => handleModeChange(state.mode === 'component' ? 'uri' : 'component')}
         disabled={state.mode === 'component'}
         aria-label="Component mode (encodes all reserved chars)"
@@ -155,7 +155,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
         Component
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={() => handleModeChange(state.mode === 'uri' ? 'component' : 'uri')}
         disabled={state.mode === 'uri'}
         aria-label="URI mode (preserves URI separators)"
@@ -165,7 +165,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
 
       {/* Plus handling: standard / plus-as-space */}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={() =>
           handlePlusModeChange(state.plusMode === 'standard' ? 'plus-as-space' : 'standard')
         }
@@ -175,7 +175,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
         %20
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={() =>
           handlePlusModeChange(state.plusMode === 'plus-as-space' ? 'standard' : 'plus-as-space')
         }
@@ -187,7 +187,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
 
       {/* Direction flip: swap input ↔ output, toggle direction */}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleDirectionToggle}
         aria-label="Flip direction: swap input and output, toggle encode/decode"
       >
@@ -196,7 +196,7 @@ export const UrlCodec: FC<UrlCodecProps> = ({ toolId, zone }) => {
 
       {/* Clear input */}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleClear}
         aria-label="Clear the input buffer"
       >

@@ -97,40 +97,72 @@ export function diffTexts(left: string, right: string): DiffResult {
         stats.unchanged += lines.filter((l) => l !== '' || lines[lines.length - 1] !== '').length;
         i++;
       } else if (entry.removed && i + 1 < lineDiff.length && lineDiff[i + 1].added) {
-        // Removed + added pair → modified hunks with word-level inline[]
+        // Removed + added pair. Pairing strategy:
+        //   - Single-line edit on each side (e.g. fix a typo on one
+        //     line): always treat as "modified" with word-level inline
+        //     diff, even if the two lines share no characters
+        //     (`'hello'` → `'world'` still reads as a one-line edit).
+        //   - Multi-line block on either side: pair line-by-line up to
+        //     the shorter length, then check word-level overlap per
+        //     pair. If a pair has at least one unchanged word, it's a
+        //     real modification (`'old line 2'` → `'new line 2'` shares
+        //     `'line'` and `'2'`). If a pair has no unchanged words
+        //     (e.g. jsdiff bundled non-adjacent delete + add into one
+        //     paired chunk because the lines between were a short LCS
+        //     match), demote that pair to two standalone hunks — one
+        //     removed, one added — so the stats reflect the user's
+        //     intent rather than a coincidental positional alignment.
         const removed = lineDiff[i];
         const added = lineDiff[i + 1];
 
         const removedLines = removed.value.split('\n').filter((l, idx, arr) => {
-          // Filter out final empty string from split
           return !(l === '' && idx === arr.length - 1);
         });
         const addedLines = added.value.split('\n').filter((l, idx, arr) => {
           return !(l === '' && idx === arr.length - 1);
         });
 
-        // Pair lines up to the shorter length
         const pairCount = Math.min(removedLines.length, addedLines.length);
+        const isSingleLineEdit = removedLines.length === 1 && addedLines.length === 1;
+
         for (let j = 0; j < pairCount; j++) {
           const leftText = removedLines[j];
           const rightText = addedLines[j];
-
-          // Compute word-level changes
           const wordDiff = diffWordsWithSpace(leftText, rightText);
-          const inline: InlineChange[] = wordDiff.map((wd) => ({
-            kind: wd.added ? 'added' : wd.removed ? 'removed' : 'unchanged',
-            text: wd.value,
-          }));
 
-          hunks.push({
-            kind: 'modified',
-            leftLine: { number: leftLineNum, text: leftText, inline },
-            rightLine: { number: rightLineNum, text: rightText, inline },
-          });
+          // A pair is a "real" modification if any non-whitespace word
+          // is preserved across both sides. Single-line edits are
+          // always real modifications regardless of overlap.
+          const hasUnchangedWord = wordDiff.some(
+            (wd) => !wd.added && !wd.removed && wd.value.trim() !== '',
+          );
+
+          if (isSingleLineEdit || hasUnchangedWord) {
+            const inline: InlineChange[] = wordDiff.map((wd) => ({
+              kind: wd.added ? 'added' : wd.removed ? 'removed' : 'unchanged',
+              text: wd.value,
+            }));
+            hunks.push({
+              kind: 'modified',
+              leftLine: { number: leftLineNum, text: leftText, inline },
+              rightLine: { number: rightLineNum, text: rightText, inline },
+            });
+            stats.modified++;
+          } else {
+            hunks.push({
+              kind: 'removed',
+              leftLine: { number: leftLineNum, text: leftText },
+            });
+            stats.removed++;
+            hunks.push({
+              kind: 'added',
+              rightLine: { number: rightLineNum, text: rightText },
+            });
+            stats.added++;
+          }
 
           leftLineNum++;
           rightLineNum++;
-          stats.modified++;
         }
 
         // Leftover lines in removed block → pure 'removed' hunks

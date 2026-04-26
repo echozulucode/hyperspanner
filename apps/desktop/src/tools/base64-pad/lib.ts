@@ -89,7 +89,7 @@ export function encodeBase64(text: string, options: Base64Options): EncodeResult
  *
  * Returns `empty` for blank / whitespace-only input.
  */
-export function decodeBase64(b64: string, options: Base64Options): DecodeResult {
+export function decodeBase64(b64: string, _options: Base64Options): DecodeResult {
   const trimmed = b64.trim();
   if (trimmed.length === 0) {
     return { kind: 'empty' };
@@ -141,16 +141,12 @@ export function decodeBase64(b64: string, options: Base64Options): DecodeResult 
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Decode UTF-8 bytes to text
-    let text: string;
-    try {
-      text = new TextDecoder().decode(bytes);
-    } catch (err) {
-      return {
-        kind: 'error',
-        message: 'Invalid UTF-8 in decoded bytes',
-      };
-    }
+    // Decode UTF-8 bytes to text. Lenient mode (non-fatal) so byte
+    // sequences that don't form valid UTF-8 produce U+FFFD replacement
+    // chars instead of throwing — that's the friendlier UX for a
+    // decoder UI, and it also keeps the URL-safe variant tests green
+    // (their synthetic base64 inputs don't decode to valid UTF-8).
+    const text = new TextDecoder().decode(bytes);
 
     return {
       kind: 'ok',

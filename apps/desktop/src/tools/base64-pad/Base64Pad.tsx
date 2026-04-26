@@ -102,14 +102,14 @@ export const Base64Pad: FC<Base64PadProps> = ({ toolId, zone }) => {
   const actions = (
     <>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleDirectionFlip}
         aria-label={`Toggle direction (currently ${state.direction})`}
       >
         {state.direction === 'encode' ? 'To Base64' : 'From Base64'}
       </LcarsPill>
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={() => handleVariantChange(state.variant === 'standard' ? 'url-safe' : 'standard')}
         aria-label={`Toggle variant (currently ${state.variant})`}
       >
@@ -117,7 +117,7 @@ export const Base64Pad: FC<Base64PadProps> = ({ toolId, zone }) => {
       </LcarsPill>
       {state.direction === 'encode' && (
         <LcarsPill
-          size={isCompact ? 'small' : 'medium'}
+          size="small"
           onClick={() => handlePaddingChange(state.padding === 'pad' ? 'strip' : 'pad')}
           aria-label={`Toggle padding (currently ${state.padding})`}
         >
@@ -125,7 +125,7 @@ export const Base64Pad: FC<Base64PadProps> = ({ toolId, zone }) => {
         </LcarsPill>
       )}
       <LcarsPill
-        size={isCompact ? 'small' : 'medium'}
+        size="small"
         onClick={handleClear}
         aria-label="Clear the buffer"
       >

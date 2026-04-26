@@ -14,3 +14,5 @@
 
 pub mod fs;
 pub mod hash;
+pub mod protobuf;
+pub mod tls;

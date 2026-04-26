@@ -128,7 +128,11 @@ export function isInCidr(ipText: string, info: CidrInfo): MembershipResult {
       }
       const ipNum = ipv4ToUint32(ipText);
       const networkNum = ipv4ToUint32(info.networkAddress);
-      const prefixLen = Number(info.prefixLength);
+      // `prefixLength` is stored as `"/24"` for display — strip the
+      // leading slash before `Number(...)` or you get NaN, which the
+      // shift coerces to 0, producing an all-ones mask and the subnet
+      // becomes "exact-address-match only".
+      const prefixLen = parsePrefixLength(info.prefixLength);
       const mask = prefixLen === 0 ? 0 : (0xffffffff << (32 - prefixLen)) >>> 0;
       const inSubnet = (ipNum & mask) === (networkNum & mask);
       return {
@@ -141,7 +145,7 @@ export function isInCidr(ipText: string, info: CidrInfo): MembershipResult {
       }
       const ipBig = ipv6ToBigint(ipText);
       const networkBig = ipv6ToBigint(info.networkAddress);
-      const prefixLen = Number(info.prefixLength);
+      const prefixLen = parsePrefixLength(info.prefixLength);
       const mask =
         prefixLen === 0 ? 0n : (0xffffffffffffffffffffffffffffffffn << BigInt(128 - prefixLen)) & 0xffffffffffffffffffffffffffffffffn;
       const inSubnet = (ipBig & mask) === (networkBig & mask);
@@ -166,6 +170,12 @@ function isValidIPv4(addr: string): boolean {
     const n = Number(p);
     return Number.isInteger(n) && n >= 0 && n <= 255;
   });
+}
+
+/** Strip the leading `/` from a stored prefix-length string (`"/24"` →
+ *  `24`). Used by `isInCidr` so the bitmask math doesn't get NaN. */
+function parsePrefixLength(stored: string): number {
+  return Number(stored.replace(/^\//, ''));
 }
 
 function ipv4ToUint32(addr: string): number {
@@ -342,23 +352,37 @@ function parseIPv6Cidr(addressStr: string, prefixLen: number): CidrInfoIPv6 {
 function getIPv6Flags(ipBig: bigint): string[] {
   const flags: string[] = [];
 
-  // Link-local: fe80::/10
-  const linkLocalMask = 0xffc0000000000000n;
-  if ((ipBig & linkLocalMask) === 0xfe80000000000000n) flags.push('Link-local');
+  // All masks below are full 128-bit BigInts (32 hex digits). The
+  // earlier version of this function used 64-bit literals for some,
+  // which masked only the LOW half of the address — every prefix
+  // comparison silently failed because IPv6 prefixes live in the
+  // HIGH half. Documentation also had a one-digit-short literal
+  // (31 hex digits → 124-bit value) that shifted the whole byte
+  // pattern by one nibble. Net effect: every classification flag
+  // returned empty for valid prefixes.
 
-  // Unique-local: fc00::/7
-  const ulMask = 0xfe00000000000000n;
-  if ((ipBig & ulMask) === 0xfc00000000000000n) flags.push('Unique-local');
+  // Link-local: fe80::/10 — upper 10 bits = 1111_1110_10
+  const linkLocalMask = 0xffc00000000000000000000000000000n;
+  const linkLocalPrefix = 0xfe800000000000000000000000000000n;
+  if ((ipBig & linkLocalMask) === linkLocalPrefix) flags.push('Link-local');
 
-  // Loopback: ::1
+  // Unique-local: fc00::/7 — upper 7 bits = 1111_110
+  const ulMask = 0xfe000000000000000000000000000000n;
+  const ulPrefix = 0xfc000000000000000000000000000000n;
+  if ((ipBig & ulMask) === ulPrefix) flags.push('Unique-local');
+
+  // Loopback: ::1 (the entire address is exactly 1)
   if (ipBig === 1n) flags.push('Loopback');
 
-  // Multicast: ff00::/8
-  if ((ipBig & 0xff00000000000000n) === 0xff00000000000000n) flags.push('Multicast');
+  // Multicast: ff00::/8 — upper 8 bits = 1111_1111
+  const mcMask = 0xff000000000000000000000000000000n;
+  const mcPrefix = 0xff000000000000000000000000000000n;
+  if ((ipBig & mcMask) === mcPrefix) flags.push('Multicast');
 
-  // Documentation: 2001:db8::/32
-  const docMask = 0xffffffff00000000000000000000000n;
-  if ((ipBig & docMask) === 0x20010db800000000000000000000000n) flags.push('Documentation');
+  // Documentation: 2001:db8::/32 — upper 32 bits = 2001_0db8
+  const docMask = 0xffffffff000000000000000000000000n;
+  const docPrefix = 0x20010db8000000000000000000000000n;
+  if ((ipBig & docMask) === docPrefix) flags.push('Documentation');
 
   return flags;
 }
