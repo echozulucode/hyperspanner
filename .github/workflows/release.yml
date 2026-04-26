@@ -62,9 +62,11 @@ jobs:
             rpm
 
       - name: Set up pnpm
+        # Don't pass `version:` here — `pnpm/action-setup@v4` reads
+        # `packageManager` from the root package.json
+        # (`"packageManager": "pnpm@9.12.0"`) and refuses to start
+        # if both are set, to prevent drift between the two sources.
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node
         uses: actions/setup-node@v4
