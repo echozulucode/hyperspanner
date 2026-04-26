@@ -14,6 +14,46 @@ next_actions:
 
 # Status Log
 
+## Session: 2026-04-26 (Version-bump script + dev-mode update-check gate)
+
+Two follow-ups to 7.9 based on user feedback:
+
+**Single source of truth for version + bump script:**
+
+  - `scripts/bump-version.mjs` — Node ESM script. Reads current
+    version from root `package.json`, accepts an explicit semver
+    string OR `patch` / `minor` / `major`, propagates to all five
+    files (root + two workspace `package.json`s + `tauri.conf.json`
+    + `Cargo.toml`'s `[package]` block). Cargo regex is anchored to
+    `[package]` so dependency `version =` lines aren't touched.
+    `--tag` flag stages + commits + creates an annotated git tag
+    but does NOT push (deliberate — typo guard). Without `--tag`
+    the script just writes the files and prints the next-step
+    commands.
+  - `package.json` (root) — added `"version:bump": "node
+    scripts/bump-version.mjs"` so `pnpm version:bump 0.0.2 --tag`
+    is the canonical invocation.
+
+**Dev-mode auto-check gate:**
+
+  - `apps/desktop/src/shell/AppShell.tsx` — the on-launch
+    `useEffect` now early-returns when `import.meta.env.DEV` is
+    true. The running dev build is typically 0.0.0 (the working
+    tree) which would perpetually flag whatever's currently
+    published as "available." The "Check now" button in Settings
+    → Updates is NOT gated, so the updater UI is still exercisable
+    during development.
+  - `apps/desktop/src/tools/system-settings/SystemSettings.tsx` —
+    Updates section's lead copy switches in dev mode to
+    "Auto-update disabled in development mode. […] Use *Check
+    now* below to test the updater flow manually." Makes the
+    gating obvious instead of looking broken.
+  - `docs/plan-007-packaging-and-updates.md` — new "Operational
+    notes" section documenting the bump script + the dev-mode
+    gate.
+
+---
+
 ## Session: 2026-04-26 (Phase 7.7 + 7.8 + 7.9 — updater plugin, release workflow, in-app UI)
 
 User generated the minisign keypair + added GitHub Actions secrets.

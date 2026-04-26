@@ -167,7 +167,17 @@ export const SystemSettings: FC<SystemSettingsProps> = ({ toolId, zone }) => {
             Updates
           </h3>
           <p className={styles.sectionLead}>
-            Hyperspanner checks for new releases on launch.{' '}
+            {import.meta.env.DEV ? (
+              <>
+                <strong>Auto-update disabled in development mode.</strong>{' '}
+                The running build is from source and would perpetually
+                trail the latest release; production builds re-enable
+                the on-launch check. Use <em>Check now</em> below to
+                test the updater flow manually.
+              </>
+            ) : (
+              <>Hyperspanner checks for new releases on launch.</>
+            )}{' '}
             {appVersion ? (
               <>
                 You're running <strong>v{appVersion}</strong>.

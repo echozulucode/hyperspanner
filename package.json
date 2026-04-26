@@ -23,7 +23,8 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r --if-present test",
     "format": "prettier --write \"**/*.{ts,tsx,css,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,css,json,md}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,css,json,md}\"",
+    "version:bump": "node scripts/bump-version.mjs"
   },
   "devDependencies": {
     "prettier": "^3.3.3"

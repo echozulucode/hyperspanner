@@ -346,6 +346,67 @@ Once 7.6–7.9 land:
 - Settings → Diagnostics broader content (logs, telemetry,
   version readouts beyond just the updater) — that's Phase 8.
 
+## Operational notes
+
+### Single-source-of-truth version bump
+
+`scripts/bump-version.mjs` propagates a new version to all five files
+that mirror it. Source of truth is the root `package.json` —
+everything else is downstream.
+
+```bash
+# Explicit version
+pnpm version:bump 0.0.2
+
+# Semver shortcuts
+pnpm version:bump patch        # 0.0.1 → 0.0.2
+pnpm version:bump minor        # 0.0.1 → 0.1.0
+pnpm version:bump major        # 0.0.1 → 1.0.0
+
+# Bump + commit + tag in one step
+pnpm version:bump 0.0.2 --tag
+```
+
+The script writes to:
+- `package.json`
+- `apps/desktop/package.json`
+- `packages/lcars-ui/package.json`
+- `apps/desktop/src-tauri/tauri.conf.json`
+- `apps/desktop/src-tauri/Cargo.toml` (anchored to the `[package]`
+  block so dependency `version =` lines aren't touched)
+
+`--tag` stages those files, commits with `chore: bump to v<X>`, and
+creates an annotated git tag. It does NOT push — that's a hand-step
+so a typo doesn't fire the release workflow before the diff is
+reviewed.
+
+### Dev-mode auto-check policy
+
+The on-launch update check is **gated on `import.meta.env.PROD`**.
+In `pnpm tauri:dev` / `pnpm dev` / vitest, the running build is
+typically the working tree's `0.0.0` and would perpetually flag the
+latest published release as "available" — that's noise. Skipping
+the auto-check there keeps every dev session quiet.
+
+The "Check now" button in Settings → Updates is NOT gated. It works
+in dev too, so the updater UI can be exercised manually during
+development. The Settings panel's lead copy switches to a dev-mode
+explanation in `import.meta.env.DEV` so it's obvious the auto-check
+isn't broken — it's deliberately disabled.
+
+The gate lives in `AppShell.tsx`'s `useEffect`:
+
+```ts
+useEffect(() => {
+  if (hasCheckedForUpdates) return;
+  if (import.meta.env.DEV) return;
+  void checkForUpdates();
+}, [hasCheckedForUpdates, checkForUpdates]);
+```
+
+Production builds (`pnpm tauri:build`) set `import.meta.env.DEV` to
+false, restoring the on-launch check.
+
 ## Decisions Made
 
 | Date | Decision | Rationale |

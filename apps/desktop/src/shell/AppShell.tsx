@@ -143,11 +143,22 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
   // store transitions to `error`, which the badge + banner ignore.
   // Settings → Updates surfaces the error message if the user
   // explicitly looks.
+  //
+  // Dev-mode policy: SKIP the auto-check entirely when running under
+  // `vite dev` / `pnpm tauri:dev` / vitest. The running build is
+  // typically 0.0.0 (the version in the working tree) and would
+  // perpetually flag the latest published release as "available",
+  // which is noisy during development. The "Check now" button in
+  // Settings → Updates is NOT gated, so manual checks still work in
+  // dev — useful for testing the update UI itself. `import.meta.env.DEV`
+  // is Vite's build-time constant, true in dev and tests, false in
+  // production builds.
   const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
   const hasCheckedForUpdates = useUpdaterStore((s) => s.hasChecked);
   const hasUpdate = useUpdaterHasUpdate();
   useEffect(() => {
     if (hasCheckedForUpdates) return;
+    if (import.meta.env.DEV) return;
     void checkForUpdates();
   }, [hasCheckedForUpdates, checkForUpdates]);
 
