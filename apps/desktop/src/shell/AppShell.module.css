@@ -42,6 +42,31 @@
    * additional height work needed here. */
 }
 
+/*
+ * Main slot wrapper — flex column that lets the UpdaterBanner sit
+ * above the workspace grid without participating in the grid itself.
+ * The workspace grid below claims `flex: 1 1 auto` so it absorbs the
+ * remaining height; the banner is `flex: 0 0 auto` (set in its own
+ * module) so it only takes the height of its content.
+ *
+ * This wrapper is always rendered, even when no banner shows. The
+ * cost when the banner is hidden is a single empty flex container —
+ * negligible.
+ */
+.mainStack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.mainStack > .workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: 1fr var(--ws-right-width, 320px);

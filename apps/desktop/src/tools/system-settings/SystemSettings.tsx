@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { LcarsPill } from '@hyperspanner/lcars-ui';
 
@@ -6,6 +6,10 @@ import type { Zone } from '../../state';
 import { ToolFrame, ToolStatusPill } from '../components';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeName } from '../../themes';
+import {
+  useUpdaterState,
+  useUpdaterStore,
+} from '../../state/useUpdater';
 import styles from './SystemSettings.module.css';
 
 export interface SystemSettingsProps {
@@ -62,6 +66,35 @@ const THEME_OPTIONS: ReadonlyArray<{
 export const SystemSettings: FC<SystemSettingsProps> = ({ toolId, zone }) => {
   const { theme, themeName, setTheme } = useTheme();
   const isCompact = zone === 'right' || zone === 'bottom';
+
+  // Updates section state. Subscribed narrowly so unrelated workspace
+  // updates don't re-render the whole settings tree.
+  const updaterState = useUpdaterState();
+  const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
+  const installUpdate = useUpdaterStore((s) => s.installUpdate);
+  const relaunchAfterInstall = useUpdaterStore((s) => s.relaunchAfterInstall);
+
+  // Resolve the running app version via Tauri's `getVersion()`. It
+  // reads from `tauri.conf.json` at runtime so the value always
+  // matches what's actually packaged. Lazy-loaded so jsdom-based tests
+  // don't try to invoke a non-existent Tauri runtime; the import
+  // promise resolves to an empty string on failure (e.g., in tests).
+  const [appVersion, setAppVersion] = useState<string>('');
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getVersion } = await import('@tauri-apps/api/app');
+        const v = await getVersion();
+        if (!cancelled) setAppVersion(v);
+      } catch {
+        // No Tauri runtime — leave the version blank.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSelectTheme = useCallback(
     (next: ThemeName) => {
@@ -126,13 +159,46 @@ export const SystemSettings: FC<SystemSettingsProps> = ({ toolId, zone }) => {
           </div>
         </section>
 
+        <section
+          className={styles.section}
+          aria-labelledby={`${toolId}-updates-hd`}
+        >
+          <h3 id={`${toolId}-updates-hd`} className={styles.sectionLabel}>
+            Updates
+          </h3>
+          <p className={styles.sectionLead}>
+            Hyperspanner checks for new releases on launch.{' '}
+            {appVersion ? (
+              <>
+                You're running <strong>v{appVersion}</strong>.
+              </>
+            ) : (
+              <>(Version unavailable in this environment.)</>
+            )}
+          </p>
+          <UpdatesPanel
+            updaterState={updaterState}
+            onCheck={() => {
+              void checkForUpdates();
+            }}
+            onInstall={() => {
+              void installUpdate();
+            }}
+            onRelaunch={() => {
+              void relaunchAfterInstall();
+            }}
+          />
+        </section>
+
         <section className={styles.section} aria-label="Phase 8 preview">
           <h3 className={styles.sectionLabel}>Coming soon</h3>
           <ul className={styles.previewList}>
             <li>Layout — default startup tools, default preset, side widths.</li>
             <li>Keyboard — rebindable shortcuts.</li>
             <li>Data — import / export workspace, custom presets.</li>
-            <li>Diagnostics — log directory, recent errors, telemetry opt-in.</li>
+            <li>
+              Diagnostics — log directory, recent errors, telemetry opt-in.
+            </li>
             <li>External integrations — clipboard, drag-and-drop policy.</li>
           </ul>
           <div className={styles.previewActions}>
@@ -144,4 +210,115 @@ export const SystemSettings: FC<SystemSettingsProps> = ({ toolId, zone }) => {
       </div>
     </ToolFrame>
   );
+};
+
+interface UpdatesPanelProps {
+  updaterState: ReturnType<typeof useUpdaterState>;
+  onCheck: () => void;
+  onInstall: () => void;
+  onRelaunch: () => void;
+}
+
+/**
+ * UpdatesPanel — renders the right copy + controls for whatever
+ * updater state we're in. Pulled out as its own component so the
+ * SystemSettings body stays readable; the state machine has more
+ * branches than fit cleanly in JSX inline.
+ */
+const UpdatesPanel: FC<UpdatesPanelProps> = ({
+  updaterState,
+  onCheck,
+  onInstall,
+  onRelaunch,
+}) => {
+  switch (updaterState.kind) {
+    case 'idle':
+    case 'up-to-date':
+      return (
+        <div className={styles.updatesRow}>
+          <span className={styles.updatesText}>
+            {updaterState.kind === 'up-to-date'
+              ? "You're on the latest version."
+              : 'No update check has run yet.'}
+          </span>
+          <LcarsPill size="small" onClick={onCheck} aria-label="Check for updates">
+            Check now
+          </LcarsPill>
+        </div>
+      );
+    case 'checking':
+      return (
+        <div className={styles.updatesRow}>
+          <span className={styles.updatesText}>Checking for updates…</span>
+          <LcarsPill size="small" disabled aria-label="Check in progress">
+            Checking…
+          </LcarsPill>
+        </div>
+      );
+    case 'available':
+      return (
+        <div className={styles.updatesAvailable}>
+          <div className={styles.updatesRow}>
+            <span className={styles.updatesText}>
+              <strong>v{updaterState.version}</strong> is available.
+            </span>
+            <LcarsPill
+              size="small"
+              onClick={onInstall}
+              aria-label={`Install version ${updaterState.version}`}
+            >
+              Install update
+            </LcarsPill>
+          </div>
+          {updaterState.notes ? (
+            <pre className={styles.releaseNotes} aria-label="Release notes">
+              {updaterState.notes}
+            </pre>
+          ) : null}
+        </div>
+      );
+    case 'downloading':
+      return (
+        <div className={styles.updatesRow}>
+          <span className={styles.updatesText}>
+            Downloading v{updaterState.version}
+            {updaterState.progress !== null
+              ? ` — ${Math.round(updaterState.progress)}%`
+              : '…'}
+          </span>
+          <progress
+            className={styles.progressBar}
+            value={updaterState.progress ?? undefined}
+            max={100}
+            aria-label="Download progress"
+          />
+        </div>
+      );
+    case 'ready-to-install':
+      return (
+        <div className={styles.updatesRow}>
+          <span className={styles.updatesText}>
+            v{updaterState.version} is ready. Restart to apply.
+          </span>
+          <LcarsPill
+            size="small"
+            onClick={onRelaunch}
+            aria-label="Restart now to install update"
+          >
+            Restart now
+          </LcarsPill>
+        </div>
+      );
+    case 'error':
+      return (
+        <div className={styles.updatesRow}>
+          <span className={styles.updatesText}>
+            Update check unavailable. {updaterState.message}
+          </span>
+          <LcarsPill size="small" onClick={onCheck} aria-label="Retry update check">
+            Retry
+          </LcarsPill>
+        </div>
+      );
+  }
 };

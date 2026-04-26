@@ -1,0 +1,123 @@
+# Release workflow for Hyperspanner.
+#
+# Triggers on tag push (v*). Builds the Tauri bundle on Windows and
+# Linux in parallel, then attaches the installer artifacts + the
+# minisign-signed `latest.json` manifest to a GitHub Release.
+#
+# Update flow once a release is published:
+#   1. Running app pings
+#      https://github.com/echozulucode/hyperspanner/releases/latest/download/latest.json
+#   2. Tauri's updater plugin compares the current version to
+#      manifest.version, downloads the matching installer, verifies
+#      its minisign signature against the public key bundled in
+#      `tauri.conf.json`, and prompts the user to install.
+#
+# The release is created as a DRAFT so we can edit notes and review
+# before going live. Publishing the draft (in the GitHub UI) is the
+# moment the channel updates and clients pick up the new version.
+#
+# Required secrets (configured under Settings → Secrets and variables → Actions):
+#   - TAURI_SIGNING_PRIVATE_KEY            — minisign private key contents
+#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD   — passphrase set when generating the key
+#   - GITHUB_TOKEN                          — auto-injected by Actions
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  # `contents: write` is required so tauri-action can create the
+  # release and upload artifacts via the GitHub API.
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust target directory
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build + release with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Minisign signing keys. tauri-action picks these up via env
+          # vars; the JSON manifest's signature field is generated from
+          # the private key during the bundle step.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # tauri-action runs `tauri build` from this directory.
+          projectPath: apps/desktop
+          # `__VERSION__` resolves to the tag (without the leading `v`).
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Hyperspanner ${{ github.ref_name }}'
+          releaseBody: |
+            Download the installer for your platform below.
+
+            **Windows** — `Hyperspanner_<version>_x64-setup.exe` (per-user, no
+            admin required). On first install, Windows SmartScreen will
+            warn about an unrecognized publisher; click **More info** →
+            **Run anyway**. (We're not Authenticode-signed for v0.x; this
+            is expected.)
+
+            **Linux** — `.AppImage` (no install needed, runs anywhere),
+            `.deb` (Debian / Ubuntu), or `.rpm` (Fedora / RHEL).
+
+            Auto-updates are wired starting from this version: launches
+            check `releases/latest/download/latest.json` and surface an
+            update affordance in **Settings → Updates** when a newer
+            release is published.
+          releaseDraft: true
+          prerelease: false
+          # Prefer NSIS over MSI for Windows update downloads. The NSIS
+          # installer is what the per-user install path uses; MSI would
+          # require elevation on update.
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}

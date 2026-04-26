@@ -17,6 +17,8 @@
   "dependencies": {
     "@hyperspanner/lcars-ui": "workspace:*",
     "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-process": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
     "diff": "^7.0.0",
     "js-yaml": "^4.1.0",
     "react": "^19.1.1",

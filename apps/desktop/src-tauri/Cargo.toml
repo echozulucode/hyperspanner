@@ -28,6 +28,16 @@ sha1 = "0.10"
 sha2 = "0.10"
 hex = "0.4"
 
+# Phase 7 — auto-updates. The updater plugin pings a manifest URL on
+# launch, downloads the new bundle if a newer version is available,
+# verifies the minisign signature against the public key in
+# `tauri.conf.json`, then hands off to NSIS (Windows) or replaces the
+# AppImage / .deb / .rpm contents (Linux). The process plugin pairs
+# with it for the post-install relaunch — `relaunch()` is the
+# canonical "restart cleanly into the new binary" call.
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
 # Phase 6.5 deps. Kept conservative: TLS via rustls (pure-Rust, no
 # OpenSSL build step on Windows), cert parsing via x509-parser. The
 # protobuf decoder is intentionally schema-less in 6.5 — it parses wire

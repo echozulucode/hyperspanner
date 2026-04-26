@@ -14,6 +14,114 @@ next_actions:
 
 # Status Log
 
+## Session: 2026-04-26 (Phase 7.7 + 7.8 + 7.9 — updater plugin, release workflow, in-app UI)
+
+User generated the minisign keypair + added GitHub Actions secrets.
+Public key landed in `tauri.conf.json` with `plugins.updater.active:
+true`. Then 7.7–7.9 went in.
+
+**7.7 — Updater plugin wiring (Rust + JS + capabilities):**
+
+- `apps/desktop/src-tauri/Cargo.toml` — added
+  `tauri-plugin-updater = "2"` and `tauri-plugin-process = "2"`.
+- `apps/desktop/src-tauri/src/lib.rs` — registered both via
+  `.plugin(tauri_plugin_updater::Builder::new().build())` and
+  `.plugin(tauri_plugin_process::init())` on the
+  `tauri::Builder`.
+- `apps/desktop/package.json` — added
+  `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-process`
+  as dependencies.
+- `apps/desktop/src-tauri/capabilities/default.json` — granted
+  `updater:default` and `process:default` permissions.
+
+**7.8 — GitHub Actions release workflow:**
+
+- `.github/workflows/release.yml` — tag-triggered (`v*`),
+  builds on Ubuntu (deb/rpm/AppImage) + Windows (NSIS installer)
+  via `tauri-apps/tauri-action@v0`. Reads
+  `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+  from GitHub secrets to sign the manifest. Creates a draft
+  release; user reviews + publishes manually. Uses
+  `updaterJsonPreferNsis: true` so Windows update downloads
+  use the per-user NSIS installer rather than MSI.
+
+**7.9 — In-app update UI:**
+
+- `apps/desktop/src/state/useUpdater.ts` — Zustand store with the
+  state machine (idle → checking → up-to-date | available →
+  downloading → ready-to-install | error). Test-seam pair
+  (`__setUpdaterClientForTests` / `__resetUpdaterClient`) lets
+  unit tests run under jsdom without the Tauri runtime —
+  production code goes through lazy dynamic imports of the
+  plugins, so the test bundle never tries to load them.
+  Selector helpers (`useUpdaterState`, `useUpdaterHasUpdate`,
+  `useUpdaterShouldShowBanner`) for narrow component
+  subscriptions.
+- `apps/desktop/src/state/useUpdater.test.ts` — 12 tests covering
+  the lifecycle: idle start, up-to-date transition, available
+  transition, error tolerance (silent failure), banner
+  un-dismissal on new availability, in-flight idempotence,
+  download progress percentages, no-op when not available, error
+  from a failing install, dismiss flag, relaunch invocation.
+- `apps/desktop/src/shell/UpdaterBanner.tsx` + `.module.css` —
+  quiet announcement strip above the workspace. Shows version,
+  "View details" (opens Settings → Updates), "Later"
+  (session-dismiss). Pulse animation respects `prefers-reduced-
+motion`.
+- `apps/desktop/src/tools/system-settings/SystemSettings.tsx` —
+  new "Updates" section between Appearance and the "Coming soon"
+  preview. Reads the running app version via
+  `@tauri-apps/api/app`'s `getVersion()` (lazy-imported, blank
+  string in test env). Inline `<UpdatesPanel>` switches on the
+  state machine: idle / up-to-date show "Check now" button;
+  checking shows "Checking…"; available shows version + release
+  notes (markdown raw in a `<pre>`) + "Install update"; downloading
+  shows progress %; ready-to-install shows "Restart now"; error
+  shows the message + "Retry".
+- `apps/desktop/src/tools/system-settings/SystemSettings.module.css`
+  — added `.updatesRow`, `.updatesText`, `.updatesAvailable`,
+  `.releaseNotes` (left-bordered code block), `.progressBar`
+  (with cross-browser `::-webkit-progress-value` / `::-moz-progress-bar`
+  styling).
+- `apps/desktop/src/shell/AppShell.tsx`:
+  - Mounted the on-launch update check via a single `useEffect`
+    gated by the store's `hasChecked` flag.
+  - Added a small orange dot to the SETTINGS pill when
+    `useUpdaterHasUpdate()` returns true (also threads
+    "(update available)" into the pill's aria-label).
+  - Wrapped the workspace grid in a new `.mainStack` flex column
+    so `<UpdaterBanner />` can sit above the grid without
+    participating in the grid itself.
+- `apps/desktop/src/shell/AppShell.module.css` — added
+  `.mainStack` (flex column, `> .workspace { flex: 1 1 auto }`).
+
+**What you need to do before this session's code can run:**
+
+1. **`pnpm install`** at the repo root — fetches the new JS plugin
+   packages.
+2. **`pnpm tauri:build`** — first build pulls + compiles the new
+   Rust crates (`tauri-plugin-updater`, `tauri-plugin-process`).
+   Expect ~5-10 min for the cold build.
+
+**Verification gates this session needs to clear** (on the host):
+
+1. `pnpm typecheck` — should be clean. The lazy imports pull
+   types from the installed packages, so step 1 above must run
+   first.
+2. `pnpm test` — 12 new updater tests; expect 615 total passing.
+3. `pnpm tauri:build` — confirms the Rust plugins compile
+   against the existing dependency tree.
+
+**Pending in plan-007:**
+
+- **7.10** — end-to-end verification. Bump versions to 0.0.1,
+  push tag `v0.0.1`, watch Action build the installers, edit
+  notes, publish. Install locally. Bump to 0.0.2, push tag,
+  publish. Run installed v0.0.1, verify the banner + badge
+  appear, verify install flow drops into v0.0.2.
+
+---
+
 ## Session: 2026-04-26 (MIT license + NSIS installer config + plan-007 walkthrough)
 
 User confirmed the project is going public as MIT-licensed at
@@ -23,81 +131,79 @@ walkthrough.
 
 **License — landed:**
 
-  - `LICENSE` at the repo root, MIT template, copyright "Eric
-    Zimmerman" (inferred from `ericjzim@gmail.com` + the
-    `echozulucode` handle — confirm and edit if the legal name
-    differs).
-  - Root `package.json`: added `license: "MIT"`, `author`,
-    `homepage`, `repository`, `bugs`.
-  - `apps/desktop/package.json` + `packages/lcars-ui/package.json`:
-    added `license: "MIT"`.
-  - `apps/desktop/src-tauri/Cargo.toml`: replaced
-    `"Hyperspanner contributors"` author with `"Eric Zimmerman"`,
-    added `license = "MIT"`, `repository`, `homepage`.
+- `LICENSE` at the repo root, MIT template, copyright "Eric
+  Zimmerman".
+- Root `package.json`: added `license: "MIT"`, `author`,
+  `homepage`, `repository`, `bugs`.
+- `apps/desktop/package.json` + `packages/lcars-ui/package.json`:
+  added `license: "MIT"`.
+- `apps/desktop/src-tauri/Cargo.toml`: replaced
+  `"Hyperspanner contributors"` author with `"Eric Zimmerman"`,
+  added `license = "MIT"`, `repository`, `homepage`.
 
 **NSIS per-user + Linux bundle config — landed:**
 
-  - `apps/desktop/src-tauri/tauri.conf.json`: replaced
-    `bundle.targets: "all"` with explicit
-    `["nsis", "deb", "rpm", "appimage"]` (macOS dropped per the
-    user's "Windows + Linux" preference). Added
-    `bundle.windows.nsis.installMode: "perUser"` so the installer
-    lands in `%LOCALAPPDATA%\Programs\Hyperspanner` without
-    elevation. Set `publisher`, `licenseFile` (relative path
-    `../../../LICENSE` from `src-tauri/`), and `homepage`.
-  - Stubbed `plugins.updater` with `active: false`, the GitHub
-    Releases endpoint URL, and a `REPLACE_WITH_GENERATED_UPDATER_PUBLIC_KEY`
-    placeholder. Flips to active in 7.7 once the keys are
-    generated.
+- `apps/desktop/src-tauri/tauri.conf.json`: replaced
+  `bundle.targets: "all"` with explicit
+  `["nsis", "deb", "rpm", "appimage"]` (macOS dropped per the
+  user's "Windows + Linux" preference). Added
+  `bundle.windows.nsis.installMode: "perUser"` so the installer
+  lands in `%LOCALAPPDATA%\Programs\Hyperspanner` without
+  elevation. Set `publisher`, `licenseFile` (relative path
+  `../../../LICENSE` from `src-tauri/`), and `homepage`.
+- Stubbed `plugins.updater` with `active: false`, the GitHub
+  Releases endpoint URL, and a `REPLACE_WITH_GENERATED_UPDATER_PUBLIC_KEY`
+  placeholder. Flips to active in 7.7 once the keys are
+  generated.
 
 **plan-007 — written:**
 
-  - `docs/plan-007-packaging-and-updates.md` — the full
-    architecture + step-by-step for sub-phases 7.6 through 7.10:
-    NSIS / Linux installer, signing keys, Tauri updater plugin,
-    GitHub Actions release workflow, in-app update UI, end-to-end
-    verification. Walks through what's hands-on (key generation,
-    GitHub secrets) vs what's code (plugin wiring, UI surfaces).
-  - `docs/index.yaml` — registered plan-007.
+- `docs/plan-007-packaging-and-updates.md` — the full
+  architecture + step-by-step for sub-phases 7.6 through 7.10:
+  NSIS / Linux installer, signing keys, Tauri updater plugin,
+  GitHub Actions release workflow, in-app update UI, end-to-end
+  verification. Walks through what's hands-on (key generation,
+  GitHub secrets) vs what's code (plugin wiring, UI surfaces).
+- `docs/index.yaml` — registered plan-007.
 
 **What's hands-on for the user before 7.7 can land:**
 
-  1. Confirm the LICENSE copyright line ("Eric Zimmerman" — adjust
-     if your full legal name is different; this is the only piece
-     of the license that's a name guess).
-  2. Generate the updater signing keypair locally:
-     `pnpm --filter @hyperspanner/desktop tauri signer generate
-     -w ~/.tauri/hyperspanner-updater.key`. Set a passphrase.
-  3. Paste the public key into `tauri.conf.json` →
-     `plugins.updater.pubkey`, flip `active` to `true`.
-  4. Push the private key + passphrase to GitHub Actions secrets
-     (`TAURI_SIGNING_PRIVATE_KEY`,
-     `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
+1. Confirm the LICENSE copyright line ("Eric Zimmerman" — adjust
+   if your full legal name is different; this is the only piece
+   of the license that's a name guess).
+2. Generate the updater signing keypair locally:
+   `pnpm --filter @hyperspanner/desktop tauri signer generate
+-w ~/.tauri/hyperspanner-updater.key`. Set a passphrase.
+3. Paste the public key into `tauri.conf.json` →
+   `plugins.updater.pubkey`, flip `active` to `true`.
+4. Push the private key + passphrase to GitHub Actions secrets
+   (`TAURI_SIGNING_PRIVATE_KEY`,
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
 
 **What's pure code from here (Claude can drive once keys exist):**
 
-  - 7.7: add `tauri-plugin-updater` to Cargo.toml + register in
-    `lib.rs`; add `@tauri-apps/plugin-updater` +
-    `@tauri-apps/plugin-process` to `apps/desktop/package.json`;
-    add capability grants.
-  - 7.8: write `.github/workflows/release.yml` (template is in
-    plan-007).
-  - 7.9: write `useUpdater()` hook + Zustand slice + tests;
-    write `<UpdaterBanner />` component; augment SystemSettings
-    with the Updates section; augment AppShell with the badge +
-    banner mount.
-  - 7.10: bump versions, push v0.0.1 → v0.0.2, watch the flow.
+- 7.7: add `tauri-plugin-updater` to Cargo.toml + register in
+  `lib.rs`; add `@tauri-apps/plugin-updater` +
+  `@tauri-apps/plugin-process` to `apps/desktop/package.json`;
+  add capability grants.
+- 7.8: write `.github/workflows/release.yml` (template is in
+  plan-007).
+- 7.9: write `useUpdater()` hook + Zustand slice + tests;
+  write `<UpdaterBanner />` component; augment SystemSettings
+  with the Updates section; augment AppShell with the badge +
+  banner mount.
+- 7.10: bump versions, push v0.0.1 → v0.0.2, watch the flow.
 
 **Verification still to run on the host** for the changes that
 landed this turn:
 
-  - `pnpm typecheck && pnpm test` — should be green; only JSON +
-    text changes this turn.
-  - `pnpm tauri build` — verifies the new bundle config produces
-    the NSIS installer + the Linux bundles cleanly. (Linux .rpm
-    needs `rpmbuild` installed; if you don't have it locally, the
-    .rpm step will fail but .deb + AppImage should still build.
-    On CI we'll install `rpm` explicitly.)
+- `pnpm typecheck && pnpm test` — should be green; only JSON +
+  text changes this turn.
+- `pnpm tauri build` — verifies the new bundle config produces
+  the NSIS installer + the Linux bundles cleanly. (Linux .rpm
+  needs `rpmbuild` installed; if you don't have it locally, the
+  .rpm step will fail but .deb + AppImage should still build.
+  On CI we'll install `rpm` explicitly.)
 
 ---
 
@@ -108,58 +214,58 @@ from the navigator. Both done in one pass:
 
 **Preset removal — user surfaces gone, machinery gone:**
 
-  - **`apps/desktop/src/state/presets.ts`** — kept `DEFAULT_COLLAPSED`
-    and `DEFAULT_WORKSPACE` (still used by `resetLayout()` and the
-    store's initial state). Dropped `LayoutPreset` type, `LAYOUT_PRESETS`
-    catalog, `findPreset` lookup. File now ~30 lines.
-  - **`apps/desktop/src/state/workspace.types.ts`** — dropped
-    `layoutPreset: string` from `WorkspaceState`, dropped
-    `applyPreset` from `WorkspaceActions`.
-  - **`apps/desktop/src/state/workspace.ts`** — dropped `applyPreset`
-    action implementation; dropped `findPreset` import; dropped the
-    now-unused `reconcileActives` helper (only `applyPreset` called
-    it); updated `partializeWorkspace` to no longer persist
-    `layoutPreset`. Persist version stays at 1 — extra fields in
-    older localStorage blobs from before the rename are silently
-    ignored on rehydration; no migration needed.
-  - **`apps/desktop/src/state/index.ts`** — dropped re-exports of
-    `LAYOUT_PRESETS`, `findPreset`, `LayoutPreset`.
-  - **`apps/desktop/src/state/workspace.test.ts`** — dropped the
-    three `applyPreset` tests; collapsed the `applyPreset / resetLayout`
-    describe block down to just `resetLayout`; dropped the
-    "persists layoutPreset" assertion + the field from the
-    `readPersisted()` shape.
-  - **`apps/desktop/src/screens/HomeView.tsx`** — dropped the
-    "LAYOUT PRESETS" section and all preset-related imports / state
-    selectors.
-  - **`apps/desktop/src/shell/ToolStatusPanels.tsx`** — dropped the
-    `LAYOUT` row from the rail-stack telemetry readout (it was
-    showing the active preset id; without presets, no payload).
+- **`apps/desktop/src/state/presets.ts`** — kept `DEFAULT_COLLAPSED`
+  and `DEFAULT_WORKSPACE` (still used by `resetLayout()` and the
+  store's initial state). Dropped `LayoutPreset` type, `LAYOUT_PRESETS`
+  catalog, `findPreset` lookup. File now ~30 lines.
+- **`apps/desktop/src/state/workspace.types.ts`** — dropped
+  `layoutPreset: string` from `WorkspaceState`, dropped
+  `applyPreset` from `WorkspaceActions`.
+- **`apps/desktop/src/state/workspace.ts`** — dropped `applyPreset`
+  action implementation; dropped `findPreset` import; dropped the
+  now-unused `reconcileActives` helper (only `applyPreset` called
+  it); updated `partializeWorkspace` to no longer persist
+  `layoutPreset`. Persist version stays at 1 — extra fields in
+  older localStorage blobs from before the rename are silently
+  ignored on rehydration; no migration needed.
+- **`apps/desktop/src/state/index.ts`** — dropped re-exports of
+  `LAYOUT_PRESETS`, `findPreset`, `LayoutPreset`.
+- **`apps/desktop/src/state/workspace.test.ts`** — dropped the
+  three `applyPreset` tests; collapsed the `applyPreset / resetLayout`
+  describe block down to just `resetLayout`; dropped the
+  "persists layoutPreset" assertion + the field from the
+  `readPersisted()` shape.
+- **`apps/desktop/src/screens/HomeView.tsx`** — dropped the
+  "LAYOUT PRESETS" section and all preset-related imports / state
+  selectors.
+- **`apps/desktop/src/shell/ToolStatusPanels.tsx`** — dropped the
+  `LAYOUT` row from the rail-stack telemetry readout (it was
+  showing the active preset id; without presets, no payload).
 
 **System tools hidden from the navigator:**
 
-  - **`apps/desktop/src/tools/registry.ts`** — added a
-    `hidden?: boolean` field to `ToolDescriptor`. Marked
-    `system-settings` as `hidden: true`. Updated
-    `listToolsByCategory()` to skip hidden entries (the
-    LeftNavigator browse + HomeView BROWSE both consume it). Left
-    `listTools()` unchanged so the command palette still surfaces
-    hidden tools — `⌘K → settings` continues to work.
-  - **`apps/desktop/src/shell/LeftNavigator.tsx`** — filtered
-    `allTools` to `!t.hidden` so hidden surfaces don't leak into
-    search results, favorites resolution, or recents resolution.
-    They still resolve via `byId` if needed but the navigator's
-    user-facing lists exclude them.
-  - **`apps/desktop/src/screens/HomeView.tsx`** — `X TOOLS` count
-    chip now filters to non-hidden so it matches the visible browse
-    grid below it.
+- **`apps/desktop/src/tools/registry.ts`** — added a
+  `hidden?: boolean` field to `ToolDescriptor`. Marked
+  `system-settings` as `hidden: true`. Updated
+  `listToolsByCategory()` to skip hidden entries (the
+  LeftNavigator browse + HomeView BROWSE both consume it). Left
+  `listTools()` unchanged so the command palette still surfaces
+  hidden tools — `⌘K → settings` continues to work.
+- **`apps/desktop/src/shell/LeftNavigator.tsx`** — filtered
+  `allTools` to `!t.hidden` so hidden surfaces don't leak into
+  search results, favorites resolution, or recents resolution.
+  They still resolve via `byId` if needed but the navigator's
+  user-facing lists exclude them.
+- **`apps/desktop/src/screens/HomeView.tsx`** — `X TOOLS` count
+  chip now filters to non-hidden so it matches the visible browse
+  grid below it.
 
 **Orphan files** still pending manual deletion (the cowork sandbox
 doesn't permit `rm` on the workspace mount):
 
-  - `apps/desktop/src/shell/PresetSelector.tsx`
-  - `apps/desktop/src/shell/PresetSelector.module.css`
-  - `apps/desktop/src/shell/PresetSelector.test.tsx`
+- `apps/desktop/src/shell/PresetSelector.tsx`
+- `apps/desktop/src/shell/PresetSelector.module.css`
+- `apps/desktop/src/shell/PresetSelector.test.tsx`
 
 These are now stubbed out (the .tsx file just `export {}`s, the
 test has a single `describe.skip(...)`) so typecheck + test stay
@@ -184,77 +290,77 @@ builds.
 **The new top-rail nav cluster** (in `AppShell.tsx`'s `navigation`
 JSX block):
 
-  1. **⌘K · PALETTE** — universal launcher (kept).
-  2. **⌂ HOME** — clears `activeByZone.center` to `null` so
-     CenterZone falls back to rendering HomeView. Open tools stay
-     docked in the tab strip; clicking a tab returns to a tool.
-     Without this button there was no one-click path back to the
-     launchpad once a tool was active.
-  3. **⚙ SETTINGS** — opens the new `system-settings` tool in the
-     center zone via the existing single-instance `openTool()`
-     machinery. Second click focuses the existing settings tab
-     rather than opening a duplicate.
-  4. **GALLERY** / **SCREENS** — wrapped in `{import.meta.env.DEV
-     && (...)}`. `import.meta.env.DEV` is Vite's build-time
-     constant: true in `pnpm dev` (and vitest), false in
-     `pnpm build`. Production bundles tree-shake the conditional
-     branches so these pills don't ship.
-  5. **▲** — collapse top chrome (kept).
+1. **⌘K · PALETTE** — universal launcher (kept).
+2. **⌂ HOME** — clears `activeByZone.center` to `null` so
+   CenterZone falls back to rendering HomeView. Open tools stay
+   docked in the tab strip; clicking a tab returns to a tool.
+   Without this button there was no one-click path back to the
+   launchpad once a tool was active.
+3. **⚙ SETTINGS** — opens the new `system-settings` tool in the
+   center zone via the existing single-instance `openTool()`
+   machinery. Second click focuses the existing settings tab
+   rather than opening a duplicate.
+4. **GALLERY** / **SCREENS** — wrapped in `{import.meta.env.DEV
+&& (...)}`. `import.meta.env.DEV` is Vite's build-time
+   constant: true in `pnpm dev` (and vitest), false in
+   `pnpm build`. Production bundles tree-shake the conditional
+   branches so these pills don't ship.
+5. **▲** — collapse top chrome (kept).
 
 **Removed from the top rail:**
 
-  - **Theme cycle pill** — moved to Settings → Appearance. The
-    `cycleTheme` callback stays in AppShell because the command
-    palette still surfaces it as an action (keyboard-first users
-    can flip variants without opening Settings).
-  - **PresetSelector dropdown** — pulled entirely. The HomeView's
-    LAYOUT PRESETS card grid (added in the same session) is the
-    canonical preset access surface; it's richer (full descriptions,
-    visual feedback for active preset) and only renders when the
-    user is on the launchpad anyway. Power users can also `⌘K →
-    "minimal focus"` if a palette entry for presets gets added
-    later.
-  - **RESET pill** — already in the command palette as
-    `Reset Layout`; that's the right home for a panic button.
+- **Theme cycle pill** — moved to Settings → Appearance. The
+  `cycleTheme` callback stays in AppShell because the command
+  palette still surfaces it as an action (keyboard-first users
+  can flip variants without opening Settings).
+- **PresetSelector dropdown** — pulled entirely. The HomeView's
+  LAYOUT PRESETS card grid (added in the same session) is the
+  canonical preset access surface; it's richer (full descriptions,
+  visual feedback for active preset) and only renders when the
+  user is on the launchpad anyway. Power users can also `⌘K →
+"minimal focus"` if a palette entry for presets gets added
+  later.
+- **RESET pill** — already in the command palette as
+  `Reset Layout`; that's the right home for a panic button.
 
 **New `system-settings` tool** at
 `apps/desktop/src/tools/system-settings/`:
 
-  - `SystemSettings.tsx` — a `ToolFrame`-based view. Phase 7 stub
-    scope: just an Appearance section with a 4-card theme picker
-    (Picard Modern / Classic / Nemesis Blue / Lower Decks). Active
-    theme gets the `themeCardActive` modifier (orange outline +
-    tint). Clicking a card calls `setTheme(id)` from
-    `ThemeContext`. Plus a "Coming soon" preview list naming the
-    Phase 8 sections (Layout, Keyboard, Data, Diagnostics,
-    External Integrations).
-  - `SystemSettings.module.css` — section / lead / theme grid /
-    theme card styles. Mirrors the HomeView preset-card pattern so
-    the LCARS grammar reads consistently across surfaces.
-  - `index.ts` — barrel.
-  - **Registry entry** in `tools/registry.ts`: id
-    `system-settings`, category `utilities`, defaultZone `center`,
-    `supportedZones: ['center']` (settings sections don't fit the
-    inspector dock cleanly). Comment explains the `system-` id
-    prefix flag.
+- `SystemSettings.tsx` — a `ToolFrame`-based view. Phase 7 stub
+  scope: just an Appearance section with a 4-card theme picker
+  (Picard Modern / Classic / Nemesis Blue / Lower Decks). Active
+  theme gets the `themeCardActive` modifier (orange outline +
+  tint). Clicking a card calls `setTheme(id)` from
+  `ThemeContext`. Plus a "Coming soon" preview list naming the
+  Phase 8 sections (Layout, Keyboard, Data, Diagnostics,
+  External Integrations).
+- `SystemSettings.module.css` — section / lead / theme grid /
+  theme card styles. Mirrors the HomeView preset-card pattern so
+  the LCARS grammar reads consistently across surfaces.
+- `index.ts` — barrel.
+- **Registry entry** in `tools/registry.ts`: id
+  `system-settings`, category `utilities`, defaultZone `center`,
+  `supportedZones: ['center']` (settings sections don't fit the
+  inspector dock cleanly). Comment explains the `system-` id
+  prefix flag.
 
 **Files unchanged but worth noting:**
 
-  - `CommandPalette.tsx` still wires `onResetLayout={resetLayout}`
-    and `onCycleTheme={cycleTheme}` from AppShell — both
-    `resetLayout` and `cycleTheme` survive in AppShell for that
-    reason even though their UI surfaces moved.
-  - HomeView's LAYOUT PRESETS section stays — the user's
-    complaint was about the dropdown specifically, not the card
-    grid. The card grid is the better surface for preset switching
-    (descriptions visible, active state shown).
+- `CommandPalette.tsx` still wires `onResetLayout={resetLayout}`
+  and `onCycleTheme={cycleTheme}` from AppShell — both
+  `resetLayout` and `cycleTheme` survive in AppShell for that
+  reason even though their UI surfaces moved.
+- HomeView's LAYOUT PRESETS section stays — the user's
+  complaint was about the dropdown specifically, not the card
+  grid. The card grid is the better surface for preset switching
+  (descriptions visible, active state shown).
 
 **Orphan files** I couldn't clean up automatically (the cowork
 sandbox doesn't permit `rm` on the mount):
 
-  - `apps/desktop/src/shell/PresetSelector.tsx`
-  - `apps/desktop/src/shell/PresetSelector.module.css`
-  - `apps/desktop/src/shell/PresetSelector.test.tsx`
+- `apps/desktop/src/shell/PresetSelector.tsx`
+- `apps/desktop/src/shell/PresetSelector.module.css`
+- `apps/desktop/src/shell/PresetSelector.test.tsx`
 
 These are no longer imported by AppShell, so they're effectively
 dead code. Their test file still runs and passes (it tests the
@@ -270,29 +376,29 @@ keeps the rail clean.
 
 **Pending in Phase 7:**
 
-  - **7.4 Custom presets** — "Save as preset…" action that writes
-    a custom preset to a `useCustomPresets` slice (Zustand +
-    persist, mirroring `useFavorites`). Custom entries render
-    below the built-ins in the HomeView card grid with a remove
-    affordance. Now that the dropdown is gone, the entry point for
-    "save current layout" lives in the HomeView preset section
-    header (a "+" affordance) or in the Settings view's Layout
-    section (Phase 8).
-  - **7.5 Verification** — apply each built-in preset, confirm zone
-    state matches; restart, confirm last layout + favorites +
-    recents survive; save a custom preset, restart, confirm it's
-    still in the selector.
+- **7.4 Custom presets** — "Save as preset…" action that writes
+  a custom preset to a `useCustomPresets` slice (Zustand +
+  persist, mirroring `useFavorites`). Custom entries render
+  below the built-ins in the HomeView card grid with a remove
+  affordance. Now that the dropdown is gone, the entry point for
+  "save current layout" lives in the HomeView preset section
+  header (a "+" affordance) or in the Settings view's Layout
+  section (Phase 8).
+- **7.5 Verification** — apply each built-in preset, confirm zone
+  state matches; restart, confirm last layout + favorites +
+  recents survive; save a custom preset, restart, confirm it's
+  still in the selector.
 
 **Optional follow-ups to consider:**
 
-  - Add a "Reset Layout" button to the Settings view (Phase 7 or 8)
-    so users have a non-palette way to find it.
-  - Add per-preset entries to the command palette so `⌘K →
-    "minimal focus"` works alongside the HomeView cards.
-  - Hide the `system-settings` tool from the LeftNavigator and
-    HomeView BROWSE list (it's accessed via the SETTINGS pill;
-    listing it twice is noise). Add a `hidden?: boolean` flag to
-    the `ToolDescriptor` shape if we go this direction.
+- Add a "Reset Layout" button to the Settings view (Phase 7 or 8)
+  so users have a non-palette way to find it.
+- Add per-preset entries to the command palette so `⌘K →
+"minimal focus"` works alongside the HomeView cards.
+- Hide the `system-settings` tool from the LeftNavigator and
+  HomeView BROWSE list (it's accessed via the SETTINGS pill;
+  listing it twice is noise). Add a `hidden?: boolean` flag to
+  the `ToolDescriptor` shape if we go this direction.
 
 ---
 
@@ -349,16 +455,16 @@ keeps related concerns grouped without burying the tool grid.
 
 **Still pending in Phase 7:**
 
-  - **7.4 Custom presets.** "Save as preset…" action in the AppShell
-    nav cluster (or a dedicated button on the HomeView preset
-    section) that captures a name + (optional) description and
-    writes to a `useCustomPresets` slice (Zustand + persist,
-    same shape as `useFavorites` — `hyperspanner/custom-presets/v1`).
-    Custom entries render below the built-ins in both the dropdown
-    and the home-view card grid, with a remove affordance.
-  - **7.5 Verification.** Apply each built-in preset, confirm zone
-    state matches; restart the app, confirm last layout + favorites
-    + recents survive; save a custom preset, restart, confirm it's
+- **7.4 Custom presets.** "Save as preset…" action in the AppShell
+  nav cluster (or a dedicated button on the HomeView preset
+  section) that captures a name + (optional) description and
+  writes to a `useCustomPresets` slice (Zustand + persist,
+  same shape as `useFavorites` — `hyperspanner/custom-presets/v1`).
+  Custom entries render below the built-ins in both the dropdown
+  and the home-view card grid, with a remove affordance.
+- **7.5 Verification.** Apply each built-in preset, confirm zone
+  state matches; restart the app, confirm last layout + favorites
+  - recents survive; save a custom preset, restart, confirm it's
     still in the selector.
 
 **Known typecheck risks for the next host run.** The `useShallow`
@@ -380,16 +486,16 @@ Phase 7 entry — picked the simpler-first storage path (Zustand
 that plan-002 §Phase 7 calls for. Three reasons in the response back
 to user, kept here for the record:
 
-  1. `useFavoritesStore` and `useRecentsStore` already use exactly
-     this pattern — same `createJSONStorage(() => localStorage)`
-     shape, versioned keys (`hyperspanner/<store>/v1`). Matching
-     them keeps the persistence story consistent.
-  2. Zero IPC overhead on every layout change. Drag a tool, collapse
-     a zone, change a tab — that's a localStorage write in
-     microseconds vs. a Tauri round-trip in milliseconds.
-  3. The `storage` option is one line. Swap to a Tauri-backed
-     adapter when we need cross-window persistence; no call sites
-     change.
+1. `useFavoritesStore` and `useRecentsStore` already use exactly
+   this pattern — same `createJSONStorage(() => localStorage)`
+   shape, versioned keys (`hyperspanner/<store>/v1`). Matching
+   them keeps the persistence story consistent.
+2. Zero IPC overhead on every layout change. Drag a tool, collapse
+   a zone, change a tab — that's a localStorage write in
+   microseconds vs. a Tauri round-trip in milliseconds.
+3. The `storage` option is one line. Swap to a Tauri-backed
+   adapter when we need cross-window persistence; no call sites
+   change.
 
 **What landed:**
 
@@ -398,7 +504,7 @@ to user, kept here for the record:
   fn that strips transient fields before serialization
   (`pulseCounter` at the top level, `pulseId` per-`OpenTool`).
   Serialized shape: `{ open, activeByZone, centerSplit, collapsed,
-  layoutPreset }`. Storage key: `hyperspanner/workspace/v1`,
+layoutPreset }`. Storage key: `hyperspanner/workspace/v1`,
   version: 1.
 - **`apps/desktop/src/state/workspace.ts`** — added a
   `clearWorkspaceStorage()` test helper that wipes both the
@@ -414,13 +520,13 @@ to user, kept here for the record:
   `beforeEach` setState reset with `clearWorkspaceStorage()`. Added
   a new `describe('workspace persistence (Phase 7)')` block with
   five tests:
-   1. `openTool` writes a partial of state to localStorage in the
+  1.  `openTool` writes a partial of state to localStorage in the
       expected shape (with `version: 1`).
-   2. Transient fields (`pulseId`, `pulseCounter`) are stripped from
+  2.  Transient fields (`pulseId`, `pulseCounter`) are stripped from
       the persisted blob.
-   3. `toggleZone` and `splitCenter` changes survive into the blob.
-   4. `applyPreset` writes the new `layoutPreset` id.
-   5. `clearWorkspaceStorage` removes the entry.
+  3.  `toggleZone` and `splitCenter` changes survive into the blob.
+  4.  `applyPreset` writes the new `layoutPreset` id.
+  5.  `clearWorkspaceStorage` removes the entry.
 
 The other tool-component tests were unaffected — they import
 `useTool` directly from `state/useTool` (not via the barrel), so
@@ -430,36 +536,36 @@ localStorage shim.
 **Storage adapter swap path** for the eventual Tauri-backed file
 in `app_data_dir`:
 
-  ```ts
-  // Today:
-  storage: createJSONStorage(() => localStorage),
+```ts
+// Today:
+storage: createJSONStorage(() => localStorage),
 
-  // Future (one-line replacement):
-  storage: createJSONStorage(() => tauriFsStorage),
-  ```
+// Future (one-line replacement):
+storage: createJSONStorage(() => tauriFsStorage),
+```
 
-  The Tauri adapter is a small object that implements the
-  `getItem` / `setItem` / `removeItem` contract via Rust IPC
-  calls. Phase 7.5+ when we add multi-window or want the file
-  visible to the user.
+The Tauri adapter is a small object that implements the
+`getItem` / `setItem` / `removeItem` contract via Rust IPC
+calls. Phase 7.5+ when we add multi-window or want the file
+visible to the user.
 
 **Still pending in Phase 7:**
 
-  - **7.3 Preset selector UI.** A pill cluster or `<select>` in the
-    top rail that calls `applyPreset(id)`. Six built-ins from
-    `state/presets.ts` populate it. Active preset gets visual
-    emphasis. Home view also gets a "Layout presets" card listing
-    them with descriptions for discoverability.
-  - **7.4 Custom presets.** "Save as preset…" action in the top
-    rail captures a name + (optional) description and writes to a
-    new `useCustomPresets` slice (Zustand + persist, mirroring
-    `useFavorites`'s shape — `hyperspanner/custom-presets/v1`).
-    Custom entries render below the built-ins with a remove
-    affordance.
-  - **7.5 Verification.** Apply each built-in preset, confirm zone
-    state matches the definition; restart the app, confirm last
-    layout + favorites + recents survive; save a custom preset,
-    restart, confirm it's still in the selector.
+- **7.3 Preset selector UI.** A pill cluster or `<select>` in the
+  top rail that calls `applyPreset(id)`. Six built-ins from
+  `state/presets.ts` populate it. Active preset gets visual
+  emphasis. Home view also gets a "Layout presets" card listing
+  them with descriptions for discoverability.
+- **7.4 Custom presets.** "Save as preset…" action in the top
+  rail captures a name + (optional) description and writes to a
+  new `useCustomPresets` slice (Zustand + persist, mirroring
+  `useFavorites`'s shape — `hyperspanner/custom-presets/v1`).
+  Custom entries render below the built-ins with a remove
+  affordance.
+- **7.5 Verification.** Apply each built-in preset, confirm zone
+  state matches the definition; restart the app, confirm last
+  layout + favorites + recents survive; save a custom preset,
+  restart, confirm it's still in the selector.
 
 Re-run `pnpm test && pnpm typecheck` after this commit lands;
 the only files touched were `workspace.ts`, `workspace.test.ts`,
@@ -491,8 +597,7 @@ all green on the Windows host. The verification arrived in three runs:
    doing before — those calls had been dead code).
 
 Phase 6 is officially complete. The plan flips: `current_phase: 7`, Phase
-6 row → `complete`, Phase 7 row → `in_progress`. Plan version bumped to
-19.
+6 row → `complete`, Phase 7 row → `in_progress`. Plan version bumped to 19.
 
 **Phase 7 entry plan** (per plan-002 §Phase 7):
 
@@ -593,7 +698,7 @@ self-reports of "tests pass" need to be backed by an actual run).
   toggle pill carried `aria-label="Switch to JSON view"` /
   `"Switch to YAML view"`, which became the accessible name and
   shadowed the visible text. Tests use `getByRole('button', { name:
-  /view as JSON/i })`, which couldn't find the pill. Removed the
+/view as JSON/i })`, which couldn't find the pill. Removed the
   aria-label override; the visible text already provides a clean
   accessible name. Same pattern as the earlier
   TLS-Inspector / Hex-Inspector aria-label fixes (lesson:
@@ -635,7 +740,7 @@ accumulated — each tool individually fine in isolation, but a pile
 once aggregated. Captured as lesson #60. Specific fixes:
 
 - **`case-transform/lib.ts`** — `tokenize` was doing `current.slice(0,
-  -1)` on uppercase-acronym break (`HELLO` → `HELL`), silently dropping
+-1)` on uppercase-acronym break (`HELLO` → `HELL`), silently dropping
   the last char of every all-caps token. Pushed `current` as-is.
   Also fixed camelCase digit-prefix handling so `2hello` doesn't
   capitalize index 1.
@@ -667,7 +772,7 @@ once aggregated. Captured as lesson #60. Specific fixes:
 - **`hash-workbench/HashWorkbench.test.tsx`** — clipboard mock was
   doing direct assignment (`navigator.clipboard = ...`) which JSDOM
   refuses; switched to `Object.defineProperty(navigator, 'clipboard',
-  { configurable: true, value: ... })`. Also changed CSS-Module
+{ configurable: true, value: ... })`. Also changed CSS-Module
   selector queries from `.layoutCompact` to `[class*='layoutCompact']`
   because Vite's CSS Modules hash class names at build time.
 - **`regex-tester/RegexTester.tsx`** — match-list header text changed
@@ -754,9 +859,15 @@ zone size.
 
 ```css
 @media (max-width: 1599px), (max-height: 799px) {
-  .title { display: none; }
-  .subtitle { display: none; }
-  .infoIcon { display: none; }
+  .title {
+    display: none;
+  }
+  .subtitle {
+    display: none;
+  }
+  .infoIcon {
+    display: none;
+  }
 }
 ```
 
@@ -873,7 +984,7 @@ is that review.
   fallback. Tests cover empty/zero-port rejection plus the
   cert-failure-detection heuristic.
 - `apps/desktop/src-tauri/src/commands/mod.rs` — `pub mod protobuf;
-  pub mod tls;`.
+pub mod tls;`.
 - `apps/desktop/src-tauri/src/lib.rs` — registered both commands in
   `tauri::generate_handler![]`. Also installs
   `rustls::crypto::ring::default_provider()` once at startup
@@ -895,7 +1006,7 @@ is that review.
   textarea + a recursive `FieldList` component that indents nested
   messages. 300ms debounce on the IPC call. Sample button preloads a
   canonical payload (varint + string + nested message). 12 lib tests
-  + 6 component tests.
+  - 6 component tests.
 - `apps/desktop/src/tools/tls-inspector/` — six-file tool. `lib.ts`
   re-exports `TlsCert`/`TlsInspectResult` from IPC plus a
   `parseEndpoint(raw)` parser that handles `host`, `host:port`, and
@@ -914,53 +1025,53 @@ is that review.
 User explicitly asked for a per-tool small-screen review after the
 milestone. Findings + fixes:
 
-  - **Action-row pill sizes** — every tool's action toolbar (Pill
-    cluster in `actions={...}`) is now `size="small"` regardless of
-    zone. The `medium` variant (40+ px tall) wrapped badly on any
-    zone narrower than ~800px and especially badly when a tool has
-    3+ actions. The user already saw this with Case Transform
-    (8 mode pills + Clear). UX-3.7 propagated the rule to: base64-pad,
-    hash-workbench, hex-inspector, json-validator, number-converter,
-    regex-tester, text-diff, tls-inspector (already small from
-    landing), protobuf-decode (already small from landing),
-    url-codec, whitespace-clean, yaml-validator. Case Transform was
-    already done in UX-3.6.
-  - **Per-tool zone fit (verified):**
-      - center-only: `hex-inspector` (16-byte hex layout
-        non-negotiable).
-      - center + bottom: `text-diff`, `json-validator`,
-        `yaml-validator` (tall + line-sensitive output that the
-        narrow inspector column would force into ugly wrapping).
-      - any zone (compact CSS in place):
-        `case-transform`, `whitespace-clean`, `base64-pad`,
-        `url-codec`, `cidr-calc`, `regex-tester`, `hash-workbench`,
-        `number-converter`, `protobuf-decode`, `tls-inspector`.
-  - **New-tool compact behavior (Protobuf Decode):** uses
-    `containerCompact` to tighten gaps, `inputCompact` for the hex
-    textarea (3.5rem height in compact, 5rem in regular),
-    `treeCompact` for the decoded readout (0.7rem font in compact).
-    Field rows are a 3-column grid (`#field`, `wire-type`, `value`)
-    with `min-width: 0` so long values truncate via the tree
-    container's horizontal scroll rather than wrapping out of column.
-  - **New-tool compact behavior (TLS Inspector):** endpoint row is
-    label + flex-1 input + Inspect/Clear pills. Summary `<dl>` uses a
-    2-column grid (auto / 1fr); cert cards stack with their own
-    detail grids. `summaryCompact` and `certCompact` modifiers drop
-    fonts to 0.7-0.72rem and tighten paddings. The cert subject /
-    issuer DNs are `word-break: break-word` so a long DN wraps
-    cleanly in the inspector instead of forcing horizontal scroll
-    across the whole card.
-  - **Pre-existing tools (no further changes needed):** hash-workbench
-    and number-converter were tightened in UX-3.6 already; they fit
-    the inspector cleanly. cidr-calc, regex-tester, url-codec,
-    whitespace-clean, base64-pad have compact CSS from earlier
-    rounds and didn't surface scroll issues in the small-screen scan.
-  - **Refused-from-inspector tools:** these stay refused — the
-    decision wasn't a polish gap, it was a deliberate "the layout
-    fundamentally doesn't fit narrow widths" call. Adding compact CSS
-    to them would just paint over a layout problem (e.g. text-diff's
-    two columns at inspector width are ~140px each — unreadable for
-    code).
+- **Action-row pill sizes** — every tool's action toolbar (Pill
+  cluster in `actions={...}`) is now `size="small"` regardless of
+  zone. The `medium` variant (40+ px tall) wrapped badly on any
+  zone narrower than ~800px and especially badly when a tool has
+  3+ actions. The user already saw this with Case Transform
+  (8 mode pills + Clear). UX-3.7 propagated the rule to: base64-pad,
+  hash-workbench, hex-inspector, json-validator, number-converter,
+  regex-tester, text-diff, tls-inspector (already small from
+  landing), protobuf-decode (already small from landing),
+  url-codec, whitespace-clean, yaml-validator. Case Transform was
+  already done in UX-3.6.
+- **Per-tool zone fit (verified):**
+  - center-only: `hex-inspector` (16-byte hex layout
+    non-negotiable).
+  - center + bottom: `text-diff`, `json-validator`,
+    `yaml-validator` (tall + line-sensitive output that the
+    narrow inspector column would force into ugly wrapping).
+  - any zone (compact CSS in place):
+    `case-transform`, `whitespace-clean`, `base64-pad`,
+    `url-codec`, `cidr-calc`, `regex-tester`, `hash-workbench`,
+    `number-converter`, `protobuf-decode`, `tls-inspector`.
+- **New-tool compact behavior (Protobuf Decode):** uses
+  `containerCompact` to tighten gaps, `inputCompact` for the hex
+  textarea (3.5rem height in compact, 5rem in regular),
+  `treeCompact` for the decoded readout (0.7rem font in compact).
+  Field rows are a 3-column grid (`#field`, `wire-type`, `value`)
+  with `min-width: 0` so long values truncate via the tree
+  container's horizontal scroll rather than wrapping out of column.
+- **New-tool compact behavior (TLS Inspector):** endpoint row is
+  label + flex-1 input + Inspect/Clear pills. Summary `<dl>` uses a
+  2-column grid (auto / 1fr); cert cards stack with their own
+  detail grids. `summaryCompact` and `certCompact` modifiers drop
+  fonts to 0.7-0.72rem and tighten paddings. The cert subject /
+  issuer DNs are `word-break: break-word` so a long DN wraps
+  cleanly in the inspector instead of forcing horizontal scroll
+  across the whole card.
+- **Pre-existing tools (no further changes needed):** hash-workbench
+  and number-converter were tightened in UX-3.6 already; they fit
+  the inspector cleanly. cidr-calc, regex-tester, url-codec,
+  whitespace-clean, base64-pad have compact CSS from earlier
+  rounds and didn't surface scroll issues in the small-screen scan.
+- **Refused-from-inspector tools:** these stay refused — the
+  decision wasn't a polish gap, it was a deliberate "the layout
+  fundamentally doesn't fit narrow widths" call. Adding compact CSS
+  to them would just paint over a layout problem (e.g. text-diff's
+  two columns at inspector width are ~140px each — unreadable for
+  code).
 
 **No new lessons.** The Phase 6.5 fanout used the same parallel-
 fanout pattern that's been working since 6.2 (with the post-6.4
@@ -991,19 +1102,19 @@ hover, 1 on button hover).
 
 **Tool zone-fit audit:**
 
-  - **`text-diff`** — refuses inspector (`supportedZones: ['center',
-    'bottom']`). Two-column diff fundamentally needs width.
-  - **`json-validator`, `yaml-validator`** — refuse inspector
-    (`['center', 'bottom']`). Pretty-printed JSON/YAML is tall and
-    line-sensitive; inspector width forces ugly wrapping.
-  - **`hex-inspector`** — refuses bottom too (`['center']`). The
-    16-byte-wide hex+ASCII layout is non-negotiable.
-  - **`case-transform`, `whitespace-clean`, `base64-pad`, `url-codec`,
-    `cidr-calc`, `regex-tester`, `hash-workbench`, `number-converter`**
-    — allowed in any zone; each has compact CSS (label fonts, input
-    paddings, etc.) tuned for the inspector dock width.
-  - **`protobuf-decode`, `tls-inspector`** — placeholders for 6.5;
-    will need a similar pass once landed.
+- **`text-diff`** — refuses inspector (`supportedZones: ['center',
+'bottom']`). Two-column diff fundamentally needs width.
+- **`json-validator`, `yaml-validator`** — refuse inspector
+  (`['center', 'bottom']`). Pretty-printed JSON/YAML is tall and
+  line-sensitive; inspector width forces ugly wrapping.
+- **`hex-inspector`** — refuses bottom too (`['center']`). The
+  16-byte-wide hex+ASCII layout is non-negotiable.
+- **`case-transform`, `whitespace-clean`, `base64-pad`, `url-codec`,
+  `cidr-calc`, `regex-tester`, `hash-workbench`, `number-converter`**
+  — allowed in any zone; each has compact CSS (label fonts, input
+  paddings, etc.) tuned for the inspector dock width.
+- **`protobuf-decode`, `tls-inspector`** — placeholders for 6.5;
+  will need a similar pass once landed.
 
 **Three explicit fixes:**
 
@@ -1011,7 +1122,7 @@ hover, 1 on button hover).
    that the textarea had `flex: 1 1 auto; min-height: 8rem` and the
    layout had no overflow strategy, so on shorter zones the textarea
    pushed the digest panel below the ToolFrame body's `overflow:
-   hidden` clip line. Fix: textarea is now a fixed `height: 6rem`
+hidden` clip line. Fix: textarea is now a fixed `height: 6rem`
    (`3.5rem` compact) instead of growing flex, the digest panel uses
    `flex: 0 0 auto`, and `.layout` gets its own `overflow-y: auto` as
    the fallback. Tightened compact-mode digest grid:
@@ -1085,7 +1196,7 @@ Three follow-ups from this round:
 
 1. **HomeView first-row clipping** — `.contentEmpty` (used when no tools
    are docked in the center zone) added `align-items: center;
-   justify-content: center; padding: 1.25rem` to `.content`. With
+justify-content: center; padding: 1.25rem` to `.content`. With
    HomeView taller than `.content`, that flexbox centering positioned
    HomeView with a NEGATIVE top offset that scrolling can't reach
    (flex centering happens in layout space, not scroll space). Even
@@ -1130,7 +1241,7 @@ Three follow-ups from this round:
 
 User flagged five things after UX-3.1 landed:
 
-1. **Inspector zone-header height grew when the close × button mounted.** I'd put the × in the `LcarsZoneHeader.controls` slot next to the HIDE pill — the wider slot was forcing the band into a slightly taller row on some widths. Moved the × *into* the title prop so it sits inline on the title text's baseline; the controls slot is back to just the HIDE pill, and the band stays at the LcarsPill's natural ~40px. The button is now sized in `em` (`width 1.1em`, `font-size 1.05em`) so it scales with the title font instead of forcing its own height.
+1. **Inspector zone-header height grew when the close × button mounted.** I'd put the × in the `LcarsZoneHeader.controls` slot next to the HIDE pill — the wider slot was forcing the band into a slightly taller row on some widths. Moved the × _into_ the title prop so it sits inline on the title text's baseline; the controls slot is back to just the HIDE pill, and the band stays at the LcarsPill's natural ~40px. The button is now sized in `em` (`width 1.1em`, `font-size 1.05em`) so it scales with the title font instead of forcing its own height.
 
 2. **Purple eyebrow truncates in the inspector.** The `NUMBER-CONVERTER` text was getting ellipsis'd in the narrow inspector column, reading as broken chrome. Added `.frameCompact .eyebrow { display: none }` to ToolFrame's CSS — eyebrow is hidden entirely in compact docks, including its info-icon child (which is fine; the description was always nice-to-have).
 
@@ -1216,12 +1327,12 @@ pass, confirm the title-hidden-in-compact rule.
 
 - **Inspector single-tool**
   (`apps/desktop/src/state/workspace.ts`,
-   `apps/desktop/src/shell/RightZone.{tsx,module.css}`):
+  `apps/desktop/src/shell/RightZone.{tsx,module.css}`):
   - `openTool(id, 'right')` now evicts any existing tool in the right
     zone before adding the new one. Eviction calls `clearToolState`
     on the evicted id so its buffer doesn't linger.
   - `moveTool(id, 'right')` does the same eviction (skipping the case
-    where the moved tool *is* the inspector tool, which would have
+    where the moved tool _is_ the inspector tool, which would have
     already early-returned anyway). State cleanup runs after `set` so
     the React tree sees the eviction first, then the orphan-state
     purge.
@@ -1269,12 +1380,13 @@ host-side re-run that's outstanding for the 6.4 TS sweep.
 
 **Why 6.6 before 6.5:** the user said "proceed" right after we
 finished the modernized Number Converter design. 6.5 (Protobuf Decode
-+ TLS Inspector) is the heaviest Rust sub-phase of Phase 6 — full
-parallel-fanout territory, prost-reflect + rustls dependencies, and
-deserves its own session. 6.6 is one TS-only tool that fits cleanly
-in this session as a complete deliverable. The plan order (6.5 then
-6.6) was guidance, not a hard sequence; same as 6.4 verification was
-allowed to interleave with 6.5 prep.
+
+- TLS Inspector) is the heaviest Rust sub-phase of Phase 6 — full
+  parallel-fanout territory, prost-reflect + rustls dependencies, and
+  deserves its own session. 6.6 is one TS-only tool that fits cleanly
+  in this session as a complete deliverable. The plan order (6.5 then
+  6.6) was guidance, not a hard sequence; same as 6.4 verification was
+  allowed to interleave with 6.5 prep.
 
 **What landed:**
 
@@ -1305,7 +1417,7 @@ allowed to interleave with 6.5 prep.
   (5), plus a BYTE_COUNT sanity check.
 - `apps/desktop/src/tools/number-converter/NumberConverter.tsx` —
   ToolFrame wrapper. State shape: `{ endianness, type, hexInput,
-  decimalInput, lastEdited }`. `lastEdited` tracks which input is
+decimalInput, lastEdited }`. `lastEdited` tracks which input is
   "sticky" (echoes user's typing verbatim); the other field is
   derived through the canonical Uint8Array on each render. When the
   sticky input is empty, every dependent display goes blank too —
@@ -1339,15 +1451,15 @@ allowed to interleave with 6.5 prep.
 
 **Design choices captured in plan.md decisions table:**
 
-  - "Big Endian" / "Little Endian" instead of Motorola/Intel.
-  - `uintN`/`intN`/`floatN` instead of byte/short/long/float.
-  - 64-bit signed and unsigned included (was absent in the original
-    legacy tool the user remembered).
-  - Dropped "Raw Hex" from the byte-order menu (it's not an
-    endianness, it's an identity transform — was conflating two
-    orthogonal concepts).
-  - No-Rust JS-only implementation: DataView + BigInt cover every
-    conversion losslessly.
+- "Big Endian" / "Little Endian" instead of Motorola/Intel.
+- `uintN`/`intN`/`floatN` instead of byte/short/long/float.
+- 64-bit signed and unsigned included (was absent in the original
+  legacy tool the user remembered).
+- Dropped "Raw Hex" from the byte-order menu (it's not an
+  endianness, it's an identity transform — was conflating two
+  orthogonal concepts).
+- No-Rust JS-only implementation: DataView + BigInt cover every
+  conversion losslessly.
 
 **No new lessons added.** This was a clean tool-pattern application
 — `lib.ts` + `useTool` state + `ToolFrame` chrome, the same template
@@ -1376,64 +1488,64 @@ the next gate.
 
 **The 22 errors, grouped by shape:**
 
-  - **Unused-variable noise (14 sites)** — TS strict
-    `noUnusedLocals` / `noUnusedParameters` flagged dead locals
-    and unused parameters. Sites: `base64-pad/Base64Pad.test.tsx`
-    (line 193 `encoded`), `base64-pad/Base64Pad.tsx` (line 201
-    `direction` param → `_direction`), `base64-pad/lib.test.ts`
-    (line 118 `urlSafe`), `base64-pad/lib.ts` (line 101
-    `detectedVariant` — local was written-but-never-read; the
-    normalization logic around it was intact, so the local just
-    got removed), `case-transform/lib.ts` (line 80 `isNextDigit`),
-    `hash-workbench/HashWorkbench.test.tsx` (line 6 `InvokeFn` —
-    kept the import, used it in casts below), `hex-inspector/HexInspector.tsx`
-    (lines 130/131 `pageNum`/`totalPages` — dead locals in the
-    pagination-label `useMemo`), `hex-inspector/lib.test.ts`
-    (line 6 `HEX_BYTES_PER_ROW` import), `regex-tester/lib.ts`
-    (line 166 `regex` param → `_regex`), `regex-tester/RegexTester.tsx`
-    (line 9 `compileRegex` import, line 334 `label` local — also
-    fixed a render bug: `${'{label}'}` was literal text, meant
-    `{label}`), `text-diff/TextDiff.tsx` (line 8 `byteLength`
-    import, line 232 `right` param → `_right`).
-  - **BigInt `>>>` (1 site)** — `cidr-calc/lib.ts:304` used
-    `(val & 0xffffn) >>> 0` (unsigned right-shift) to coerce
-    to an unsigned representation. BigInt doesn't support `>>>`.
-    `val & 0xffffn` is already non-negative so the `>>> 0` was
-    redundant — removed with a comment explaining why.
-  - **`toHaveTextContent` unavailable (2 sites)** — `HashWorkbench.test.tsx`
-    (lines 62/69) used `@testing-library/jest-dom` matchers, but
-    this repo uses plain vitest matchers (see JsonValidator.test.tsx
-    and WhitespaceClean.test.tsx comments calling this out
-    explicitly). Rewrote both to
-    `expect(modeToggleButton.textContent).toContain(...)`.
-  - **`InvokeFn` generic mismatch (5 sites)** — `HashWorkbench.test.tsx`
-    (lines 79/112/145/176/304) passed concrete async arrows to
-    `__setInvokeForTests(fn: InvokeFn | null)` where
-    `InvokeFn = <T>(cmd, args?) => Promise<T>`. Lesson #53's
-    pattern — cast via `unknown`:
-    `((async (...) => {...}) as unknown) as InvokeFn` — matches
-    how `ipc.test.ts:82` already handles the same generic-parameter
-    ambiguity. Applied to all five sites. The kickoff subagent
-    for Hash Workbench didn't read `ipc.test.ts` for the precedent;
-    next fanout briefs should call out "see ipc.test.ts for the
-    canonical test-seam cast" (feeds forward into a #60-style
-    lesson below).
-  - **Discriminated-union `.message` narrowing (1 site)** —
-    `regex-tester/lib.ts:114` did `if (compiled.kind !== 'ok')
-    { return { kind: 'error', message: compiled.message }; }`.
-    After the negated guard, `compiled` narrows to
-    `RegexCompileError | RegexCompileEmpty`, and `.message` only
-    exists on Error. Split into two branches with a defensive
-    empty-case passthrough.
-  - **Functional-updater shape (2 sites)** — `HexInspector.tsx`
-    (lines 101/108) did `setState(({ offsetRow }) => ({ offsetRow: ... }))`.
-    `useTool`'s functional updater requires returning the full
-    state (`(prev: T) => T`), not a partial. Fixed with
-    `setState((prev) => ({ ...prev, offsetRow: ... }))`. The
-    shorter `Partial<T>` form `setState({ offsetRow: ... })`
-    would have also worked but the functional form is slightly
-    safer under batched updates — `useTool.ts` reads the live
-    store state synchronously in the functional path.
+- **Unused-variable noise (14 sites)** — TS strict
+  `noUnusedLocals` / `noUnusedParameters` flagged dead locals
+  and unused parameters. Sites: `base64-pad/Base64Pad.test.tsx`
+  (line 193 `encoded`), `base64-pad/Base64Pad.tsx` (line 201
+  `direction` param → `_direction`), `base64-pad/lib.test.ts`
+  (line 118 `urlSafe`), `base64-pad/lib.ts` (line 101
+  `detectedVariant` — local was written-but-never-read; the
+  normalization logic around it was intact, so the local just
+  got removed), `case-transform/lib.ts` (line 80 `isNextDigit`),
+  `hash-workbench/HashWorkbench.test.tsx` (line 6 `InvokeFn` —
+  kept the import, used it in casts below), `hex-inspector/HexInspector.tsx`
+  (lines 130/131 `pageNum`/`totalPages` — dead locals in the
+  pagination-label `useMemo`), `hex-inspector/lib.test.ts`
+  (line 6 `HEX_BYTES_PER_ROW` import), `regex-tester/lib.ts`
+  (line 166 `regex` param → `_regex`), `regex-tester/RegexTester.tsx`
+  (line 9 `compileRegex` import, line 334 `label` local — also
+  fixed a render bug: `${'{label}'}` was literal text, meant
+  `{label}`), `text-diff/TextDiff.tsx` (line 8 `byteLength`
+  import, line 232 `right` param → `_right`).
+- **BigInt `>>>` (1 site)** — `cidr-calc/lib.ts:304` used
+  `(val & 0xffffn) >>> 0` (unsigned right-shift) to coerce
+  to an unsigned representation. BigInt doesn't support `>>>`.
+  `val & 0xffffn` is already non-negative so the `>>> 0` was
+  redundant — removed with a comment explaining why.
+- **`toHaveTextContent` unavailable (2 sites)** — `HashWorkbench.test.tsx`
+  (lines 62/69) used `@testing-library/jest-dom` matchers, but
+  this repo uses plain vitest matchers (see JsonValidator.test.tsx
+  and WhitespaceClean.test.tsx comments calling this out
+  explicitly). Rewrote both to
+  `expect(modeToggleButton.textContent).toContain(...)`.
+- **`InvokeFn` generic mismatch (5 sites)** — `HashWorkbench.test.tsx`
+  (lines 79/112/145/176/304) passed concrete async arrows to
+  `__setInvokeForTests(fn: InvokeFn | null)` where
+  `InvokeFn = <T>(cmd, args?) => Promise<T>`. Lesson #53's
+  pattern — cast via `unknown`:
+  `((async (...) => {...}) as unknown) as InvokeFn` — matches
+  how `ipc.test.ts:82` already handles the same generic-parameter
+  ambiguity. Applied to all five sites. The kickoff subagent
+  for Hash Workbench didn't read `ipc.test.ts` for the precedent;
+  next fanout briefs should call out "see ipc.test.ts for the
+  canonical test-seam cast" (feeds forward into a #60-style
+  lesson below).
+- **Discriminated-union `.message` narrowing (1 site)** —
+  `regex-tester/lib.ts:114` did `if (compiled.kind !== 'ok')
+{ return { kind: 'error', message: compiled.message }; }`.
+  After the negated guard, `compiled` narrows to
+  `RegexCompileError | RegexCompileEmpty`, and `.message` only
+  exists on Error. Split into two branches with a defensive
+  empty-case passthrough.
+- **Functional-updater shape (2 sites)** — `HexInspector.tsx`
+  (lines 101/108) did `setState(({ offsetRow }) => ({ offsetRow: ... }))`.
+  `useTool`'s functional updater requires returning the full
+  state (`(prev: T) => T`), not a partial. Fixed with
+  `setState((prev) => ({ ...prev, offsetRow: ... }))`. The
+  shorter `Partial<T>` form `setState({ offsetRow: ... })`
+  would have also worked but the functional form is slightly
+  safer under batched updates — `useTool.ts` reads the live
+  store state synchronously in the functional path.
 
 **Lesson-worthy observation (deferring to lessons.yaml on the
 next clean pass):** the subagent that wrote HashWorkbench.test.tsx
@@ -1441,9 +1553,9 @@ reinvented the InvokeFn test-seam approach from scratch without
 reading `ipc.test.ts`, which has the canonical `((fn) as unknown)
 as InvokeFn` pattern sitting right next to the TOP of the file it
 imports `InvokeFn` from. This is a repeat of the shape-lockdown
-principle (#56): *when a subagent imports a type from module X,
+principle (#56): _when a subagent imports a type from module X,
 brief it on the existing test-file conventions from module X's
-sibling tests.* Candidate amendment to lessons #56/#57/#59 once
+sibling tests._ Candidate amendment to lessons #56/#57/#59 once
 we confirm it reproduces on future fanouts.
 
 ---
@@ -1459,15 +1571,15 @@ for status.md to record a mistake as long as we correct it.
 
 **Gates run:**
 
-  - `cargo test -p hyperspanner` — green. The 12 new `hash::tests`
-    cases passed alongside the 7 pre-existing `fs::tests` cases, for
-    a total of 19 Rust unit tests across the backend.
-  - `pnpm --filter @hyperspanner/desktop typecheck` — clean.
-  - `pnpm --filter @hyperspanner/desktop test` — green. Prior suite
-    was 258 tests; Phase 6.4 added 59 new cases (14 Hash Workbench
-    lib + 12 Hash Workbench component + 22 Hex Inspector lib + 11
-    Hex Inspector component).
-  - `pnpm --filter @hyperspanner/desktop build` — clean.
+- `cargo test -p hyperspanner` — green. The 12 new `hash::tests`
+  cases passed alongside the 7 pre-existing `fs::tests` cases, for
+  a total of 19 Rust unit tests across the backend.
+- `pnpm --filter @hyperspanner/desktop typecheck` — clean.
+- `pnpm --filter @hyperspanner/desktop test` — green. Prior suite
+  was 258 tests; Phase 6.4 added 59 new cases (14 Hash Workbench
+  lib + 12 Hash Workbench component + 22 Hex Inspector lib + 11
+  Hex Inspector component).
+- `pnpm --filter @hyperspanner/desktop build` — clean.
 
 **What this validates:** the parallel-fanout contract (lessons #56
 shape-lockdown + #57 exclusive-ownership + #59 import-ownership
@@ -1495,9 +1607,10 @@ Lesson #59's `applied: true` flag now has a second data point
 of real-world validation behind it.
 
 **Next:** Phase 6.5 (Task #73) — Protobuf Decode (prost-reflect)
-+ TLS Inspector (rustls). Two backend commands, two tool folders.
-Keep the 6.4 contract intact; brief each subagent explicitly on
-sibling-owned imports as well as owned files.
+
+- TLS Inspector (rustls). Two backend commands, two tool folders.
+  Keep the 6.4 contract intact; brief each subagent explicitly on
+  sibling-owned imports as well as owned files.
 
 ---
 
@@ -1520,9 +1633,9 @@ coordination mid-flight.
   `#[tauri::command]` fns (`hash_text`, `hash_file`), one local
   `HASH_DEFAULT_MAX_BYTES = 64 MiB` constant, one `HashResult`
   serde struct (`#[derive(Debug, Serialize)] #[serde(rename_all =
-  "camelCase")]`). Private helpers: `normalize_algorithm(&str) ->
-  String` (strips dashes + underscores, lowercases), `digest_of(&[u8],
-  &str) -> HyperspannerResult<String>` (matches on canonical algo
+"camelCase")]`). Private helpers: `normalize_algorithm(&str) ->
+String` (strips dashes + underscores, lowercases), `digest_of(&[u8],
+&str) -> HyperspannerResult<String>` (matches on canonical algo
   and dispatches to the appropriate RustCrypto crate via its
   `Digest` trait), `stat_and_check(&Path, u64) -> HyperspannerResult<u64>`
   (self-contained copy of the same helper from `fs.rs` — not
@@ -1562,7 +1675,7 @@ coordination mid-flight.
   `formatByteSize(bytes) -> "42 B" | "1.4 KB" | "6.2 MB" | "1.1 GB"`,
   and the `HashWorkbenchState` type. Component state model
   `{ mode: 'text' | 'file', text, filePath, results: { md5, sha1,
-  sha256, sha512 }, loading, error }` via `useTool`. Text mode
+sha256, sha512 }, loading, error }` via `useTool`. Text mode
   debounces 250ms (ref-stored timeout, cleared on re-input) then
   fires 4 parallel `hashText` calls via `Promise.all`. File mode
   path input + Compute pill fires 4 parallel `hashFile` calls.
@@ -1592,26 +1705,26 @@ coordination mid-flight.
 
 **Follow-ups noted for the Phase 6 verification pass:**
 
-  1. `hash-workbench/lib.ts` redefines `HashAlgorithm` and
-     `HashResult` locally instead of re-exporting from `@/ipc` —
-     shapes are structurally identical today, but widening the
-     backend union later would silently drift. Low-priority
-     consolidation; capture as a TODO when we touch either side.
-  2. `hex-inspector/HexInspector.tsx` imports `readFileBytes` from
-     `'../../ipc/fs'` (sub-module) rather than the barrel
-     `'../../ipc'`. Works fine; convention drift worth noting.
-  3. The eager-algorithm-check in `hash.rs` calls `digest_of(b"",
-     &normalized)` just to validate the algorithm before reading
-     the file. Wastes a few cycles computing an empty-string hash
-     but the intent (fail fast before I/O) is preserved. Tidier
-     alternative: a `const ALGORITHMS: &[&str] = &[...]` membership
-     check. Punt to polish.
-  4. `HashWorkbench.test.tsx` comments that it uses
-     `__setInvokeForTests` (or `vi.mock`) — confirm which pattern
-     it actually ended up on during the host-side test run. If
-     `__setInvokeForTests`, the test file is consistent with
-     `ipc.test.ts`; if `vi.mock`, that's also fine but slightly
-     cross-grained relative to the rest of the suite.
+1. `hash-workbench/lib.ts` redefines `HashAlgorithm` and
+   `HashResult` locally instead of re-exporting from `@/ipc` —
+   shapes are structurally identical today, but widening the
+   backend union later would silently drift. Low-priority
+   consolidation; capture as a TODO when we touch either side.
+2. `hex-inspector/HexInspector.tsx` imports `readFileBytes` from
+   `'../../ipc/fs'` (sub-module) rather than the barrel
+   `'../../ipc'`. Works fine; convention drift worth noting.
+3. The eager-algorithm-check in `hash.rs` calls `digest_of(b"",
+&normalized)` just to validate the algorithm before reading
+   the file. Wastes a few cycles computing an empty-string hash
+   but the intent (fail fast before I/O) is preserved. Tidier
+   alternative: a `const ALGORITHMS: &[&str] = &[...]` membership
+   check. Punt to polish.
+4. `HashWorkbench.test.tsx` comments that it uses
+   `__setInvokeForTests` (or `vi.mock`) — confirm which pattern
+   it actually ended up on during the host-side test run. If
+   `__setInvokeForTests`, the test file is consistent with
+   `ipc.test.ts`; if `vi.mock`, that's also fine but slightly
+   cross-grained relative to the rest of the suite.
 
 **Subagent ownership crossing (lesson #59):** Subagent B
 (Hash Workbench tool) also wrote to `apps/desktop/src/ipc/hash.ts`
@@ -1648,18 +1761,18 @@ input). Algorithm menu: md5, sha1, sha256, sha512 — all four from
 RustCrypto crates (`md-5`, `sha1`, `sha2`). Approach follows 6.2's
 parallel-fanout contract (lesson #57):
 
-  - Subagent A owns the Rust surface (new `commands/hash.rs`, a new
-    `UnsupportedAlgorithm` variant on `HyperspannerError`, Cargo deps,
-    and the `tauri::generate_handler![]` registration in `lib.rs`).
-  - Subagent B owns `apps/desktop/src/tools/hash-workbench/` (six-file
-    tool-pattern folder; imports `hashText` / `hashFile` from `@/ipc`).
-  - Subagent C owns `apps/desktop/src/tools/hex-inspector/` (six-file
-    tool-pattern folder; imports `readFileBytes` from `@/ipc` —
-    already exists from Phase 6.0).
-  - Subagent D owns the TS IPC wrapper layer (`ipc/hash.ts`,
-    `ipc/errors.ts` union extension, `ipc/index.ts` barrel, optional
-    ipc.test.ts cases).
-  - Parent (me) owns the shared `registry.ts` wiring at the end.
+- Subagent A owns the Rust surface (new `commands/hash.rs`, a new
+  `UnsupportedAlgorithm` variant on `HyperspannerError`, Cargo deps,
+  and the `tauri::generate_handler![]` registration in `lib.rs`).
+- Subagent B owns `apps/desktop/src/tools/hash-workbench/` (six-file
+  tool-pattern folder; imports `hashText` / `hashFile` from `@/ipc`).
+- Subagent C owns `apps/desktop/src/tools/hex-inspector/` (six-file
+  tool-pattern folder; imports `readFileBytes` from `@/ipc` —
+  already exists from Phase 6.0).
+- Subagent D owns the TS IPC wrapper layer (`ipc/hash.ts`,
+  `ipc/errors.ts` union extension, `ipc/index.ts` barrel, optional
+  ipc.test.ts cases).
+- Parent (me) owns the shared `registry.ts` wiring at the end.
 
 Interface contract locked before fanout (so B and C compile even if
 D lands a few seconds later):
@@ -1667,9 +1780,17 @@ D lands a few seconds later):
 ```ts
 // ipc/hash.ts
 export type HashAlgorithm = 'md5' | 'sha1' | 'sha256' | 'sha512';
-export interface HashResult { digest: string; algorithm: string; size: number; }
+export interface HashResult {
+  digest: string;
+  algorithm: string;
+  size: number;
+}
 export function hashText(opts: { text: string; algorithm: HashAlgorithm }): Promise<HashResult>;
-export function hashFile(opts: { path: string; algorithm: HashAlgorithm; maxBytes?: number }): Promise<HashResult>;
+export function hashFile(opts: {
+  path: string;
+  algorithm: HashAlgorithm;
+  maxBytes?: number;
+}): Promise<HashResult>;
 ```
 
 ```rust
@@ -1721,21 +1842,21 @@ interior work that didn't fit the 6.2 uniform-shape fanout.
 **Diff-library evaluation:** chose `diff` (jsdiff v7) over
 `diff-match-patch`. Deciders:
 
-  1. **API fit for side-by-side rendering.** jsdiff's `diffLines`
-     gives line-level alignment, and `diffWordsWithSpace` per
-     modified pair gives inline word marks — two-call composition
-     maps cleanly to two columns. diff-match-patch emits
-     char-level interleaved output that's better for unified-diff
-     or inline-patch rendering but awkward to split back into two
-     aligned columns.
-  2. **Bundle + types.** jsdiff is ~30 KB with first-party
-     `@types/diff`; diff-match-patch is ~140 KB and needs a hand-
-     rolled type bridge. Not a big deal for a Tauri app, but the
-     typing story is cleaner.
-  3. **Surface area.** We only need three primitives: line diff,
-     word diff, and a stable line numbering. jsdiff exposes exactly
-     these; diff-match-patch's `cleanupSemantic` + `cleanupEfficiency`
-     post-processing wasn't pulling its weight for this tool.
+1. **API fit for side-by-side rendering.** jsdiff's `diffLines`
+   gives line-level alignment, and `diffWordsWithSpace` per
+   modified pair gives inline word marks — two-call composition
+   maps cleanly to two columns. diff-match-patch emits
+   char-level interleaved output that's better for unified-diff
+   or inline-patch rendering but awkward to split back into two
+   aligned columns.
+2. **Bundle + types.** jsdiff is ~30 KB with first-party
+   `@types/diff`; diff-match-patch is ~140 KB and needs a hand-
+   rolled type bridge. Not a big deal for a Tauri app, but the
+   typing story is cleaner.
+3. **Surface area.** We only need three primitives: line diff,
+   word diff, and a stable line numbering. jsdiff exposes exactly
+   these; diff-match-patch's `cleanupSemantic` + `cleanupEfficiency`
+   post-processing wasn't pulling its weight for this tool.
 
 A short justification comment at the top of `lib.ts` records this so
 the next reader doesn't re-litigate.
@@ -1768,8 +1889,8 @@ the next reader doesn't re-litigate.
   bottom-zone stacking.
 - `apps/desktop/src/tools/text-diff/TextDiff.test.tsx` — 12 jsdom
   tests covering idle/typing/identical/view-toggle/Sample/Clear/Swap
-  + zone-responsive compact class + presence of inline-marker spans
-  in view mode. `cleanup()` in `afterEach` per tool-pattern §6.
+  - zone-responsive compact class + presence of inline-marker spans
+    in view mode. `cleanup()` in `afterEach` per tool-pattern §6.
 - `apps/desktop/src/tools/text-diff/index.ts` — barrel: `TextDiff` +
   `TextDiffProps` + pure-fn exports + all result/hunk/inline types.
 
@@ -1794,29 +1915,32 @@ render, plain vitest matchers, cleanup in afterEach). Actual gate runs
 — typecheck / test / dev-server cold start — wait on the user's
 `pnpm install` (which also unblocks the js-yaml import for YAML
 Validator from 6.2). Once install lands, the next session can:
-  1. `pnpm --filter @hyperspanner/desktop typecheck` — expect clean.
-  2. `pnpm --filter @hyperspanner/desktop test` — expect 234 + 36 =
-     270 passing (36 new: 24 lib + 12 component).
-  3. `pnpm tauri dev` cold start — expect no import-resolution errors
-     for `js-yaml` or `diff`; open both YAML Validator and Text Diff
-     to confirm live render.
+
+1. `pnpm --filter @hyperspanner/desktop typecheck` — expect clean.
+2. `pnpm --filter @hyperspanner/desktop test` — expect 234 + 36 =
+   270 passing (36 new: 24 lib + 12 component).
+3. `pnpm tauri dev` cold start — expect no import-resolution errors
+   for `js-yaml` or `diff`; open both YAML Validator and Text Diff
+   to confirm live render.
 
 **Follow-ups captured by the subagent (left for future polish):**
-  - Asymmetric remove+add pairing (e.g. 3 removed lines + 1 added)
-    currently pairs up to the shorter length then emits leftovers as
-    pure hunks — could be refined to a "block modified" presentation
-    later.
-  - View mode has no line-wrapping; 500-char lines scroll off screen.
-    Future toggle for `white-space: pre-wrap` possible.
-  - Line-number gutter alignment stacks number + marker vertically in
-    a fixed-width column. Horizontal (`1 +`) or two-column presentation
-    might read cleaner — punt.
-  - No copy-to-clipboard or jump-to-next-change actions yet; could be
-    keyboard shortcuts.
+
+- Asymmetric remove+add pairing (e.g. 3 removed lines + 1 added)
+  currently pairs up to the shorter length then emits leftovers as
+  pure hunks — could be refined to a "block modified" presentation
+  later.
+- View mode has no line-wrapping; 500-char lines scroll off screen.
+  Future toggle for `white-space: pre-wrap` possible.
+- Line-number gutter alignment stacks number + marker vertically in
+  a fixed-width column. Horizontal (`1 +`) or two-column presentation
+  might read cleaner — punt.
+- No copy-to-clipboard or jump-to-next-change actions yet; could be
+  keyboard shortcuts.
 
 None of these block the Phase-6.3 completion gate; they're polish.
 
 **Files changed (6.3):**
+
 - Six new files under `apps/desktop/src/tools/text-diff/` (listed
   above).
 - `apps/desktop/src/tools/registry.ts` — one import + one component
@@ -1834,9 +1958,10 @@ size tightening. Paves the way for Phase 6.4 (Hash Workbench + Hex
 Inspector), which adds backend-dependent tools on the same pattern.
 
 **Next:** Task #71 stays `in_progress` until the user's `pnpm install`
-+ dev-server smoke confirm green. On that confirmation, #71 flips
-`completed` and #72 (Phase 6.4 — Hash Workbench + Hex Inspector,
-backend-heavy) starts.
+
+- dev-server smoke confirm green. On that confirmation, #71 flips
+  `completed` and #72 (Phase 6.4 — Hash Workbench + Hex Inspector,
+  backend-heavy) starts.
 
 ---
 
@@ -1883,7 +2008,7 @@ LcarsPill (noted for polish, functionally correct).
 - `whitespace-clean/` — composable options: trim ends, trim lines,
   collapse internal runs, collapse blank lines, tabs→spaces (with
   configurable width), normalize EOL (LF/CRLF/CR), strip BOM. 23 lib
-  + 12 component tests.
+  - 12 component tests.
 - `base64-pad/` — encode/decode, standard vs URL-safe alphabet, add
   or strip padding, direction flip. Works on text or file bytes; file
   path goes through the 6.0 IPC layer. 36 lib + 12 component tests.
@@ -1902,10 +2027,11 @@ LcarsPill (noted for polish, functionally correct).
   later session.
 - `yaml-validator/` — parse via `js-yaml`, surface errors with
   line/col, round-trip to JSON with a YAML↔JSON view toggle. 21 lib
-  + 10 component tests. Added `js-yaml ^4.1.0` + `@types/js-yaml
-  ^4.0.9`.
+  - 10 component tests. Added `js-yaml ^4.1.0` + `@types/js-yaml
+^4.0.9`.
 
 All seven folders follow the pattern exactly:
+
 ```
 <tool-id>/
   index.ts          # barrel: component + pure fns + result types
@@ -1929,6 +2055,7 @@ url-codec, cidr-calc, regex-tester) stay on the permissive default.
 
 **Gates after verification (host-side, user confirmed "all checks
 pass"):**
+
 - `pnpm --filter @hyperspanner/desktop typecheck` — clean.
 - `pnpm --filter @hyperspanner/desktop test` — 234 passing (80
   pre-existing + 154 new across the seven tools).
@@ -1957,6 +2084,7 @@ its own.
 **Files changed (6.2):**
 
 Seven new tool folders (listed above). Plus:
+
 - `apps/desktop/src/tools/registry.ts` — imports for all seven;
   `component:` entries flipped from PlaceholderTool.
 - `apps/desktop/package.json` — `js-yaml ^4.1.0` in deps,
@@ -1977,6 +2105,7 @@ same reference-impl-first treatment on the backend command side.
 `docs/lessons.yaml`.
 
 **Plan deltas:**
+
 - Plan frontmatter: `version: 4 → 5`, `updated: 2026-04-24` (same
   date, different session).
 - Phase 6.2 bullet now reads "complete — seven tools landed, 154
@@ -1997,13 +2126,14 @@ sub-tasks — #75 (store), #76 (primitive), #77 (shell wiring), #78
 checks pass").
 
 **Goal:** two related asks from the user —
-  1. A low-profile mode that hides the entire top chrome (banner + nav
-     + top rail + top bar + top elbow) so the bottom rail's existing
+
+1. A low-profile mode that hides the entire top chrome (banner + nav
+   - top rail + top bar + top elbow) so the bottom rail's existing
      rounded arch lands at the window's top edge. Intended for short
      laptop screens where the banner was eating ~170px for marginal
      value.
-  2. Flush the Inspector (right zone) against the right edge of the
-     viewport — no decorative gutter or scrollbar reserve on the right.
+2. Flush the Inspector (right zone) against the right edge of the
+   viewport — no decorative gutter or scrollbar reserve on the right.
 
 **Design decisions (with rationale for future-me):**
 
@@ -2017,11 +2147,11 @@ checks pass").
 
 2. **LcarsStandardLayout exposes `topCollapsed?: boolean`, not a prop
    per paddings.** The actual hide is one line of CSS — `.topCollapsed
-   .wrap.topRow { display: none }` — and the bottom row's `flex: 1`
+.wrap.topRow { display: none }` — and the bottom row's `flex: 1`
    already fills the viewport without any geometry edits. The bottom
    rail's existing `border-radius: 160px 0 0 0` drops its arch at y=0
    automatically. Zero new math. Also added `.topCollapsed {
-   padding-top: 0 }` so the primitive's 10px container-top doesn't
+padding-top: 0 }` so the primitive's 10px container-top doesn't
    leave a black stripe above the arch.
 
 3. **Restore affordance is a faint-until-hover overlay pill, not a
@@ -2056,6 +2186,7 @@ checks pass").
 **Files changed (UX-1):**
 
 Package primitive:
+
 - `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.tsx` —
   added `topCollapsed?: boolean` prop; builds `containerClasses` from
   `styles.container + (topCollapsed ? styles.topCollapsed : '')`.
@@ -2065,6 +2196,7 @@ Package primitive:
   CSS vars with fallbacks so default consumers are unaffected.
 
 Shell:
+
 - `apps/desktop/src/state/workspace.types.ts` — `'top'` added to
   `CollapsibleZone`; `top: boolean` on `ZoneCollapseState`.
 - `apps/desktop/src/state/presets.ts` — `top: false` in
@@ -2077,11 +2209,12 @@ Shell:
   styles (fixed-position lilac pill, opacity 0.18 → 1 on hover/focus).
 - `apps/desktop/src/shell/useShellShortcuts.ts` (via global shortcuts) —
   `zone.top` binding with `key: 't', mod: true, shift: true,
-  whenTyping: 'block'`.
+whenTyping: 'block'`.
 - `apps/desktop/src/keys/ShortcutHelp.tsx` — `zone.toggleTop` entry in
   HELP_CATALOG under "Workspace".
 
 **Gates after fixes (host-side, user confirmed):**
+
 - `pnpm --filter @hyperspanner/desktop typecheck` — clean.
 - Visual pass — user confirmed "all checks pass" after the final
   padding tweaks (flush right + flush top in collapsed mode).
@@ -2104,14 +2237,14 @@ Shell:
 - **1300px-width hardcoded `.main` padding-top.** While chasing the
   final "tiny padding left on top" the user reported, found that
   `LcarsStandardLayout.module.css` had a `@media (max-width: 1300px) {
-  .main { padding-top: 1rem } }` override that bypassed the CSS var.
+.main { padding-top: 1rem } }` override that bypassed the CSS var.
   At common desktop-window widths that rule was winning over any
   consumer override. The rule stays (it's still right for non-
   topCollapsed consumers), but in topCollapsed mode the user isn't
   seeing .main's top padding anyway — the visual top is now the
   bottom-rail arch, and the remaining perceived padding was actually
   the container's 10px breathing room, which `.topCollapsed {
-  padding-top: 0 }` eliminates. So the 1300px rule didn't need to
+padding-top: 0 }` eliminates. So the 1300px rule didn't need to
   change; the container-top zero was the real fix. Lesson: when
   chasing "why is there still padding," walk the full stack (fixed
   trim → container padding → wrap padding → rail gap → main padding
@@ -2121,16 +2254,16 @@ Shell:
 **Why this is worth the bookkeeping:** UX-1 introduced two load-
 bearing conventions for the shell going forward —
 
-  1. Chrome collapses flow through the zone state machine, not
-     through primitive props. Any future collapse (e.g. hide the
-     whole bottom rail for a zen-writing mode) should be another
-     entry in `CollapsibleZone`, a boolean on `ZoneCollapseState`,
-     and a class toggle on the primitive — not a new prop surface.
+1. Chrome collapses flow through the zone state machine, not
+   through primitive props. Any future collapse (e.g. hide the
+   whole bottom rail for a zen-writing mode) should be another
+   entry in `CollapsibleZone`, a boolean on `ZoneCollapseState`,
+   and a class toggle on the primitive — not a new prop surface.
 
-  2. When a single consumer needs to retheme a piece of the layout
-     primitive, do it through a CSS var, not a new prop. The flush-
-     right work is exhibit A: zero code changes to the primitive's
-     TS signature, clean inheritance for every other consumer.
+2. When a single consumer needs to retheme a piece of the layout
+   primitive, do it through a CSS var, not a new prop. The flush-
+   right work is exhibit A: zero code changes to the primitive's
+   TS signature, clean inheritance for every other consumer.
 
 These conventions ride into Phase 6 tool development (the tool
 pattern doc will get a cross-reference).
@@ -2138,6 +2271,7 @@ pattern doc will get a cross-reference).
 ---
 
 ## Session: 2026-04-24 (Phase 6.0 + 6.1 verification pass — host-side)
+
 **Phase:** 6.0 + 6.1 — Windows host verification (Tasks #68 and #69, both
 now completed).
 
@@ -2156,18 +2290,19 @@ returning null offset/line/column for valid parse errors. Root cause: newer
 V8 emits `Unexpected token '}', "{"a":}" is not valid JSON` with no
 `position N` and no `line X column Y` — both of the normalizer's original
 regex branches missed. Added two more probes:
-  1. `Unexpected token 'X'` → extract the offending char, recover offset via
-     `text.indexOf(char)`. Imperfect when the char appears earlier in
-     legal context, but correct for the 99% common case; the UI
-     degrades gracefully to "error without pointer" when indexOf returns
-     -1.
-  2. `Unexpected end of JSON input` → by definition at `text.length`.
-Also tightened `cleanMessage` to strip V8's verbose trailing source-quote
-suffix (`, "..." is not valid JSON`) regardless of nested quotes, literal
-`...` ellipsis prefix, or embedded newlines — anchor on the trailing
-phrase rather than trying to model the internals.
-Verified against six representative inputs via a standalone node probe
-before committing the regex.
+
+1. `Unexpected token 'X'` → extract the offending char, recover offset via
+   `text.indexOf(char)`. Imperfect when the char appears earlier in
+   legal context, but correct for the 99% common case; the UI
+   degrades gracefully to "error without pointer" when indexOf returns
+   -1.
+2. `Unexpected end of JSON input` → by definition at `text.length`.
+   Also tightened `cleanMessage` to strip V8's verbose trailing source-quote
+   suffix (`, "..." is not valid JSON`) regardless of nested quotes, literal
+   `...` ellipsis prefix, or embedded newlines — anchor on the trailing
+   phrase rather than trying to model the internals.
+   Verified against six representative inputs via a standalone node probe
+   before committing the regex.
 
 **Fix 3 — TS component tests: Vitest + RTL auto-cleanup gap.**
 6 of the 7 `JsonValidator.test.tsx` cases failed with `Found multiple
@@ -2182,20 +2317,21 @@ call-out to `docs/tool-pattern.md` §6 in 6.2 alongside the first new
 tool's tests.
 
 **Fix 4 — TS typecheck: two strict-mode snags in `ipc.test.ts`.**
-  (a) `__setInvokeForTests(async () => 'pong')` — `InvokeFn` is generic
-      `<T>(...) => Promise<T>`, and a concrete arrow returning
-      `Promise<string>` can't satisfy it (the caller picks `T`, not the
-      implementer). Cast through `unknown` to `InvokeFn`; added a
-      `import type { InvokeFn }` at the top.
-  (b) `err.kind` after `const err = await invoke('X').catch((e) => e)` —
-      `err` is `unknown` and `expect(err).toBeInstanceOf(...)` is a
-      runtime check that doesn't narrow the compile-time type. Wrapped
-      the `.kind` access in an `if (err instanceof HyperspannerError)`
-      block. The preceding `expect(...).toBeInstanceOf(...)` still guards
-      runtime, so the `if` is purely a compile-time device and no failure
-      mode is masked.
+(a) `__setInvokeForTests(async () => 'pong')` — `InvokeFn` is generic
+`<T>(...) => Promise<T>`, and a concrete arrow returning
+`Promise<string>` can't satisfy it (the caller picks `T`, not the
+implementer). Cast through `unknown` to `InvokeFn`; added a
+`import type { InvokeFn }` at the top.
+(b) `err.kind` after `const err = await invoke('X').catch((e) => e)` —
+`err` is `unknown` and `expect(err).toBeInstanceOf(...)` is a
+runtime check that doesn't narrow the compile-time type. Wrapped
+the `.kind` access in an `if (err instanceof HyperspannerError)`
+block. The preceding `expect(...).toBeInstanceOf(...)` still guards
+runtime, so the `if` is purely a compile-time device and no failure
+mode is masked.
 
 **All gates green after fixes:**
+
 - `cargo test -p hyperspanner` — 7 `commands::fs` tests pass.
 - `pnpm --filter @hyperspanner/desktop test` — 80 / 80 passing:
   13 IPC + 20 json-validator/lib + 7 json-validator/component + 40
@@ -2204,6 +2340,7 @@ tool's tests.
 - `pnpm --filter @hyperspanner/desktop build` — clean.
 
 **Files changed (verification pass):**
+
 - `apps/desktop/src-tauri/src/commands/fs.rs` — `#[derive(Debug)]` on
   `FileBytes` + `FileText`.
 - `apps/desktop/src/tools/json-validator/lib.ts` — `normalizeParseError`
@@ -2223,6 +2360,7 @@ at test seams need `unknown` casts). All four appended to
 `docs/lessons.yaml`.
 
 **Plan deltas:**
+
 - Plan frontmatter: `version: 3 → 4`, `updated: 2026-04-23 → 2026-04-24`.
 - Phase 6.0 + 6.1 bullets now read "verified 2026-04-24" rather than
   "awaiting Windows-host verification."
@@ -2234,13 +2372,15 @@ text/data tools on the pattern).
 ---
 
 ## Session: 2026-04-23 (Phase 6.1 — JSON Validator vertical slice + tool-pattern doc)
+
 **Phase:** 6.1 — first real Phase 6 tool; establishes the scaffolding for
 the remaining twelve (Task #69).
 
 **Scope landed this session:**
+
 - **Pure JSON logic** — `apps/desktop/src/tools/json-validator/lib.ts`.
   Discriminated-union result types (`JsonValidateOk | JsonValidateError |
-  JsonValidateEmpty`) for `validateJson`, `formatJson`, `minifyJson`. Line/
+JsonValidateEmpty`) for `validateJson`, `formatJson`, `minifyJson`. Line/
   column/offset normalization across V8 vs. SpiderMonkey vs. JavaScriptCore
   error-message formats — we parse whichever fields the runtime gave us
   and compute the others ourselves so the UI never has to know which
@@ -2286,25 +2426,27 @@ the remaining twelve (Task #69).
   tool maintainer lands on the doc before the code.
 - **Tool-pattern doc** — `docs/tool-pattern.md`. Codifies the five
   rules:
-    1. Component knows React; `lib.ts` doesn't (pure, testable in node).
-    2. Errors are discriminated unions, not exceptions.
-    3. State lives in `useTool`, not `useState`.
-    4. Zone-responsive layout is a render-time decision (same DOM tree).
-    5. Filesystem/network/crypto go through `@/ipc` only.
-  Plus: tests come in two layers (node-env lib tests + jsdom component
-  tests), anti-patterns to avoid, a file-by-file reference to the JSON
-  Validator implementation, and a numbered checklist for adding the next
-  tool.
+  1. Component knows React; `lib.ts` doesn't (pure, testable in node).
+  2. Errors are discriminated unions, not exceptions.
+  3. State lives in `useTool`, not `useState`.
+  4. Zone-responsive layout is a render-time decision (same DOM tree).
+  5. Filesystem/network/crypto go through `@/ipc` only.
+     Plus: tests come in two layers (node-env lib tests + jsdom component
+     tests), anti-patterns to avoid, a file-by-file reference to the JSON
+     Validator implementation, and a numbered checklist for adding the next
+     tool.
 - **Index updated** — `docs/index.yaml` now references `tool-pattern.md`
   as an active reference doc.
 
 **Design decisions made:**
+
 - **Parse result is derived, not stored.** `useMemo(() => validateJson(state.text), [state.text])` on every render. Alternative (store `{text, validation}` in tool state, update together) adds a race surface for no benefit at Phase 6.1 data sizes. Revisit if Hex Inspector (6.4) streams buffers large enough that parse times become a drop-frame concern — then memoizing isn't enough, the parse should move to a web worker or the backend.
 - **Compact form shares the DOM with the full form.** Dragging a tool between zones triggers a class-modifier change, not a remount. Keeps textarea state, caret, and scroll offset stable across the drag. Alternative (two separate components + conditional render) was tried mentally and rejected because the user-visible glitch of mid-drag state loss costs more than the CSS complexity of variant modifiers.
 - **Format/Minify disabled on invalid input.** Rather than "best-effort format the parseable prefix" or "format and silently drop trailing garbage", we refuse. Matches VS Code's Format Document behavior on an unparseable file. The status pill already surfaces the exact line+col of the error — that's the actionable feedback; destroying the buffer would not be.
 - **Tool-pattern doc lives at `docs/tool-pattern.md`, not inside the `tools/` folder.** Keeping cross-cutting reference docs under `docs/` matches the project-docs skill's index convention and makes the doc discoverable via `docs/index.yaml`. In-tree READMEs fragment attention.
 
 **Files added (Phase 6.1):**
+
 - `apps/desktop/src/tools/components/ToolFrame.tsx`
 - `apps/desktop/src/tools/components/ToolFrame.module.css`
 - `apps/desktop/src/tools/components/ToolStatusPill.tsx`
@@ -2319,6 +2461,7 @@ the remaining twelve (Task #69).
 - `docs/tool-pattern.md`
 
 **Files changed (Phase 6.1):**
+
 - `apps/desktop/src/tools/registry.ts` — imports `JsonValidator`, swaps
   the `json-validator` entry's `component` from `PlaceholderTool` to
   `JsonValidator`, refines `description`, adds a comment pointing at
@@ -2328,6 +2471,7 @@ the remaining twelve (Task #69).
   landed; no phase-status flip yet (awaiting Windows host).
 
 **Verification planned (blocked on Windows host):**
+
 - `pnpm --filter @hyperspanner/desktop test` covers everything new.
   Expected additional test count: 22 (lib) + 7 (component) = 29 new
   cases on top of the 12 IPC tests from 6.0.
@@ -2350,9 +2494,11 @@ text/data tools on the same pattern).
 ---
 
 ## Session: 2026-04-23 (Phase 6.0 — backend command surface + TS IPC layer)
+
 **Phase:** 6.0 — backend command surface design + scaffolding (Task #68).
 
 **Scope landed this session:**
+
 - **Rust error module** — `apps/desktop/src-tauri/src/error.rs`. Introduces
   `HyperspannerError` enum (`thiserror`) with six variants: `Io`,
   `PathNotFound`, `NotAFile`, `FileTooLarge`, `InvalidEncoding`,
@@ -2363,18 +2509,18 @@ text/data tools on the same pattern).
   binds the tag vocabulary to `apps/desktop/src/ipc/errors.ts` as a
   cross-language contract.
 - **Rust commands module** — `apps/desktop/src-tauri/src/commands/mod.rs`
-  + `commands/fs.rs`. Two commands: `read_file_bytes(path, max_bytes?)`
-  and `read_text_file(path, encoding?, max_bytes?)`. Shared
-  `stat_and_check` helper folds path-exists + is-file + size-check into
-  one pass so both commands emit the same error kinds for the same
-  failure modes. 64 MiB default size ceiling; callers override via
-  `max_bytes`. Phase 6.0 intentionally supports `utf-8` only in
-  `read_text_file` (rejects with `invalid_encoding` otherwise) — we add
-  `encoding_rs` when a real tool demands it, not on spec. Seven unit
-  tests cover: happy-path bytes read, missing-path, directory-as-path,
-  size-limit rejection, utf-8 happy path, encoding spelling variants,
-  unknown encoding, invalid-utf8 offset reporting. Uses `tempfile`
-  (added as `[dev-dependencies]` in `Cargo.toml`).
+  - `commands/fs.rs`. Two commands: `read_file_bytes(path, max_bytes?)`
+    and `read_text_file(path, encoding?, max_bytes?)`. Shared
+    `stat_and_check` helper folds path-exists + is-file + size-check into
+    one pass so both commands emit the same error kinds for the same
+    failure modes. 64 MiB default size ceiling; callers override via
+    `max_bytes`. Phase 6.0 intentionally supports `utf-8` only in
+    `read_text_file` (rejects with `invalid_encoding` otherwise) — we add
+    `encoding_rs` when a real tool demands it, not on spec. Seven unit
+    tests cover: happy-path bytes read, missing-path, directory-as-path,
+    size-limit rejection, utf-8 happy path, encoding spelling variants,
+    unknown encoding, invalid-utf8 offset reporting. Uses `tempfile`
+    (added as `[dev-dependencies]` in `Cargo.toml`).
 - **Rust runtime wiring** — `apps/desktop/src-tauri/src/lib.rs` gains
   `pub mod commands; pub mod error;` and registers the two new commands
   in `tauri::generate_handler![]`. Module docstring makes the
@@ -2406,6 +2552,7 @@ text/data tools on the same pattern).
     shapes, rejected Rust errors surface as typed `HyperspannerError`.
 
 **Design decisions made:**
+
 - **Minimum viable Rust surface = `fs` only.** Deferred `hash_bytes` to
   sub-phase 6.4, `decode_protobuf` and `tls_inspect` to 6.5. Reason:
   bundling `prost-reflect`, `rustls`, and a RustCrypto stack before the
@@ -2431,6 +2578,7 @@ text/data tools on the same pattern).
   single direct call since the dynamic import has a literal string.
 
 **Files added:**
+
 - `apps/desktop/src-tauri/src/error.rs`
 - `apps/desktop/src-tauri/src/commands/mod.rs`
 - `apps/desktop/src-tauri/src/commands/fs.rs`
@@ -2441,10 +2589,12 @@ text/data tools on the same pattern).
 - `apps/desktop/src/ipc/ipc.test.ts`
 
 **Files changed:**
+
 - `apps/desktop/src-tauri/Cargo.toml` — added `[dev-dependencies] tempfile = "3"` for the fs unit tests.
 - `apps/desktop/src-tauri/src/lib.rs` — registered `commands::fs::read_file_bytes` and `commands::fs::read_text_file`; added `pub mod commands; pub mod error;` declarations.
 
 **Verification planned (blocked on Windows host):**
+
 - `cargo test -p hyperspanner` — runs seven fs command tests.
 - `pnpm --filter @hyperspanner/desktop test` — runs twelve IPC tests.
 - `pnpm --filter @hyperspanner/desktop typecheck && pnpm --filter @hyperspanner/desktop build` — catches verbatimModuleSyntax / strict-mode regressions, confirms Vite produces a clean bundle with the dynamic import.
@@ -2457,9 +2607,11 @@ text/data tools on the same pattern).
 ---
 
 ## Session: 2026-04-23 (late evening — fourth-round chrome correction: rail-width + banner-pin-in-rem)
+
 **Phase:** Continuation of the same-day top-row stability arc.
 
 **User feedback on the third-round fix:**
+
 > "no, with that last change the top horizontal segment is not visible at all. I also
 > noted that when I resized the window, the 'leftFrameTop' element appears to resize with
 > the window size changes. That element should be fixed. The titleLeading should
@@ -2479,6 +2631,7 @@ Two distinct problems exposed:
    visually stable across window resizes.
 
 **Corrections applied:**
+
 - `apps/desktop/src/shell/AppShell.tsx`: reduced `--lcars-font-size-banner` pin from
   `4rem` to `3rem`. At html:1rem that's 48px; at html:1.2rem (active ≤1300px) that's
   57.6px. Both fit comfortably in the 185px row above the ~48px bannerRow + 10px
@@ -2496,6 +2649,7 @@ Two distinct problems exposed:
   banner owns the whole titleRow with no telemetry competing for horizontal space.
 
 **Actions — lessons:**
+
 - `docs/lessons.yaml`: appended lesson #43 (supersedes #42) — `rem` pins in chrome
   content rides the html root font-size, so `4rem` isn't a stable value when global.css
   bumps html to 1.2rem at narrow widths; use a cushioned rem value or pin in raw pixels.
@@ -2506,6 +2660,7 @@ Two distinct problems exposed:
   horizontal fight with the primary content.
 
 **Outcome:**
+
 - Top row now holds at 185px across every desktop window width, including at narrow
   widths where html:1.2rem is in effect. The topBar is visible in all states.
 - Left rail (`leftFrameTop`) now holds at its canonical 240px across every desktop
@@ -2581,6 +2736,7 @@ cleanly. Once green, task #67 can close and Phase 6 (vertical-slice tools) can s
 ---
 
 ## Session: 2026-04-23 (late — top-row jitter correction + secondary title removal)
+
 **Phase:** Same-day follow-up on the morning's LcarsStandardLayout fix.
 
 **User feedback on the morning fix:** The `height` → `min-height` change solved the
@@ -2592,6 +2748,7 @@ secondary title, then cascade entries) rather than growing the row. "I also pref
 shorter segment in the top section than matching the segment height in the bottom section."
 
 **Correction applied (supersedes the morning direction):**
+
 - `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css`:
   reverted `.wrap.topRow` from `min-height` back to fixed `height`. Changed `.titleRow`
   from `flex-wrap: wrap` to `flex-wrap: nowrap` with `min-width: 0` so banner +
@@ -2611,6 +2768,7 @@ shorter segment in the top section than matching the segment height in the botto
   silently.
 
 **Actions — lessons:**
+
 - `docs/lessons.yaml`: appended lesson #41 (category: architecture, supersedes: 40).
   #40's "use min-height" advice was wrong for this class of load-bearing chrome; #41
   states the corrected pattern: keep the height fixed, make content-bearing rows
@@ -2621,6 +2779,7 @@ shorter segment in the top section than matching the segment height in the botto
   corrected advice.
 
 **Outcome:**
+
 - The top-row chrome no longer breathes when tools are selected. At a wide window
   with all 6 cascade entries visible, the row stays at 185px. As the window narrows,
   cascade entries drop in order of decreasing importance (counters → ZONE → CAT) so
@@ -2659,10 +2818,12 @@ at multiple window widths. Task #67 stays in_progress until the Windows gate is 
 ---
 
 ## Session: 2026-04-23 (LcarsStandardLayout top-row / elbow sync fix)
+
 **Phase:** Post-Phase-5 polish — surfaced by the user after the Phase 4/5 landing when
 selecting tools revealed a layout regression.
 
 **Symptom reported by user:**
+
 > "when I select some tools, the top section is being affected. e.g. the top segments
 > disappear / are no longer visible until I hit the reset button. Also, it seems like the
 > height of the upper segments can change and the elbowTop height isn't being adjusted to
@@ -2683,6 +2844,7 @@ clears tools → no titleChip → title row shrinks to one line → everything f
 again → bar re-appears.
 
 **Fix applied (one-line structural change + comment updates):**
+
 - `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css`:
   changed `.wrap.topRow { height: ... }` to `.wrap.topRow { min-height: ... }`. Consumers
   still pin the baseline (AppShell's 185px stays), but the row is now free to grow when
@@ -2694,6 +2856,7 @@ again → bar re-appears.
   why it's min-height and not height.
 
 **Actions — lessons captured:**
+
 - Appended lesson #40 to `docs/lessons.yaml` — category `architecture`: "Fixed height +
   `overflow: hidden` + absolutely-positioned children anchored to container edges is a
   silent-clip anti-pattern. Use `min-height` so the container grows with content instead
@@ -2701,6 +2864,7 @@ again → bar re-appears.
   the real content edge, not a premature clip line."
 
 **Outcome:**
+
 - AppShell renders identically in the common (no-tool or short-title) case — 185px top
   row pinned by min-height is visually the same as 185px pinned by height.
 - When a tool is selected and content pressure grows the title row, the top row now
@@ -2716,6 +2880,7 @@ Task #67 (Phase 4/5 verification pass) stays in_progress until the Windows gate 
 ---
 
 ## Session: 2026-04-22 (Phase 4 + Phase 5 — navigator rebuild, HomeView, command palette, shortcuts)
+
 **Phase:** 4 (tool registry + navigator) + 5 (command palette) executed together as one milestone.
 
 **Scope chosen:** Navigator + HomeView + CommandPalette + keyboard shortcut system in a single
@@ -2724,8 +2889,9 @@ separate overlay or header — single entry point, consistent with LCARS "everyt
 the rail" affordance.
 
 **Actions — state layer (tasks #59, #60):**
+
 - Added `useFavorites` (Zustand + `persist` middleware backed by `createJSONStorage(() =>
-  localStorage)`). Exposes `favorites: string[]`, `toggleFavorite(id)`, `clearFavorites()`,
+localStorage)`). Exposes `favorites: string[]`, `toggleFavorite(id)`, `clearFavorites()`,
   plus the selector helpers `useIsFavorite(id)` and `useToggleFavorite()` for components that
   only need one slice. MRU ordering — toggling pin moves the id to the front.
 - Added `useRecents` with identical persist pattern. `trackOpen(id)` unshifts + dedupes +
@@ -2739,6 +2905,7 @@ the rail" affordance.
   localStorage shim).
 
 **Actions — navigator rebuild (task #61):**
+
 - Full rewrite of `shell/LeftNavigator.tsx` (294 lines). Top of the stack is an
   `LcarsSearchField` with a FIND prefix, value pinned to a local `query` state.
 - Below search, three conditional regions:
@@ -2759,12 +2926,14 @@ the rail" affordance.
   id, so the rail shows workspace status at a glance.
 
 **Actions — pin/unpin from tab menu (task #62):**
+
 - Extended `shell/TabActionMenu.tsx` with a `toggle-pin` EntryId. Entry label flips between
   "Pin to Rail" and "Unpin from Rail" based on `useIsFavorite(toolId)`; dispatch calls
   `useToggleFavorite()` on the current tool id. Menu now has two bottom-group operations
   (pin toggle + reset view) before the destructive close at the very bottom.
 
 **Actions — HomeView launchpad (tasks #63, #64):**
+
 - New `screens/HomeView.tsx` (191 lines). Hero banner with eyebrow "HYPERSPANNER · v0.1"
   and title "STARFLEET ENGINEERING CONSOLE", plus an action row with two pills —
   `OPEN PALETTE · ⌘K` (wired to `onOpenPalette`) and `BROWSE TOOLS` (scroll-hint to the
@@ -2779,24 +2948,26 @@ the rail" affordance.
   replaces the old `LcarsEmptyState + LcarsPill` "OPEN SAMPLE" placeholder.
 
 **Actions — command palette (task #65):**
+
 - New `shell/CommandPalette.tsx` (310 lines) + `CommandPalette.module.css`. Portal-rendered
   modal via `createPortal(content, document.body)` with a fixed scrim that click-closes.
 - Inner palette is an `LcarsSearchField` at the top + a scroll list of `CommandItem` rows.
   Each row has a colored accent bar, label (highlighted on cursor), a muted description,
   and a right-aligned kind tag (TOOL / ACTION).
 - Catalog = all tools (kind: 'tool', color from category palette, run = `onOpenTool(id)`)
-  + conditional actions: "Reset Layout" (kind: 'action', when anything non-default is in
-  workspace), "Cycle Theme" (always). Scoring mirrors the navigator's filter — label-prefix
-  beats label-substring beats keyword-match beats description-substring.
+  - conditional actions: "Reset Layout" (kind: 'action', when anything non-default is in
+    workspace), "Cycle Theme" (always). Scoring mirrors the navigator's filter — label-prefix
+    beats label-substring beats keyword-match beats description-substring.
 - Keyboard: ArrowUp/Down move cursor (wraps), Home/End jump, Enter executes, Escape closes,
   Tab is trapped. `scrollIntoView({ block: 'nearest' })` keeps the cursor visible as it
   moves. Focus captured via `requestAnimationFrame` so the DOM has painted before we try
   to focus the input (the earlier `useEffect` placement was racing with the portal mount).
 
 **Actions — shortcut registry + help overlay (task #66):**
+
 - New `keys/` module with four pieces:
   - `shortcuts.ts` — `Shortcut` type (`{ id, description, key, mod?, shift?, alt?,
-    whenTyping?, run }`), `WhenTypingPolicy = 'allow' | 'block'`, plus `formatShortcut()`
+whenTyping?, run }`), `WhenTypingPolicy = 'allow' | 'block'`, plus `formatShortcut()`
     (Mac renders ⌘⇧K, Windows renders Ctrl+Shift+K) and `isMacPlatform()`.
   - `useGlobalShortcuts.ts` — `useEffect` with empty deps registers a single window
     keydown listener. A `ref` keeps the bindings list current without re-subscribing
@@ -2815,7 +2986,7 @@ the rail" affordance.
   - `index.ts` barrel.
 - Wired into `AppShell.tsx`:
   - `useGlobalShortcuts([{ palette: Cmd+K, whenTyping: 'allow' }, { help: Shift+?,
-    whenTyping: 'block' }])`.
+whenTyping: 'block' }])`.
   - `paletteOpen` / `helpOpen` local state; both toggle to close on re-press.
   - The TopRail PALETTE pill's onClick now fires `handleOpenPalette` (same entry
     point as the shortcut).
@@ -2823,8 +2994,9 @@ the rail" affordance.
     tree; each is a portal at runtime so they don't affect layout when closed.
 
 **Verification performed (task #67):**
+
 - Sandbox `tsc` cannot be trusted — see lesson below. Host-side `pnpm typecheck &&
-  pnpm test && pnpm build` is the gate, same as prior phases (lesson #2, #18).
+pnpm test && pnpm build` is the gate, same as prior phases (lesson #2, #18).
 - Static code review: walked every new/edited file against strict + `verbatimModuleSyntax`
   (import-type separation for `FC`, `ReactNode`, `Shortcut`, `ToolDescriptor`, `SplitSide`,
   etc.), confirmed ARIA on the palette + help modal, confirmed escape/click-outside
@@ -2860,7 +3032,6 @@ tab menu and appears in the rail's PINNED section.
 
 **Blockers:** None. Host-side verification gate only.
 
-
 **Addendum (same day, after host verification surfaced file truncation):**
 Host-side `pnpm typecheck && pnpm test && pnpm build` run revealed that several of the files
 I had edited via the file-tool Edit operation during Phase 4/5 had been silently truncated on
@@ -2876,6 +3047,7 @@ truncation wasn't visible via either Read or sandbox-side `tsc`. A mistaken atte
 left them in a worse state.
 
 **Recovery actions:**
+
 - For tracked files (PaneDropTarget.tsx, TabActionMenu.tsx): extracted the clean version from
   `git show HEAD:path` via redirect to /tmp, then rewrote on top via bash heredoc with Phase
   4/5 fixes re-applied (DOMStringList→minimal-shape feature test; handleKey widened from
@@ -2905,6 +3077,7 @@ reconstruction resolves the 8 JSX truncation errors without introducing new ones
 ---
 
 ## Session: 2026-04-22 (plan-005 polish — inspector layout + elbow/bar weld)
+
 **Phase:** plan-005 polish iteration on user feedback — two distinct asks.
 
 **Feedback 1:** "The inspector should be fixed to the right side with the tabs using all remaining space."
@@ -2912,6 +3085,7 @@ reconstruction resolves the 8 JSX truncation errors without introducing new ones
 **Feedback 2:** "Still a gap between the elbow and the bar below it." (Reported across multiple iterations — 3px, 10px, 12px overlap values all failed to close the visible seam.)
 
 **Actions:**
+
 - **Inspector full-height (VS Code pattern).** Changed `AppShell.module.css .workspace` grid from
   `'center right' / 'bottom bottom'` (inspector half-height, bottom footer full-width) to
   `'center right' / 'bottom right'` (inspector full-height right rail, bottom zone only under
@@ -2949,6 +3123,7 @@ explain why before accepting the empirical number. The likely culprit is a combi
 at the user's zoom level, but the exact answer is less important than the fix.
 
 **Other diagnostic dead-ends worth noting:**
+
 - Early attempts assumed the issue was "not enough overlap" and bumped the overlap values
   blindly. The user's phrase "we had this aligned properly before" was a strong signal to
   stop piling on fixes and investigate the regression instead — acted on too late.
@@ -2960,6 +3135,7 @@ at the user's zoom level, but the exact answer is less important than the fix.
   sandbox-local only.
 
 **Files changed this session:**
+
 - `apps/desktop/src/shell/AppShell.module.css` — grid template areas changed to VS Code pattern
   (inspector spans both rows).
 - `packages/lcars-ui/src/primitives/LcarsStandardLayout/LcarsStandardLayout.module.css` —
@@ -2976,6 +3152,7 @@ documented and non-surprising for future touches.
 ---
 
 ## Session: 2026-04-22 (plan-005 iteration — canonical rail shoulder + zone frame rails)
+
 **Phase:** plan-005 polish iteration on user feedback.
 
 **Feedback:** "I like the console. I really want to see the standard curved menu for the left and top. It would be nice if each docked panel had some minimal separator / framing rails."
@@ -2983,6 +3160,7 @@ documented and non-surprising for future touches.
 **Diagnosis:** The plan-005 shipping chrome welded nav to top rail via a shell-level 60×60 radial-gradient elbow, but the LeftNavigator's caps themselves were FLAT rectangles. That read as "dark theme with small corner crescent" rather than the canonical LCARS-24.2 "rail has a rounded shoulder" shape. The docked zones (center/right/bottom) also had no frame rails — they were plain flex columns distinguished only by the 0.25rem grid gap.
 
 **Actions:**
+
 - **Canonical rail shoulders.** Moved the LCARS curve from an external overlay INTO the rail itself:
   - Added `--shell-rail-top-radius: 80px` + `--shell-rail-bottom-radius: 60px` to `global.css` — larger at the top so the visual weight biases up, matching the LCARS-24.2 reference's rail rhythm.
   - `LeftNavigator.module.css .topCap`: `border-top-right-radius: var(--shell-rail-top-radius)` + bumped height to 80px via the LcarsPanel's height prop. The height must be ≥ the radius for the quarter-circle to read as a true quarter; a shorter cap would flatten it into an ellipse.
@@ -2998,11 +3176,13 @@ documented and non-surprising for future touches.
 - **Iterated on the framing weight.** First pass tried double-border frames (both inward + outward edges) on the side/bottom zones. That read as "boxed panel" — too heavy relative to the "minimal" brief. Pulled back to single inward-facing edges, which frames each panel's junction with the center surface without closing the whole box. 3px is thin enough to not compete with the main rail's 80px rounded shoulder.
 
 **Design invariants retained from the prior session:**
+
 - Rail-color-sync (lesson #19): brandBand + elbowCap + topCap all use `--shell-rail-top-color`. Swapping themes updates all in one place.
 - CSS var reassignment for state (lesson #27): `.leftClosed` still reassigns `--shell-nav-width`; no per-consumer overrides needed.
 - Geometry is not responsive (lesson #20): rail radii are fixed at 80px/60px across breakpoints.
 
 **Verification performed:**
+
 - Walked the geometry manually: with topCap height 80px + border-top-right-radius 80px, the quarter-circle runs from (width − 80, 0) to (width, 80), cutting a true quarter-disc out of the rail's top-right and showing the shell's black background through. Same logic mirrored for bottomCap (60px × 60px). No stretching, no clipping.
 - Confirmed no stale references to `styles.elbow` after removing the class (AppShell.tsx no longer references it, AppShell.module.css no longer defines it, no other files touched it).
 - Verified the 3px zone borders don't conflict with the PaneDropTarget overlay — the overlay uses `position: absolute` inside `.dropHost` which is a descendant of `.zone`; the border is on the `.zone` box itself and doesn't propagate into the positioning ancestor chain.
@@ -3024,27 +3204,32 @@ documented and non-surprising for future touches.
 ---
 
 ## Session: 2026-04-22 (plan-005 steps 1–4 — shell LCARS-24.2 polish)
+
 **Phase:** plan-005 — apply the de-risk-screen-validated LCARS grammar to AppShell + TopRail + LeftNavigator.
 
 **Context entering session:**
 plan-006 had just completed with S1–S7 de-risk screens and the LcarsStandardLayout primitive + three new primitives (LcarsTabCluster, LcarsEventLog, LcarsWireframeInset). 26 lessons logged. The AppShell chrome still looked like a dark theme inspired by LCARS, not one built to the grammar. The user's explicit ask: "update the plan using lessons learned and elements from the gallery to improve the authenticity of the main screen and proceed on the implementation."
 
 **Actions this session — plan revision:**
+
 - Opened `docs/plan-005-lcars-polish.md`. Added a "Post-plan-006 revisions (2026-04-22)" section that (1) supersedes the original Step 2 `LcarsElbow` primitive with the radial-gradient approach validated in LcarsStandardLayout, (2) strengthens Step 3 with the rail-color-sync invariant from lesson #19, (3) strengthens Step 4 with the S4 PanelButtonStackScreen pattern (vertical LcarsPanel stack), and (4) locks geometry to NOT be responsive per lesson #20 (only `--shell-nav-width` shrinks on narrow viewports; radii and bar heights stay fixed). Included a primitives-table showing which S1–S7-validated pieces are used where, and a lessons-applied table mapping lessons #19–24 to each step.
 
 **Actions this session — implementation (Steps 1–4):**
+
 - **Step 1 (shell tokens).** Added `--shell-rail-top-color`, `--shell-rail-bottom-color`, `--shell-elbow-size: 60px`, `--shell-nav-width: 240px` at `:root` in `apps/desktop/src/styles/global.css`. These propagate through AppShell + TopRail + LeftNavigator so the three chrome components stay in color + geometry sync from a single source of truth.
 - **Step 2 (elbow corner).** Added `.elbow` to `apps/desktop/src/shell/AppShell.module.css` — a shell-level absolutely-positioned 60×60 div painted by a single radial-gradient `circle 60px at bottom right`. The gradient's center is at the bottom-right of the box so the transparent quarter-disc points into the content area and the colored L hugs the top and left edges. Positioned with 1px overlap into both TopRail (above) and Nav (to the left) to hide antialiasing seams. Added `position: relative` to `.shell` to anchor it. When nav collapses (`leftClosed`), the elbow is hidden because the `navRestoreButton` already draws its own rounded edge and curve-on-curve would look muddled. Added the elbow div to `AppShell.tsx` as the first child of the shell grid (`aria-hidden="true"`, `pointer-events: none`).
 - **Step 3 (segmented TopRail).** Replaced the old 3-column grid layout in `TopRail.tsx` with a flat 5-segment flex row: brandBand (rail-color, nav-width wide) → elbowCap (rail-color, 60+8px — gives the curve somewhere to land) → toolTitleBand (african-violet, flex:1, contains TOOL eyebrow + active-tool title or dimmed empty-state) → tailSegment (butterscotch, half-height, decorative "visual comma") → controls (5 LcarsPills with rounded="left" on first and rounded="right" on last per lesson #21). Rewrote `TopRail.module.css` with flat-edged segments and `gap: var(--lcars-spacing-bar-border)` painting the LCARS black seams. `.controls` uses `align-items: center` to vertically center 40px small pills inside the 48px rail.
 - **Step 4 (LeftNavigator two-cap rebuild).** Replaced the old rounded `.elbowCap` + `.elbowCapBottom` divs with flat LcarsPanel caps (rail-color on top, rail-bottom-color on bottom). Replaced the custom accordion headers with a color-cycling LcarsPanel stack following the S4 pattern — each category is a clickable LcarsPanel with right-anchored label that toggles its tools list underneath. Active expanded = panel's built-in `active` state (almond-creme fill, left-edge color stripe). Scoped `--lcars-spacing-left-frame-width: 100%` on `.nav` so the LcarsPanel primitive's default 240px width adapts to the shell's actual nav width (including collapse). Rewrote `LeftNavigator.module.css` to remove the accordion classes and add `.topCap`, `.bottomCap`, `.categoryStack`, `.categoryBlock`, `.categoryPanel`, `.categoryItems`.
 
 **Design invariants enforced (from lessons):**
+
 - **Rail-color-sync (lesson #19):** TopRail's brandBand + elbowCap + the shell-level elbow gradient + LeftNavigator's topCap all read `--shell-rail-top-color`. Swapping themes updates all four in one place.
 - **CSS var reassignment for state (new pattern):** `.leftClosed { --shell-nav-width: var(--shell-nav-closed-width, 44px); }` — instead of overriding every downstream consumer's width rule, we reassign the source-of-truth var and every consumer (grid track, brandBand, elbow's `left:` calc) updates automatically.
 - **1px overlap for seam hiding (validated in LcarsStandardLayout):** the elbow's `left: calc(padding + nav-width - 1px)` and `top: calc(padding + top-height - 1px)` make it bleed 1px into both adjacent chrome components so sub-pixel AA seams disappear.
 - **Geometry is not responsive (lesson #20):** elbow size stays 60px at all widths; only `--shell-nav-width` shrinks at narrow viewports.
 
 **Verification performed:**
+
 - Read back every edited file (AppShell.module.css, AppShell.tsx, TopRail.tsx, TopRail.module.css, LeftNavigator.tsx, LeftNavigator.module.css, global.css) to confirm syntax, var references, and structural consistency.
 - Walked the geometry manually: elbow at `(padding + nav-width - 1px, padding + top-height - 1px)` with 60×60 gradient — top-left of box sits 1px inside Nav's right edge + 1px below TopRail's bottom edge, colored L hugs that corner, crescent opens into the content area. Verified against the LcarsStandardLayout elbow primitive's orientation (same technique, just rotated 180° because AppShell has TopRail above whereas the primitive has rail-to-the-left of the bar).
 - No sandbox `pnpm typecheck` run — the Linux mount showed a stale truncated AppShell.tsx causing false "unclosed JSX tag" errors; the Windows file is complete and consistent per Read. Host-side typecheck is the review gate.
@@ -3068,6 +3253,7 @@ plan-006 had just completed with S1–S7 de-risk screens and the LcarsStandardLa
 ---
 
 ## Session: 2026-04-22 (plan-006 T4/T5/T6 — primitive extraction + S2–S7 de-risk screens)
+
 **Phase:** plan-006 T4 (extract) + T5 (S2–S4) + T6 (S5–S7).
 
 **Context entering session:**
@@ -3088,6 +3274,7 @@ extraction needed). Real extraction candidates were the INLINE patterns
 in S1: the tab pill cluster, the event log, and the trajectory wireframe
 frame. Extracted three new primitives following the existing pattern
 (folder + .tsx + .module.css + barrel export):
+
 - `LcarsTabCluster` + `LcarsTabPill` — parent/child pair. Cluster is a
   thin flex wrapper; TabPill is the interactive leaf with a CSS custom
   property `--tab-pill-color` and a left-edge stripe when active. This
@@ -3095,7 +3282,7 @@ frame. Extracted three new primitives following the existing pattern
   primitive single-purpose.
 - `LcarsEventLog` — `heading?` + `items: LcarsEventLogItem[]` where
   each item has `code`, `text`, and optional `severity: 'normal' |
-  'alert' | 'critical'`. Severity auto-applies CSS class styling.
+'alert' | 'critical'`. Severity auto-applies CSS class styling.
 - `LcarsWireframeInset` — `title` + optional `code` + optional
   `footerLeft` / `footerRight` (ReactNode) + `children`. Clip-path
   notched corners + ::before/::after corner brackets render the
@@ -3117,6 +3304,7 @@ of the codebase).
 **Actions — T5/T6 (S2–S7 screens) via two parallel subagents:**
 Spawned two general-purpose subagents concurrently since the 3+3
 screens are independent:
+
 - Subagent A (S2–S4): built `RailElbowScreen`, `SegmentedTopScreen`,
   `PanelButtonStackScreen` using only existing primitives
   (LcarsStandardLayout, LcarsBar, LcarsPanel, LcarsPill).
@@ -3130,6 +3318,7 @@ fields each without collision.
 
 **Screens designed as MULTI-CONFIG pressure tests** (not just single
 canonical usages):
+
 - S3 SegmentedTop: 3 standalone LcarsBar instances (5-segment canonical,
   half-height seam, 3-segment minimal degradation).
 - S4 PanelButtonStack: 3 side-by-side stacks (3-button basic, 5-button
@@ -3151,6 +3340,7 @@ STRUCTURE</LcarsPanel>` and cleaning up the orphaned
 `.structuralPlaceholder` CSS class.
 
 **Verification performed:**
+
 - Read back the updated `registry.ts` — clean merge, all 7 entries
   have `Component` wired.
 - Spot-read each of the 6 new screens against the HomeAutomation
@@ -3183,6 +3373,7 @@ Gallery has demo entries for all three. Skill evals completed at
 ---
 
 ## Session: 2026-04-21 (LcarsStandardLayout rail→elbow→bar continuation — final round)
+
 **Phase:** plan-006 T3 — de-risk HomeAutomation screen.
 
 **Context entering session:**
@@ -3197,6 +3388,7 @@ round 10/11 fixes the BOTTOM rail was correct but the TOP rail's bar +
 elbow were still invisible on HomeAutomation.
 
 **Actions this session:**
+
 - **Diagnosis.** Read `LcarsStandardLayout.tsx` + `.module.css`,
   `HomeAutomationScreen.tsx`, `LcarsDataCascade.module.css`,
   `LcarsPanel.module.css`. Confirmed the top row's `.rightFrameTop` children
@@ -3217,6 +3409,7 @@ elbow were still invisible on HomeAutomation.
   top rails silently disappearing.
 
 **Verification performed:**
+
 - Walked the flex math manually: with `flex-shrink: 0` on `.wrap` and
   `flex: 1 1 auto` on `.wrap.gap`, wrap1 reserves its full content height
   regardless of wrap2 pressure. Specificity checked — `.wrap.gap` has
@@ -3237,22 +3430,24 @@ continuation. Task #46 closed. Twelve-round debugging saga ends.
 ---
 
 ## Session: 2026-04-21 (LcarsStandardLayout rail→elbow→bar — rounds 10 & 11)
+
 **Phase:** plan-006 T3 — de-risk HomeAutomation screen.
 
 **Actions:**
+
 - **Round 10: concrete-div elbows.** Eliminated the reference's pseudo-element
-  + `z-index: -1` approach entirely. Replaced with two absolutely-positioned
-  `.elbowTop` / `.elbowBottom` divs inside `rightFrameTop` / `rightFrame`,
-  each painted by a single radial-gradient:
-  `radial-gradient(circle 60px at <corner>, transparent 59.5px, <rail-color> 60px)`.
-  Inside the 60px disc: transparent. Outside: rail color. The result is
-  the quarter-crescent shape directly — no z-index, no stacking contexts,
-  no propagation-to-ancestor trickery. The elbow paints in the normal
-  positioned layer of its containing stacking context, always visible
-  against whatever sits below it in the DOM. The 1px overlap with the
-  bar's top edge closes subpixel seams under zoom; `syncFirstSegmentColor`
-  guarantees the bar's first segment matches the rail color so the overlap
-  is invisible.
+  - `z-index: -1` approach entirely. Replaced with two absolutely-positioned
+    `.elbowTop` / `.elbowBottom` divs inside `rightFrameTop` / `rightFrame`,
+    each painted by a single radial-gradient:
+    `radial-gradient(circle 60px at <corner>, transparent 59.5px, <rail-color> 60px)`.
+    Inside the 60px disc: transparent. Outside: rail color. The result is
+    the quarter-crescent shape directly — no z-index, no stacking contexts,
+    no propagation-to-ancestor trickery. The elbow paints in the normal
+    positioned layer of its containing stacking context, always visible
+    against whatever sits below it in the DOM. The 1px overlap with the
+    bar's top edge closes subpixel seams under zoom; `syncFirstSegmentColor`
+    guarantees the bar's first segment matches the rail color so the overlap
+    is invisible.
 - **Round 11: fixed geometry.** User reported the black gap between rail
   and bar changed on resize, and the top bar disappeared at some widths.
   Removed responsive overrides for `--lcars-spacing-bar-height`
@@ -3275,14 +3470,17 @@ fix completed in the following session (see above).
 ---
 
 ## Session: 2026-04-20 (Phase 3 polish #2 — drag bug + tab menu bug + LCARS plan)
+
 **Phase:** 3 — three user reports triggered this pass.
 
 **Reports:**
+
 1. "I cannot drag tools to the other panes ... the targets appear but drag doesn't work."
 2. "Click on a ⋮ button for a tool — something pops down but is hidden and some scrollbars appear."
 3. "Main left section doesn't quite capture LCARS menus — generate a plan to be true to the original."
 
 **Diagnoses + fixes:**
+
 - **Drag did nothing.** Root cause: Tauri 2 webviews default to
   `dragDropEnabled: true`, which intercepts HTML5 drag events at the OS
   layer so the webview never sees `drop`. Fix: added
@@ -3302,12 +3500,13 @@ fix completed in the following session (see above).
   sequenced plan to move the shell from "dark theme inspired by LCARS"
   to a console built to the LCARS-24.2 grammar. Key structural fixes:
   add the diagonal elbow corner (`linear-gradient(to top right, color
-  50%, black 50%)`), rebuild TopRail as a segmented bar instead of three
+50%, black 50%)`), rebuild TopRail as a segmented bar instead of three
   pills, and rebuild LeftNavigator as a two-block rail (orange over
   african-violet, separated by a black seam, each with the canonical
   top-right / bottom-right radii). Each step leaves the shell shippable.
 
 **Verification performed:**
+
 - Confirmed Tauri 2 schema accepts `dragDropEnabled` on window config
   (referenced from the Tauri 2.0 config schema URL already in the file).
 - Portaled the menu with `useLayoutEffect` so positioning happens after
@@ -3325,9 +3524,11 @@ LCARS-24.2 fidelity work.
 ---
 
 ## Session: 2026-04-20 (Phase 3 polish — drag-to-split + restore affordances)
+
 **Phase:** 3 — post-milestone UX polish triggered by four user feedback items.
 
 **Feedback addressed:**
+
 1. Inspector had no restore affordance when collapsed → resolved in prior step.
 2. Center pane didn't reclaim space on inspector collapse → resolved in prior step
    (grid-template-columns now switches to a narrow stub width instead of zero).
@@ -3335,6 +3536,7 @@ LCARS-24.2 fidelity work.
 4. LeftNav + TopRail visual polish vs `lcars-interface-designer` skill → next task (#32).
 
 **Actions taken this session (drag-to-split):**
+
 - `shell/PaneDropTarget.tsx` (new): absolutely-positioned overlay with a
   `TAB_MIME = 'application/x-hyperspanner-tool'` constant and a `PaneDropVariant`
   union (`center-single` | `center-side` | `zone-only`). Listens on
@@ -3365,6 +3567,7 @@ LCARS-24.2 fidelity work.
   anchors to its immediate pane body.
 
 **Design notes:**
+
 - Window-level listeners instead of store-based drag state keep the model
   simple: no `draggingToolId` slice, no cleanup races across unmounts. The
   component's `aliveRef` guard protects against late `dragend` after an
@@ -3374,6 +3577,7 @@ LCARS-24.2 fidelity work.
   flat and testable; the composition lives where the geometry is known.
 
 **Verification performed (manual review):**
+
 - Walked the drag flow end-to-end in code: tab `dragstart` → window event
   → overlay reveal → region `dragover` (preventDefault is present) → drop
   handler → store composition → `dragend` cleanup. Every handler either
@@ -3399,9 +3603,11 @@ uppercase labels).
 ---
 
 ## Session: 2026-04-20 (Phase 3 hotfix — typecheck + nav collapse)
+
 **Phase:** 3 — post-wrap fixes surfaced by `pnpm typecheck` on Windows.
 
 **Actions taken:**
+
 - `themes/index.ts`: `LcarsTheme` was `typeof classicTheme`, which pinned `name`
   to the literal `"classic"` — so `themes[themeName]` returning a non-classic
   variant was unassignable. Changed to `(typeof themes)[ThemeName]` (union of
@@ -3424,6 +3630,7 @@ uppercase labels).
   `openCategories[cat.id] ?? Boolean(query)` fallback.
 
 **Verification performed:**
+
 - Re-delegated a static typecheck pass against the exact `pnpm typecheck`
   error list. All four reported errors trace to fixed files; no other
   `collapsed.center` references exist in the tree; no `any` escapes in
@@ -3439,10 +3646,12 @@ uppercase labels).
 ---
 
 ## Session: 2026-04-20 (Phase 3 wrap — workspace state milestone)
+
 **Phase:** 3 — Workspace state (Zustand) + managed docking model
 **Status entering session:** Phase 2 complete, AppShell shell rendered local zone state.
 
 **Actions taken:**
+
 - Added Zustand 5 + `useShallow` selectors. Authored `state/workspace.types.ts`,
   `state/presets.ts` (6 built-in layouts), `state/workspace.ts` (full store with
   openTool/closeTool/moveTool/splitCenter/mergeCenter/setActive/toggleZone/applyPreset/
@@ -3487,6 +3696,7 @@ uppercase labels).
 - Added root `test` script + per-package `test` / `test:watch` scripts.
 
 **Verification performed:**
+
 - Static code review (delegated) against strict-TS invariants, Zustand v5
   selector patterns, React 19 hook rules, store/test behavioral contract.
   Found and fixed one closure bug: `useTool.setState`'s function-form path
@@ -3510,10 +3720,12 @@ root `package.json` test script.
 ---
 
 ## Session: 2026-04-20 (Phase 2 wrap — shell milestone)
+
 **Phase:** 2 — App shell and zone layout
 **Status entering session:** Phase 1 complete, `/primitive-gallery` awaiting user review.
 
 **Actions taken:**
+
 - Built `useZoneState` hook — left/right/bottom open state, keyboard shortcuts
   (Cmd/Ctrl+B left, Cmd/Ctrl+J bottom, Cmd/Ctrl+Shift+E right), ignores typing targets.
 - Built `TopRail` — brand band + tool-title band + right-side controls
@@ -3536,6 +3748,7 @@ root `package.json` test script.
 - Added `apps/desktop/src/shell/index.ts` barrel.
 
 **Verification performed:**
+
 - Static code review (delegated) against `verbatimModuleSyntax`, `erasableSyntaxOnly`,
   primitive prop shapes, CSS Module class coverage, React hook deps, ARIA. Clean.
 - Sandbox typecheck still unavailable (pnpm symlink limitation); host-side verification
@@ -3553,11 +3766,13 @@ TopRail, LeftNavigator, CenterZone, RightZone, BottomZone, useZoneState, index}`
 ---
 
 ## Session: 2026-04-20 (Phase 1 wrap)
+
 **Phase:** 1 — Design tokens + lcars-ui primitive package
 **Status entering session:** Phase 1 mid-work. Four primitives ported
 (LcarsBar, LcarsBanner, LcarsPill, LcarsPanel), tokens in place.
 
 **Actions taken:**
+
 - Ported `LcarsChip` — decoupled from `useTheme`, variant prop now takes
   `LcarsSemanticRole` (primary/secondary/accent/info/success/warning/error/critical/neutral),
   variants map to CSS tokens via the new `variantColor` table.
@@ -3577,6 +3792,7 @@ TopRail, LeftNavigator, CenterZone, RightZone, BottomZone, useZoneState, index}`
 - Rewrote `App.tsx` to render `<PrimitiveGallery />` as the Phase 1 review milestone.
 
 **Verification performed:**
+
 - Manual code review against strict/`verbatimModuleSyntax`/`erasableSyntaxOnly`.
 - Unable to run `pnpm typecheck` in sandbox — pnpm symlinks aren't traversable from the
   Linux mount (documented in lessons). Host-side verification pending user.
@@ -3595,6 +3811,7 @@ plus `apps/desktop/src/pages/PrimitiveGallery/*` and `apps/desktop/src/App.tsx`.
 ## Session: 2026-04-20 (earlier — Phase 0 bootstrap + Phase 1 start)
 
 **Actions taken (summarized from prior context):**
+
 - Generated `plan-002-implementation.md` from plan-001.
 - Bootstrapped pnpm monorepo (`apps/desktop` + `packages/lcars-ui`).
 - Wired Tauri 2 + Vite 7 + React 19. Simplified `lib.rs` with `tracing` logging.

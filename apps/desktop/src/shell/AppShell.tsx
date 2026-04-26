@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FC } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { LcarsPill, LcarsStandardLayout } from '@hyperspanner/lcars-ui';
@@ -8,8 +8,13 @@ import { RightZone } from './RightZone';
 import { BottomZone } from './BottomZone';
 import { CascadeStatus } from './ToolStatusPanels';
 import { CommandPalette } from './CommandPalette';
+import { UpdaterBanner } from './UpdaterBanner';
 import { useShellShortcuts } from './useZoneState';
 import { useWorkspaceStore, useTrackOpen } from '../state';
+import {
+  useUpdaterHasUpdate,
+  useUpdaterStore,
+} from '../state/useUpdater';
 import { getTool } from '../tools';
 import { useTheme } from '../contexts/ThemeContext';
 import type { ThemeName } from '../themes';
@@ -131,6 +136,21 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
     openTool('system-settings', 'center');
   }, [openTool]);
 
+  // Auto-update integration. The on-launch check fires once after
+  // mount; subsequent re-renders are guarded by the store's
+  // `hasChecked` flag so we don't re-poll on every state update.
+  // Failures are silent at the UI layer (offline tolerance) — the
+  // store transitions to `error`, which the badge + banner ignore.
+  // Settings → Updates surfaces the error message if the user
+  // explicitly looks.
+  const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
+  const hasCheckedForUpdates = useUpdaterStore((s) => s.hasChecked);
+  const hasUpdate = useUpdaterHasUpdate();
+  useEffect(() => {
+    if (hasCheckedForUpdates) return;
+    void checkForUpdates();
+  }, [hasCheckedForUpdates, checkForUpdates]);
+
   const cycleTheme = useCallback(() => {
     // Theme cycling lives inside the Settings view now. The command
     // palette still wires to a `cycleTheme` callback for keyboard-
@@ -243,9 +263,33 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
         rounded="none"
         color={theme.colors.africanViolet}
         onClick={handleOpenSettings}
-        aria-label="Open settings"
+        aria-label={
+          hasUpdate
+            ? 'Open settings (update available)'
+            : 'Open settings'
+        }
       >
+        {/* The update badge is a tiny orange disc that hangs off the
+          * SETTINGS label. CSS-only — `::after` would be cleaner but
+          * LcarsPill doesn't expose a pseudo-element hook, so we
+          * inline a span sized to fit. The aria-label above carries
+          * the announcement; this dot is decorative. */}
         ⚙ SETTINGS
+        {hasUpdate ? (
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-block',
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              backgroundColor: theme.colors.orange,
+              marginLeft: '0.4rem',
+              verticalAlign: 'middle',
+              boxShadow: `0 0 4px ${theme.colors.orange}`,
+            }}
+          />
+        ) : null}
       </LcarsPill>
       {import.meta.env.DEV && (
         <LcarsPill
@@ -379,8 +423,15 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
       className={styles.layoutRoot}
       style={layoutStyle}
     >
-      <div className={workspaceClasses}>
-        <div className={styles.center}>
+      {/* Main slot is a flex column so the UpdaterBanner can sit
+        * above the workspace grid without participating in the grid
+        * itself. The banner renders only when a new version is
+        * available + not dismissed (`flex: 0 0 auto` keeps it from
+        * stealing space from the workspace below). */}
+      <div className={styles.mainStack}>
+        <UpdaterBanner onOpenSettings={handleOpenSettings} />
+        <div className={workspaceClasses}>
+          <div className={styles.center}>
           <CenterZone
             tools={centerTools}
             activeTabId={centerActive}
@@ -429,6 +480,7 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
             </button>
           )}
         </div>
+      </div>
       </div>
       {collapsed.top && (
         <button

@@ -41,6 +41,15 @@ pub fn run() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     tauri::Builder::default()
+        // Phase 7 plugins. The updater plugin pings the manifest URL
+        // configured in `tauri.conf.json` (plugins.updater.endpoints)
+        // and verifies signatures against the bundled minisign public
+        // key. The process plugin pairs with it for the post-install
+        // `relaunch()` call from the JS side. Both must be registered
+        // BEFORE `invoke_handler` because plugin initializers expose
+        // their commands through the same routing layer.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             ping,
             commands::fs::read_file_bytes,

@@ -62,11 +62,11 @@
   },
   "plugins": {
     "updater": {
-      "active": false,
+      "active": true,
       "endpoints": [
         "https://github.com/echozulucode/hyperspanner/releases/latest/download/latest.json"
       ],
-      "pubkey": "REPLACE_WITH_GENERATED_UPDATER_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFENzEyNEM5MkMyRTkyNjAKUldSZ2tpNHN5U1J4SFFiZ2FNM3o0RnhkTSs1UkhOWVJQb0pCa2dGczBxbnY1VEhkc0xwWmwxeWYK",
       "windows": {
         "installMode": "passive"
       }

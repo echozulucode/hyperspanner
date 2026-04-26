@@ -144,3 +144,75 @@
   margin-top: 0.4rem;
   opacity: 0.6;
 }
+
+/*
+ * Updates section. Single-row layout for the common states
+ * (idle / checking / downloading / ready / error); the `available`
+ * state expands to show release notes below the action row.
+ */
+
+.updatesRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.updatesText {
+  flex: 1 1 auto;
+  font-size: 0.85rem;
+  color: var(--lcars-color-sand, #eae4d6);
+  min-width: 0;
+}
+
+.updatesText strong {
+  color: var(--lcars-color-almond-creme, #e8d9b2);
+}
+
+.updatesAvailable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.releaseNotes {
+  margin: 0;
+  padding: 0.6rem 0.85rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid var(--lcars-color-orange, #d88463);
+  border-radius: 4px;
+  font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', 'Menlo',
+    'Consolas', monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--lcars-color-sand, #eae4d6);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.progressBar {
+  flex: 0 0 auto;
+  width: 12rem;
+  height: 0.5rem;
+  border-radius: 3px;
+  /* Reset native styling enough to read as part of the LCARS panel.
+   * Detailed cross-browser styling can come in a polish pass. */
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--lcars-color-gutter, rgba(138, 122, 168, 0.4));
+  background-color: var(--lcars-color-bg-raised, rgba(16, 16, 24, 0.7));
+}
+
+.progressBar::-webkit-progress-bar {
+  background-color: var(--lcars-color-bg-raised, rgba(16, 16, 24, 0.7));
+}
+
+.progressBar::-webkit-progress-value {
+  background-color: var(--lcars-color-orange, #d88463);
+}
+
+.progressBar::-moz-progress-bar {
+  background-color: var(--lcars-color-orange, #d88463);
+}
