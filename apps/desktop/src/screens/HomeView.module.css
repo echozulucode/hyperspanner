@@ -159,3 +159,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Preset cards carry longer descriptions than tool cards (one-line
+ * tool blurbs vs. a sentence describing what the preset arranges).
+ * The wrap modifier relaxes the nowrap so the full description is
+ * legible without forcing the user to hover for a tooltip. We bump
+ * min-height too so wrapped two-line descriptions don't squish the
+ * preset name. */
+.cardDescWrap {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.presetCard {
+  min-height: 5.25rem;
+}
+
+/* Active preset gets a brighter accent + a faint outline so the user
+ * can see which layout they're currently on at a glance. */
+.presetCardActive {
+  outline: 2px solid var(--lcars-color-orange, #d88463);
+  outline-offset: -2px;
+  background-color: rgba(216, 132, 99, 0.12);
+}

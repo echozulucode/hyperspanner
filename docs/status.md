@@ -14,6 +14,207 @@ next_actions:
 
 # Status Log
 
+## Session: 2026-04-26 (Top-rail menu redesign — preset dropdown removed, Settings stub landed)
+
+User pushback on 7.3 led to a redesign of the top-rail navigation
+cluster. The complaints were sharp and right: the preset dropdown
+was clutter, theme cycling belongs in a Settings view (it's a
+once-per-session decision, not a daily-use control), and Gallery /
+Screens are dev affordances that shouldn't ship to production
+builds.
+
+**The new top-rail nav cluster** (in `AppShell.tsx`'s `navigation`
+JSX block):
+
+  1. **⌘K · PALETTE** — universal launcher (kept).
+  2. **⌂ HOME** — clears `activeByZone.center` to `null` so
+     CenterZone falls back to rendering HomeView. Open tools stay
+     docked in the tab strip; clicking a tab returns to a tool.
+     Without this button there was no one-click path back to the
+     launchpad once a tool was active.
+  3. **⚙ SETTINGS** — opens the new `system-settings` tool in the
+     center zone via the existing single-instance `openTool()`
+     machinery. Second click focuses the existing settings tab
+     rather than opening a duplicate.
+  4. **GALLERY** / **SCREENS** — wrapped in `{import.meta.env.DEV
+     && (...)}`. `import.meta.env.DEV` is Vite's build-time
+     constant: true in `pnpm dev` (and vitest), false in
+     `pnpm build`. Production bundles tree-shake the conditional
+     branches so these pills don't ship.
+  5. **▲** — collapse top chrome (kept).
+
+**Removed from the top rail:**
+
+  - **Theme cycle pill** — moved to Settings → Appearance. The
+    `cycleTheme` callback stays in AppShell because the command
+    palette still surfaces it as an action (keyboard-first users
+    can flip variants without opening Settings).
+  - **PresetSelector dropdown** — pulled entirely. The HomeView's
+    LAYOUT PRESETS card grid (added in the same session) is the
+    canonical preset access surface; it's richer (full descriptions,
+    visual feedback for active preset) and only renders when the
+    user is on the launchpad anyway. Power users can also `⌘K →
+    "minimal focus"` if a palette entry for presets gets added
+    later.
+  - **RESET pill** — already in the command palette as
+    `Reset Layout`; that's the right home for a panic button.
+
+**New `system-settings` tool** at
+`apps/desktop/src/tools/system-settings/`:
+
+  - `SystemSettings.tsx` — a `ToolFrame`-based view. Phase 7 stub
+    scope: just an Appearance section with a 4-card theme picker
+    (Picard Modern / Classic / Nemesis Blue / Lower Decks). Active
+    theme gets the `themeCardActive` modifier (orange outline +
+    tint). Clicking a card calls `setTheme(id)` from
+    `ThemeContext`. Plus a "Coming soon" preview list naming the
+    Phase 8 sections (Layout, Keyboard, Data, Diagnostics,
+    External Integrations).
+  - `SystemSettings.module.css` — section / lead / theme grid /
+    theme card styles. Mirrors the HomeView preset-card pattern so
+    the LCARS grammar reads consistently across surfaces.
+  - `index.ts` — barrel.
+  - **Registry entry** in `tools/registry.ts`: id
+    `system-settings`, category `utilities`, defaultZone `center`,
+    `supportedZones: ['center']` (settings sections don't fit the
+    inspector dock cleanly). Comment explains the `system-` id
+    prefix flag.
+
+**Files unchanged but worth noting:**
+
+  - `CommandPalette.tsx` still wires `onResetLayout={resetLayout}`
+    and `onCycleTheme={cycleTheme}` from AppShell — both
+    `resetLayout` and `cycleTheme` survive in AppShell for that
+    reason even though their UI surfaces moved.
+  - HomeView's LAYOUT PRESETS section stays — the user's
+    complaint was about the dropdown specifically, not the card
+    grid. The card grid is the better surface for preset switching
+    (descriptions visible, active state shown).
+
+**Orphan files** I couldn't clean up automatically (the cowork
+sandbox doesn't permit `rm` on the mount):
+
+  - `apps/desktop/src/shell/PresetSelector.tsx`
+  - `apps/desktop/src/shell/PresetSelector.module.css`
+  - `apps/desktop/src/shell/PresetSelector.test.tsx`
+
+These are no longer imported by AppShell, so they're effectively
+dead code. Their test file still runs and passes (it tests the
+component in isolation against the workspace store). Worth
+deleting manually before the next typecheck pass to avoid
+maintaining unused surface.
+
+**Phase 7 status update.** The "preset selector" deliverable in
+plan-002 §Phase 7 is satisfied via HomeView (cards) + command
+palette (per-preset action — to add in a follow-up). The top-rail
+selector was the wrong surface for the control, and dropping it
+keeps the rail clean.
+
+**Pending in Phase 7:**
+
+  - **7.4 Custom presets** — "Save as preset…" action that writes
+    a custom preset to a `useCustomPresets` slice (Zustand +
+    persist, mirroring `useFavorites`). Custom entries render
+    below the built-ins in the HomeView card grid with a remove
+    affordance. Now that the dropdown is gone, the entry point for
+    "save current layout" lives in the HomeView preset section
+    header (a "+" affordance) or in the Settings view's Layout
+    section (Phase 8).
+  - **7.5 Verification** — apply each built-in preset, confirm zone
+    state matches; restart, confirm last layout + favorites +
+    recents survive; save a custom preset, restart, confirm it's
+    still in the selector.
+
+**Optional follow-ups to consider:**
+
+  - Add a "Reset Layout" button to the Settings view (Phase 7 or 8)
+    so users have a non-palette way to find it.
+  - Add per-preset entries to the command palette so `⌘K →
+    "minimal focus"` works alongside the HomeView cards.
+  - Hide the `system-settings` tool from the LeftNavigator and
+    HomeView BROWSE list (it's accessed via the SETTINGS pill;
+    listing it twice is noise). Add a `hidden?: boolean` flag to
+    the `ToolDescriptor` shape if we go this direction.
+
+---
+
+## Session: 2026-04-26 (Phase 7.3 — preset selector UI)
+
+Phase 7.3 lands the layout-preset selector in two places per
+plan-002 §Phase 7: a compact picker in the AppShell's top-row
+navigation cluster, and a richer card grid on the home view. Both
+read `layoutPreset` from the workspace store and dispatch
+`applyPreset(id)` on change.
+
+**Files added:**
+
+- **`apps/desktop/src/shell/PresetSelector.tsx`** — a small styled
+  `<select>` populated from `LAYOUT_PRESETS`. Lives in the AppShell's
+  navigation pill cluster between the theme pill and the RESET pill
+  ("appearance → arrangement → reset" reading L-to-R). Picked native
+  `<select>` over a custom popover for the same reasons Case
+  Transform's mode picker did: six options doesn't warrant the
+  popover machinery, keyboard / a11y is free, browser owns the
+  dropdown chrome.
+- **`apps/desktop/src/shell/PresetSelector.module.css`** — styles
+  the trigger to match the LcarsPill `size="small"` height (40px) and
+  the top-rail's hue. Custom SVG caret so the `<select>` reads as
+  deliberately styled rather than borrowing the platform affordance.
+  The popup itself can't be fully themed cross-browser, but
+  `option { background-color: --bg-raised, color: --sand }` carries
+  on platforms that respect native option styling.
+- **`apps/desktop/src/shell/PresetSelector.test.tsx`** — four tests:
+  current-preset-as-value; one option per built-in; change dispatches
+  `applyPreset`; external store changes flow back into the select.
+
+**Files modified:**
+
+- **`apps/desktop/src/shell/AppShell.tsx`** — imported
+  `PresetSelector` and slotted it into the navigation cluster. No
+  other shell changes; the existing RESET / GALLERY / SCREENS pills
+  stay where they were.
+- **`apps/desktop/src/screens/HomeView.tsx`** — added a "LAYOUT
+  PRESETS" section between RECENT and BROWSE. Six preset cards in
+  the same grid that holds the tool cards; clicking applies. Active
+  preset gets a brighter outline + accent so the user can see at a
+  glance which layout they're currently on.
+- **`apps/desktop/src/screens/HomeView.module.css`** — added two new
+  modifiers (`cardDescWrap` for two-line clamped descriptions since
+  preset blurbs are sentences, not phrases; `presetCardActive` for
+  the orange outline + tint).
+
+**Reasoning for the home-view placement** (between RECENT and
+BROWSE): preset selection is workspace-shape control, more chrome
+than tool-launching. Putting it adjacent to RECENT (also a
+workspace-history affordance) and above BROWSE (per-tool grid)
+keeps related concerns grouped without burying the tool grid.
+
+**Still pending in Phase 7:**
+
+  - **7.4 Custom presets.** "Save as preset…" action in the AppShell
+    nav cluster (or a dedicated button on the HomeView preset
+    section) that captures a name + (optional) description and
+    writes to a `useCustomPresets` slice (Zustand + persist,
+    same shape as `useFavorites` — `hyperspanner/custom-presets/v1`).
+    Custom entries render below the built-ins in both the dropdown
+    and the home-view card grid, with a remove affordance.
+  - **7.5 Verification.** Apply each built-in preset, confirm zone
+    state matches; restart the app, confirm last layout + favorites
+    + recents survive; save a custom preset, restart, confirm it's
+    still in the selector.
+
+**Known typecheck risks for the next host run.** The `useShallow`
+import is already present in `AppShell.tsx`; the `PresetSelector`
+component pulls a single primitive (`layoutPreset` string) and a
+function (`applyPreset`), both stable references, so it shouldn't
+need shallow-equality memoization despite the `useShallow` import
+in its file. If `pnpm typecheck` flags the unused `LAYOUT_PRESETS`
+import in `HomeView.tsx`, that's a stale post-edit leftover —
+prune it. (The component uses `Object.values(LAYOUT_PRESETS)`
+once via the memoized `presetList`, so it should be live.)
+
+---
+
 ## Session: 2026-04-25 (Phase 7.1 + 7.2 — workspace persistence layer landed)
 
 Phase 7 entry — picked the simpler-first storage path (Zustand

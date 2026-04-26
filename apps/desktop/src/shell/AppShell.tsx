@@ -44,6 +44,11 @@ const themeOrder: ThemeName[] = ['picard-modern', 'classic', 'nemesis-blue', 'lo
  * effect in this iteration (the left rail is always visible).
  */
 export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) => {
+  // Keep `themeName` + `setTheme` available for the `cycleTheme`
+  // callback below — the command palette still surfaces a "Cycle
+  // theme" action so keyboard-first users can flip variants without
+  // opening Settings. The top-rail theme pill is gone; the only
+  // surface that uses these is the palette wiring.
   const { theme, themeName, setTheme } = useTheme();
 
   const collapsed = useWorkspaceStore(useShallow((s) => s.collapsed));
@@ -65,6 +70,7 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
 
   const openTool = useWorkspaceStore((s) => s.openTool);
   const toggleZone = useWorkspaceStore((s) => s.toggleZone);
+  const setActive = useWorkspaceStore((s) => s.setActive);
   const resetLayout = useWorkspaceStore((s) => s.resetLayout);
 
   // Recents tracking — every path that opens a tool (nav click, sample
@@ -108,7 +114,30 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
   const handleClosePalette = useCallback(() => setPaletteOpen(false), []);
   const handleCloseHelp = useCallback(() => setHelpOpen(false), []);
 
+  // HOME button — clears the center zone's active tab so CenterZone
+  // falls back to rendering HomeView. Open tools stay docked in the
+  // tab strip so the user can click a tab to return to a tool. In
+  // split mode this only clears the active side; the SplitPane on
+  // the other side keeps its last-active tool. Document this if it
+  // becomes confusing in practice.
+  const handleGoHome = useCallback(() => {
+    setActive('center', null);
+  }, [setActive]);
+
+  // SETTINGS button — opens the system-settings tool in the center
+  // zone. Single-instance, so a second click focuses + pulses the
+  // existing settings tab rather than opening a duplicate.
+  const handleOpenSettings = useCallback(() => {
+    openTool('system-settings', 'center');
+  }, [openTool]);
+
   const cycleTheme = useCallback(() => {
+    // Theme cycling lives inside the Settings view now. The command
+    // palette still wires to a `cycleTheme` callback for keyboard-
+    // first users; we keep the function here so the palette wiring
+    // below stays unchanged. If/when settings exposes a richer theme
+    // picker, this becomes "open settings + scroll to Appearance"
+    // and the palette entry can update accordingly.
     const idx = themeOrder.indexOf(themeName);
     const next = themeOrder[(idx + 1) % themeOrder.length];
     setTheme(next);
@@ -158,6 +187,37 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
   const topRailColor = theme.colors.orange;
   const bottomRailColor = theme.colors.africanViolet;
 
+  /*
+   * Top-rail navigation cluster.
+   *
+   * Design principle: the top rail is the only persistent global
+   * chrome in the app. Every pixel competes with the active tool, so
+   * the bar should hold things that are reached for many times per
+   * session AND that affect global (not tool) state. Things that
+   * belong elsewhere:
+   *   - Theme switching → Settings → Appearance.
+   *   - Layout presets → HomeView's preset cards + command palette.
+   *   - Reset workspace → command palette + Settings (it's a panic
+   *     button, not a daily-use control).
+   *
+   * Things that earn their pixels here:
+   *   - PALETTE (⌘K) — universal launcher, indisputable.
+   *   - HOME — when several tools are open, get back to the
+   *     launchpad without closing them. Without this button there's
+   *     no one-click path back to HomeView once a tool is active.
+   *   - SETTINGS — opens the settings tool (Phase 8 expands; for
+   *     now it stubs the theme picker).
+   *   - ▲ collapse-top — tucks the entire top row away on small
+   *     screens / laptops with limited vertical real-estate.
+   *
+   * Dev-only affordances (visible only when `import.meta.env.DEV`):
+   *   - GALLERY, SCREENS — primitive gallery + de-risk screens hub.
+   *
+   * `import.meta.env.DEV` is Vite's build-time constant: `true` in
+   * `pnpm dev` (and in vitest), `false` in `pnpm build`. The
+   * production bundle tree-shakes the conditional branches so these
+   * pills don't ship to release builds.
+   */
   const navigation = (
     <>
       <LcarsPill
@@ -172,39 +232,43 @@ export const AppShell: FC<AppShellProps> = ({ onOpenGallery, onOpenScreens }) =>
       <LcarsPill
         size="small"
         rounded="none"
-        color={theme.colors.africanViolet}
-        onClick={cycleTheme}
-        aria-label={`Current theme ${themeName}. Click to cycle.`}
-      >
-        {themeName}
-      </LcarsPill>
-      <LcarsPill
-        size="small"
-        rounded="none"
         color={theme.colors.butterscotch}
-        onClick={resetLayout}
-        aria-label="Reset layout"
+        onClick={handleGoHome}
+        aria-label="Show home / launchpad"
       >
-        RESET
+        ⌂ HOME
       </LcarsPill>
       <LcarsPill
         size="small"
         rounded="none"
-        color={theme.colors.orange}
-        onClick={onOpenGallery}
-        aria-label="Open primitive gallery"
+        color={theme.colors.africanViolet}
+        onClick={handleOpenSettings}
+        aria-label="Open settings"
       >
-        GALLERY
+        ⚙ SETTINGS
       </LcarsPill>
-      <LcarsPill
-        size="small"
-        rounded="none"
-        color={theme.colors.red}
-        onClick={onOpenScreens}
-        aria-label="Open de-risk screens hub"
-      >
-        SCREENS
-      </LcarsPill>
+      {import.meta.env.DEV && (
+        <LcarsPill
+          size="small"
+          rounded="none"
+          color={theme.colors.orange}
+          onClick={onOpenGallery}
+          aria-label="Open primitive gallery (dev)"
+        >
+          GALLERY
+        </LcarsPill>
+      )}
+      {import.meta.env.DEV && (
+        <LcarsPill
+          size="small"
+          rounded="none"
+          color={theme.colors.red}
+          onClick={onOpenScreens}
+          aria-label="Open de-risk screens hub (dev)"
+        >
+          SCREENS
+        </LcarsPill>
+      )}
       <LcarsPill
         size="small"
         rounded="right"

@@ -9,6 +9,7 @@ import { JsonValidator } from './json-validator';
 import { NumberConverter } from './number-converter';
 import { ProtobufDecode } from './protobuf-decode';
 import { RegexTester } from './regex-tester';
+import { SystemSettings } from './system-settings';
 import { TextDiff } from './text-diff';
 import { TlsInspector } from './tls-inspector';
 import { UrlCodec } from './url-codec';
@@ -212,6 +213,26 @@ const entries: ToolDescriptor[] = [
       'Connect to host:port and inspect the negotiated TLS version, cipher suite, and full cert chain.',
     defaultZone: 'center',
     component: TlsInspector,
+  },
+  {
+    // System surfaces use the `system-` id prefix to flag them as
+    // application-level views (vs. user-level developer tooling).
+    // They register through the same tool machinery so the workspace
+    // store, single-instance focus, drag-dock, and command-palette
+    // plumbing all "just work" without a dedicated route hierarchy.
+    // Plan-002 §Phase 8 expands this category with an About / Diagnostics
+    // surface (id `system-about`).
+    id: 'system-settings',
+    name: 'Settings',
+    category: 'utilities',
+    description:
+      'Application preferences — theme, layout defaults, keyboard shortcuts, diagnostics.',
+    defaultZone: 'center',
+    // Settings is conceptually a center-zone view; refusing inspector / bottom
+    // keeps the layout primitives consistent with what the section rendering
+    // expects. (Cards in narrow columns wrap awkwardly.)
+    supportedZones: ['center'],
+    component: SystemSettings,
   },
 ];
 

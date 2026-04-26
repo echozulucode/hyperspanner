@@ -1,0 +1,58 @@
+/*
+ * PresetSelector — styled native <select> that lives in the AppShell's
+ * top-row navigation pill cluster.
+ *
+ * Goal: read as part of the LcarsPill rhythm (height, hue, focus ring),
+ * not as a stock browser dropdown. We can't fully restyle the option
+ * popup itself (browsers own that chrome), but we can match the trigger.
+ *
+ * Height pinned at 40px to match LcarsPill `size="small"` so the pill
+ * cluster doesn't get a stray taller item that breaks the row's
+ * vertical rhythm.
+ */
+
+.select {
+  height: 40px;
+  min-width: 9rem;
+  max-width: 12rem;
+  box-sizing: border-box;
+  padding: 0 1.6rem 0 0.75rem;
+  border: 1px solid var(--lcars-color-gutter, rgba(138, 122, 168, 0.4));
+  border-radius: 4px;
+  background-color: var(--lcars-color-bg-raised, rgba(16, 16, 24, 0.7));
+  color: var(--lcars-color-sand, #eae4d6);
+
+  /* Custom caret so the select reads as deliberately styled rather than
+   * borrowing the platform's affordance. The arrow uses `currentColor`
+   * indirectly via the SVG fill so it inherits the active text color. */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%23eae4d6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+
+  font-family: 'Antonio', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.select:hover {
+  border-color: var(--lcars-color-african-violet, #8a7aa8);
+}
+
+.select:focus-visible {
+  border-color: var(--lcars-color-orange, #d88463);
+  box-shadow: 0 0 0 2px var(--lcars-color-orange, #d88463);
+}
+
+/* The popup itself can't be fully themed cross-browser, but on
+ * platforms that respect color-scheme + native option styling, the
+ * dark-on-dark contrast carries over. */
+.select option {
+  background-color: var(--lcars-color-bg-raised, #14141c);
+  color: var(--lcars-color-sand, #eae4d6);
+}

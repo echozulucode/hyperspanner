@@ -1,0 +1,146 @@
+/*
+ * SystemSettings — sits in the ToolFrame body. Sections stack
+ * vertically; each section has a label, a one-line lead, and a body
+ * (the theme grid is the only populated body in this Phase 7 stub).
+ *
+ * Compact-mode (inspector / bottom dock) tightens spacing and drops
+ * descriptions to a single line, matching the suite-wide compact
+ * convention.
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0.5rem 0;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.containerCompact {
+  gap: 1rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--lcars-color-orange, #d88463);
+  opacity: 0.95;
+}
+
+.sectionLead {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--lcars-color-sand, #eae4d6);
+  opacity: 0.75;
+  line-height: 1.4;
+  max-width: 56ch;
+}
+
+.containerCompact .sectionLead {
+  font-size: 0.78rem;
+}
+
+.themeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem;
+}
+
+.themeCard {
+  all: unset;
+  display: flex;
+  align-items: stretch;
+  min-height: 4.5rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+  box-sizing: border-box;
+}
+
+.themeCard:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.themeCard:focus-visible {
+  outline: 2px solid var(--lcars-color-orange, #d88463);
+  outline-offset: 2px;
+}
+
+.themeCardActive {
+  outline: 2px solid var(--lcars-color-orange, #d88463);
+  outline-offset: -2px;
+  background-color: rgba(216, 132, 99, 0.12);
+}
+
+.themeAccent {
+  flex: 0 0 6px;
+  background-color: var(--lcars-color-lilac, #b9a7d8);
+}
+
+.themeBody {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.85rem;
+  min-width: 0;
+}
+
+.themeName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--lcars-color-almond-creme, #e8d9b2);
+}
+
+.themeDesc {
+  font-size: 0.75rem;
+  color: var(--lcars-color-sand, #eae4d6);
+  opacity: 0.7;
+  line-height: 1.3;
+}
+
+.containerCompact .themeDesc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Phase 8 preview list — a placeholder showing what's coming. Styled
+ * as a low-emphasis bullet list so it reads as informational, not as
+ * actionable controls.
+ */
+
+.previewList {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  font-size: 0.8rem;
+  color: var(--lcars-color-sand, #eae4d6);
+  opacity: 0.65;
+  line-height: 1.6;
+}
+
+.previewList li {
+  margin: 0;
+}
+
+.previewActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  opacity: 0.6;
+}
