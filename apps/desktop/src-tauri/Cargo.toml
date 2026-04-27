@@ -1,6 +1,6 @@
 [package]
 name = "hyperspanner"
-version = "0.0.2"
+version = "0.0.3"
 description = "A Starfleet engineering console for developer utility workflows."
 authors = ["Eric Zimmerman"]
 license = "MIT"
