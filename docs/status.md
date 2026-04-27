@@ -1,18 +1,220 @@
 ---
 type: status
-updated: 2026-04-26
-current_phase: "Phase 6 COMPLETE (verified 2026-04-25). All 14 tools shipped with real implementations; full host-side verification gate passed: `cargo test -p hyperspanner`, `pnpm --filter @hyperspanner/desktop test` (599 passing), `pnpm typecheck`, `pnpm build` all green. Verification took two iterations — first run had 13 failing tests across 7 tools; second run cleared 12 of them but still had a BOM-mid-buffer case in whitespace-clean; third run added `title?: string` to `LcarsPill` to clear 4 typecheck errors. Phase 7 (Layout presets and persistence) is now `in_progress`. The presets themselves already exist (`apps/desktop/src/state/presets.ts`, six built-ins: default / text-ops / validation / binary-inspection / minimal-focus / diagnostics) and `applyPreset` is wired into the workspace store; what remains is the persistence layer per plan-002 §Phase 7: serialize selected workspace state to a `workspace.json` in the Tauri app data dir, load it on startup, hydrate the store. Plus a preset selector in the top rail / home view, and a 'Save as preset…' action."
+updated: 2026-04-27
+current_phase: "Phase 7 + plan-007 (Packaging + Auto-Updates) substantially COMPLETE. End-to-end auto-update flow verified live: installed v0.0.2 detected published v0.0.3, downloaded the signed installer, verified the minisign signature, replaced the binary in passive mode, and relaunched into v0.0.3. The MIT-licensed public repo at github.com/echozulucode/hyperspanner is the manifest endpoint; the workflow at `.github/workflows/release.yml` produces signed installers for Windows (NSIS per-user) and Linux (deb/rpm/AppImage). README.md committed with screenshots. Phase 7 'preset persistence' was redirected: the user removed the preset feature entirely (UX feedback — not useful as a daily-use control), so the persistence layer landed for general workspace state instead (zone layout, open tools, favorites, recents survive restart via Zustand persist + localStorage). Settings tool stub shipped with Appearance (theme picker) and Updates (current version + check/install/restart) sections. Top-rail nav redesigned: PALETTE / HOME / SETTINGS / collapse-top, with GALLERY + SCREENS gated behind `import.meta.env.DEV`. Auto-update check is also dev-gated to prevent perpetual 'update available' nag in `pnpm tauri:dev`."
 blockers: []
 next_actions:
-  - "Phase 7.1: design the persistence boundary. What gets serialized vs what's ephemeral. Strawman: serialize `open` (tool ids + zones), `activeByZone`, `centerSplit`, `collapsed`, `layoutPreset`, plus favorites and recents (already in their own slices). Do NOT serialize `pulseCounter` (transient), per-tool runtime state (intentionally ephemeral — `useTool` slots clear on close), drag state, or the IPC test seam. Decide between Zustand `persist()` middleware (localStorage, fast, runs in renderer) vs. a Tauri-backed JSON file (cross-window persistence, survives window close/reopen, but needs an IPC round-trip on every save). Plan-002 calls for the Tauri path; localStorage works for now and we can swap the storage adapter without touching call sites."
-  - "Phase 7.2: implement the storage layer. If localStorage path: wrap the workspace `create()` in `persist({ name: 'hyperspanner-workspace', partialize, version: 1, migrate })`. If Tauri path: add a `read_workspace_state` / `write_workspace_state` Rust command pair against `app_data_dir()`, plus a small custom Zustand storage shim that calls them via the IPC layer. Either way, debounce writes (~200ms) so rapid layout changes don't thrash disk."
-  - "Phase 7.3: preset selector UI. A pill cluster or `<select>` in the top rail that calls `applyPreset(id)` from `useWorkspaceStore`. Six built-ins from `state/presets.ts` populate it. Active preset gets visual emphasis. Home view gets a 'Layout presets' card listing the same set with descriptions."
-  - "Phase 7.4: 'Save as preset…' action. A modal or inline form in the top rail that captures a name + (optional) description and writes a custom preset to a new slice (`useCustomPresets` — Zustand+persist, similar shape to `useFavorites`). Custom presets render below the built-ins with a remove affordance."
-  - "Phase 7 verification: apply each built-in preset, confirm zone collapse + center-split state matches the definition; restart the app and confirm last layout + tools survive; save a custom preset, restart, confirm it's still in the selector."
-  - "Optional polish carried from earlier phases: (a) RegexTester's flag toggles use inline-styled buttons instead of LcarsPill — off-grammar; (b) `hash-workbench/lib.ts` redefines `HashAlgorithm` and `HashResult` locally instead of re-exporting from `@/ipc`; (c) `HexInspector.tsx` imports `readFileBytes` from `../../ipc/fs` rather than the barrel `../../ipc`; (d) `hash.rs`'s eager-algorithm-check uses a wasted empty-string digest. Fold into a Phase 7 polish pass once preset persistence lands."
+  - "Phase 8 (Settings expansion). Currently Settings has Appearance + Updates sections only. Plan-002 §Phase 8 calls for: Layout (default startup tools, default workspace, side widths), Keyboard (rebindable shortcuts — registry already supports rebinding, just needs UI), Data (import/export workspace), Diagnostics (log directory, recent backend errors, theme/Tauri/Rust version readouts, telemetry opt-in), External integrations (clipboard policy, drag-and-drop policy). Each is its own subsection in the Settings tool. About view (`system-about` tool) is part of Phase 8 too — version readouts + storage paths + recent failures."
+  - "Phase 9 polish per plan-002: motion (tab pulse animation, smooth zone collapse/expand, DataCascade telemetry in top rail), sound (off by default; toggle in Settings; reuse beep1-4 from reference), accessibility (focus rings, ARIA landmarks, color contrast audit), empty-state copy."
+  - "Plan-007 carried follow-ups: (a) Authenticode code-signing certificate before v1.0 to clear the SmartScreen warning; ($200-500/yr from Sectigo/DigiCert/SSL.com); (b) macOS DMG + notarization (currently shipping Windows + Linux only); (c) decide whether to ever build the schema-driven protobuf decoder (current is wire-format only — fine for an MVP)."
+  - "Optional cleanup carried from earlier phases: (a) RegexTester's flag toggles use inline-styled buttons instead of LcarsPill — off-grammar; (b) `hash-workbench/lib.ts` redefines `HashAlgorithm` and `HashResult` locally instead of re-exporting from `@/ipc`; (c) `HexInspector.tsx` imports `readFileBytes` from `../../ipc/fs` rather than the barrel `../../ipc`; (d) `hash.rs`'s eager-algorithm-check uses a wasted empty-string digest; (e) HomeView CSS still has dead `.cardDescWrap`, `.presetCard`, `.presetCardActive` from the removed preset section; (f) orphan `apps/desktop/src/shell/PresetSelector.{tsx,module.css,test.tsx}` files (stubbed empty, awaiting manual deletion)."
 ---
 
 # Status Log
+
+## Session: 2026-04-27 (Window state plugin + Settings/TextDiff overflow fixes — Phase 7 closed, Phase 8 entry)
+
+User feedback after running v0.0.3 in real workflows surfaced three
+items. All three landed in this pass:
+
+**Window size + tab restoration on restart.** The Zustand persist
+middleware on `useWorkspaceStore` already serializes `open`,
+`activeByZone`, `centerSplit`, and `collapsed` to localStorage on
+every change, so the in-app layout (which tools are docked, which
+zone, split mode, collapse state) restores automatically. What was
+missing was the WINDOW geometry — Tauri doesn't save that by default.
+Added `tauri-plugin-window-state` to:
+
+  - `apps/desktop/src-tauri/Cargo.toml` — `tauri-plugin-window-state = "2"`.
+  - `apps/desktop/src-tauri/src/lib.rs` — `.plugin(tauri_plugin_window_state::Builder::default().build())`.
+  - `apps/desktop/src-tauri/capabilities/default.json` — added
+    `"window-state:default"` permission.
+
+With `Builder::default()`, the plugin auto-saves window size +
+position + maximize/fullscreen state on close and auto-restores on
+the first window's creation. No frontend code needed. The saved
+state lives in the Tauri app data dir alongside the workspace
+store's localStorage; together they give a complete "leave it where
+I left it" experience.
+
+**Settings tool overflow on small screens.** ToolFrame's `.body` has
+`overflow: hidden` (intentional — it's the host container, individual
+tools own their scroll behavior). SystemSettings stacks several
+sections (Appearance theme grid + Updates panel + Coming Soon
+preview list) which together exceed the body height on smaller
+windows. Without explicit scroll, the bottom sections get clipped
+and there's nowhere for the user to reach them. Fix: SystemSettings
+container now sets `min-height: 0` + `overflow-y: auto` so it
+becomes its own scroll container inside the body. Documented the
+flex `min-height: auto` gotcha in the CSS comment — load-bearing
+detail for anyone editing this later.
+
+**Text Diff diff-table overflow.** Same root cause: `.viewLayout`
+had `overflow: hidden` and the grid grew with content. With many
+hunks the bottom rows fell past the ToolFrame body and got clipped.
+Changed to `overflow-y: auto` + `min-height: 0` + `align-content:
+start` (the last keeps rows packed at the top instead of vertically
+centering them when they happen to fit, which produced a "first
+hunk floats" effect when scrolling back to the top).
+
+**Plan position update:**
+
+  - Phase 7 (Presets + persistence) marked **complete**. Presets
+    were dropped per user UX feedback (the preset feature wasn't
+    valuable as a daily-use control); the persistence half landed
+    fully — workspace state via Zustand persist + localStorage,
+    window state via tauri-plugin-window-state.
+  - Phase 8 (Settings + about) flipped to **in_progress**.
+    Currently has Appearance + Updates sections; remaining per
+    plan-002 §Phase 8: Layout (default startup tools, default
+    workspace), Keyboard (rebindable shortcuts), Data (import/
+    export workspace), Diagnostics (log directory, recent backend
+    errors, telemetry opt-in), External integrations, plus a
+    separate `system-about` tool with version readouts + storage
+    paths + recent failures.
+  - Plan version bumped to 20.
+
+**Verification still to run on the host:**
+
+  - `pnpm install` to fetch any new pnpm-side dependencies (none
+    expected — the window-state plugin is Rust-only, no JS package
+    needed for the auto-save mode).
+  - `pnpm typecheck && pnpm test` — should be clean. Pure CSS +
+    Rust dep changes this turn; no TS surface touched.
+  - `pnpm tauri:build` — first build pulls + compiles
+    `tauri-plugin-window-state`. Then run the new installer, verify:
+    (a) maximize the window, close, reopen → still maximized; (b)
+    resize to 1280×720, close, reopen → same size; (c) open three
+    tools in the layout the user described (json + hash split in
+    center, number converter in inspector), close, reopen → all
+    three restored.
+
+**Three new lessons surfaced** but not yet logged:
+
+  - When a tool stacks multiple sections inside ToolFrame's body,
+    the tool's own root container needs `min-height: 0; overflow-y:
+    auto` to participate in the body's `overflow: hidden` clipping
+    correctly. The flex `min-height: auto` default refuses to shrink
+    below intrinsic content size; without `min-height: 0` the
+    overflow rule never fires, the content extends past the
+    allocated body height, and the parent's `overflow: hidden`
+    silently clips. This is the third time we've hit this gotcha
+    (HomeView, Settings, TextDiff) — worth a lesson + a tool-pattern
+    note. (Adding to lessons.yaml as #63.)
+
+---
+
+## Session: 2026-04-27 (Phase 7.10 — auto-update flow VERIFIED end-to-end on v0.0.2 → v0.0.3)
+
+User confirmed: "awesome, it worked with the last version!" — the
+installed v0.0.2 detected the published v0.0.3 release on launch,
+displayed the banner + SETTINGS pill badge, downloaded the signed
+NSIS installer, verified the minisign signature against the public
+key bundled in `tauri.conf.json`, ran the installer in passive mode,
+and relaunched into v0.0.3. Phase 7.10 (end-to-end verification) is
+done. plan-007 is closed.
+
+The path to a working release was non-trivial. Three blockers
+surfaced during the v0.0.1/v0.0.2/v0.0.3 sequence; recording each
+because each could trip up the next person who builds a Tauri 2
+auto-updater from scratch.
+
+**Blocker 1: pnpm version conflict between workflow + package.json.**
+First v0.0.1 run failed at the `pnpm/action-setup@v4` step with
+"Multiple versions of pnpm specified". The workflow had
+`with: { version: 9 }`, and the root `package.json` had
+`packageManager: "pnpm@9.12.0"`. Action-setup@v4 refuses to start
+when both are set. Fix: drop the `version:` from the workflow and
+let the action read `packageManager` as the canonical source.
+
+**Blocker 2: pre-release flag hides the manifest from
+`releases/latest`.** Second attempt: workflow ran clean, draft
+release created, user published it. But the in-app updater reported
+"Could not fetch a valid release JSON from the remote." Direct fetch
+of `https://github.com/echozulucode/hyperspanner/releases/latest/download/latest.json`
+returned `{"error":"Not Found"}` (JSON 404). Cause: the release was
+published with the **Pre-release** flag checked (intuitive default
+for v0.x.y in many release UIs). GitHub's `releases/latest/...`
+pointer excludes drafts AND pre-releases AND requires "Set as the
+latest release"; a pre-release release never resolves there.
+
+**Blocker 3 (the actual root cause, masked by Blocker 2): Tauri 2
+requires explicit `bundle.createUpdaterArtifacts: true`.** Even
+after fixing the pre-release flag, the URL still 404'd. Inspecting
+v0.0.2's release page directly showed the assets were
+`Hyperspanner_0.0.2_x64-setup.exe` and Linux installers, but the
+`.sig` files and the `latest.json` manifest were **missing
+entirely**. Tauri 2 changed the bundler's default behavior from
+Tauri 1: signing artifacts are now opt-in via
+`bundle.createUpdaterArtifacts: true` in `tauri.conf.json`. The
+presence of `TAURI_SIGNING_PRIVATE_KEY` in env is necessary but not
+sufficient; the bundle config has to ask for the signed artifacts
+in the first place. Without it, the bundler emits installers, but
+no signatures, and tauri-action has no manifest to upload — the
+release ends up with installers only and the updater endpoint 404s.
+
+Fix: added `"createUpdaterArtifacts": true` to
+`apps/desktop/src-tauri/tauri.conf.json`, then bumped to v0.0.3 and
+re-released. v0.0.3's assets included
+`Hyperspanner_0.0.3_x64-setup.exe.sig` (424 bytes) and
+`latest.json` (4.23 KB); the `releases/latest/...` URL resolved;
+the in-app updater detected, downloaded, signature-verified, and
+installed the new version. End-to-end working.
+
+**Two lessons added** (#61, #62 in `docs/lessons.yaml`):
+
+  - **#61** — Tauri 2 silently produces unsigned installers when
+    `bundle.createUpdaterArtifacts` is unset; the failure mode is
+    "manifest missing from release" rather than a build error,
+    making it easy to ship without realizing.
+  - **#62** — `releases/latest/...` is a selective pointer
+    (excludes drafts + pre-releases + needs explicit "set as
+    latest"); diagnosing a 404 there has at least three distinct
+    causes that all return the same JSON shape.
+
+**Plan-007 outcomes recorded:**
+
+  - NSIS per-user installer (`installMode: "currentUser"`): works.
+  - Linux deb / rpm / AppImage: works.
+  - GitHub Actions release workflow: works (after Blocker 1 fix).
+  - Tauri updater plugin (Rust + JS): works.
+  - In-app UI (banner + SETTINGS pill badge + Updates section):
+    works. The dev-mode gate on the auto-check kept dev sessions
+    quiet.
+  - Version-bump script (`pnpm version:bump <version> --tag`):
+    works.
+
+Phase 8 (Settings expansion) is the natural next milestone — the
+Settings tool currently has only Appearance + Updates; plan-002
+calls for Layout, Keyboard, Data, Diagnostics, External
+Integrations subsections. Phase 9 (motion + sound + a11y polish)
+follows. Authenticode signing is parked until v1.0.
+
+---
+
+## Session: 2026-04-27 (README, license cleanup, repo public)
+
+Smaller maintenance session before the v0.0.3 release attempt:
+
+  - **`LICENSE`** — MIT, copyright "Eric Zimmerman" (inferred from
+    email + GitHub handle; awaiting confirmation).
+  - **`README.md`** — written for end users only, no developer
+    sections. Tool catalog by category, install per platform with
+    SmartScreen note, automatic-update flow with click-by-click
+    steps, link to issues. Two iterations: first draft was rewritten
+    after user feedback to drop LCARS / Star Trek references (let
+    the screenshots speak), drop em-dashes, drop developer-only
+    sections (build from source / project layout / dev workflow /
+    acknowledgements).
+  - **Repo flipped public** at github.com/echozulucode/hyperspanner.
+    Pre-1.0 tooling like the auto-updater requires the manifest
+    URL to resolve unauthenticated; the alternative (PAT-bundled
+    or user-prompted token) doesn't work for a public installer.
+  - **package.json** files (root + 2 workspaces) now carry
+    `license: "MIT"`, `author`, `homepage`, `repository`, `bugs`.
+    `Cargo.toml` updated similarly.
+
+---
 
 ## Session: 2026-04-26 (Version-bump script + dev-mode update-check gate)
 

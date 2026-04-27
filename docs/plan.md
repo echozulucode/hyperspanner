@@ -2,8 +2,8 @@
 type: plan
 project: "Hyperspanner"
 status: active
-version: 19
-updated: 2026-04-25
+version: 20
+updated: 2026-04-27
 phases:
   - id: 0
     name: "Bootstrap (Tauri + React + Vite + pnpm workspace)"
@@ -28,10 +28,10 @@ phases:
     status: complete
   - id: 7
     name: "Presets + persistence"
-    status: in_progress
+    status: complete
   - id: 8
     name: "Settings + about"
-    status: pending
+    status: in_progress
   - id: 9
     name: "Polish (motion, sound, a11y)"
     status: pending
@@ -41,7 +41,7 @@ phases:
   - id: 11
     name: "Testing / packaging / first release"
     status: pending
-current_phase: 7
+current_phase: 8
 ---
 
 # Plan: Hyperspanner

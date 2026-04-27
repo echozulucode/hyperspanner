@@ -66,16 +66,28 @@
   min-height: 3.5rem;
 }
 
-/* View mode: two-column diff rendering */
+/* View mode: two-column diff rendering. The grid is allowed to grow
+ * with content but its height is capped by the flex parent — when the
+ * total hunk count exceeds the visible area, `overflow-y: auto` makes
+ * the diff itself scroll. Without `min-height: 0` the flex layout
+ * would refuse to shrink below intrinsic content size, which would
+ * push the bottom of the diff past the ToolFrame body and clip it
+ * (the parent has overflow: hidden), so the scroll bar never appears. */
 .viewLayout {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0;
   flex: 1 1 auto;
-  min-height: 8rem;
+  min-height: 0;
   border: 1px solid var(--lcars-color-gutter, rgba(138, 122, 168, 0.4));
   border-radius: 8px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* `align-content: start` keeps the rows packed at the top of the
+   * grid — without it, an overflowing grid still vertically centers
+   * its rows in the leftover space, which produces a weird "first
+   * hunk floats" effect when the user scrolls back to the top. */
+  align-content: start;
 }
 
 .viewLayoutCompact {

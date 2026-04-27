@@ -38,6 +38,15 @@ hex = "0.4"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 
+# Window state — saves and restores window size, position, and
+# maximize/fullscreen state across launches. With `Builder::default()`
+# it auto-saves on close + auto-restores on the first window's
+# creation, so no frontend code is needed. Pairs with the workspace
+# store's Zustand persist (which restores zone collapse, open tools,
+# active tabs, split state) to give a complete "leave the app where
+# I left it" experience.
+tauri-plugin-window-state = "2"
+
 # Phase 6.5 deps. Kept conservative: TLS via rustls (pure-Rust, no
 # OpenSSL build step on Windows), cert parsing via x509-parser. The
 # protobuf decoder is intentionally schema-less in 6.5 — it parses wire

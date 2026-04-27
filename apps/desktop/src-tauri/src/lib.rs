@@ -50,6 +50,15 @@ pub fn run() {
         // their commands through the same routing layer.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // Window state — auto-saves window size, position, and
+        // maximized/fullscreen state on close, restores on next
+        // launch. With `Builder::default()` it hooks the window
+        // lifecycle without any frontend code; the saved blob lives
+        // in the Tauri app data dir alongside the workspace store's
+        // localStorage. Together they restore "exactly where I left
+        // it" — window geometry from this plugin, zone layout +
+        // open tools + active tabs from the workspace store.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             ping,
             commands::fs::read_file_bytes,

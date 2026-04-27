@@ -1,4 +1,173 @@
 lessons:
+  - id: 63
+    date: 2026-04-27
+    source: "session"
+    category: tooling
+    lesson: |
+      Flex layouts with `overflow: hidden` on a parent and growing
+      content in a child silently clip the bottom of the child
+      unless the child explicitly opts out of the default
+      `min-height: auto` behavior.
+
+      Recipe that works:
+
+        Parent: `display: flex; flex-direction: column; overflow: hidden;`
+        Child:  `flex: 1 1 auto; min-height: 0; overflow-y: auto;`
+
+      Without `min-height: 0` on the child, the flex algorithm
+      refuses to shrink the child below its intrinsic content size.
+      The child's content grows past the parent's allocated height,
+      the parent's `overflow: hidden` clips the bottom, and the
+      `overflow-y: auto` on the child never triggers because from
+      the child's own perspective there's no overflow to scroll —
+      it's just been visibly chopped.
+
+      Failure mode is silent (no error, no warning, no broken
+      layout obvious in dev tools without a careful look at
+      computed heights), so it's easy to ship.
+
+      Hyperspanner has hit this three times so far:
+
+        1. **HomeView** — first row of tool cards rendered half-
+           clipped at the scroll origin (the launchpad rendered
+           inside a flex container that didn't have `min-height: 0`,
+           and `align-items: center` interacted weirdly with
+           overflow-scroll to position the child with a negative
+           top offset that scrolling couldn't reach). Fixed by
+           dropping the `align-items: center` in the no-tools case
+           AND ensuring the launchpad root had `overflow-y: auto`.
+        2. **SystemSettings** — multiple stacked sections
+           (Appearance + Updates + Coming Soon) overflowed the
+           ToolFrame body and got clipped on small screens. Fixed
+           by adding `min-height: 0; overflow-y: auto` to the
+           settings container.
+        3. **TextDiff `.viewLayout`** — diff hunks past the visible
+           area got clipped. Same fix.
+
+      Action item for the tool-pattern doc: any tool whose body
+      stacks multiple sections (no single internal scroll
+      container like a textarea) MUST set `min-height: 0;
+      overflow-y: auto` on its root container inside ToolFrame.
+      Tools whose body is a single textarea / preformatted block
+      can rely on the textarea's own scroll and don't need this.
+
+      Added to mental checklist for new tool authors: "if my tool
+      has more than one section, does the root container scroll?"
+    applied: true
+
+  - id: 62
+    date: 2026-04-27
+    source: "session"
+    category: tooling
+    lesson: |
+      GitHub's `releases/latest/download/<asset>` URL pattern (and
+      the equivalent REST API endpoint
+      `/repos/{owner}/{repo}/releases/latest`) is a SELECTIVE
+      pointer, not "the most recent release". Specifically, it
+      excludes:
+
+        1. Drafts (release.draft === true)
+        2. Pre-releases (release.prerelease === true)
+        3. Releases not explicitly flagged "Set as the latest
+           release"
+
+      All three exclusions return the same JSON 404
+      (`{"error":"Not Found"}`) when the URL is fetched
+      unauthenticated. From the in-app updater's perspective this
+      is indistinguishable from "the asset doesn't exist." So
+      diagnosing a `releases/latest` 404 has at least three
+      separate root causes that look identical:
+
+        - The release is still a draft (didn't click Publish).
+        - The release is published but flagged Pre-release (which
+          is a tempting default for `0.x.y` versions; many UIs
+          default to checked).
+        - The release is published and not pre-release, but the
+          asset under that filename doesn't actually exist on the
+          release. (This was the actual cause for v0.0.2 — see
+          lesson #61.)
+
+      Diagnostic ladder when the updater can't find a manifest:
+
+        1. Open the release page in the browser. Is the release
+           there? Is "Pre-release" badge showing?
+        2. Click into the release. Does the assets list include
+           the manifest filename you're looking for (e.g.,
+           `latest.json`)?
+        3. If yes to (2) but the URL still 404s, the release is
+           pre-release or marked draft.
+        4. If no to (2), the build didn't generate the manifest.
+           Go look at lesson #61 — almost always
+           `bundle.createUpdaterArtifacts` not set.
+
+      Default policy for `0.x.y` releases on a project shipping
+      auto-updates: leave Pre-release UNCHECKED, leave "Set as the
+      latest release" CHECKED. The semver-implied "this is
+      pre-release software" is one signal; the GitHub Pre-release
+      flag is a different, infrastructure-level signal that
+      controls update routing.
+    applied: true
+
+  - id: 61
+    date: 2026-04-27
+    source: "session"
+    category: tooling
+    lesson: |
+      Tauri 2 changed updater-artifact generation from automatic
+      to opt-in. Without `bundle.createUpdaterArtifacts: true` in
+      `tauri.conf.json`, the bundler produces installers but
+      generates NO `.sig` files and NO `latest.json` manifest —
+      even when `TAURI_SIGNING_PRIVATE_KEY` and
+      `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are present in env. The
+      env vars are necessary but not sufficient; the bundle config
+      gates whether the bundler signs anything at all.
+
+      Failure mode is silent: the build succeeds, installers are
+      uploaded to the release, the workflow reports green. The
+      missing pieces only surface when an end user (or the
+      diagnostic walk) checks the release's assets list and notices
+      `latest.json` isn't there. The in-app updater's error
+      ("Could not fetch a valid release JSON from the remote") is
+      indistinguishable from a network failure, a private-repo
+      auth failure, or a draft/pre-release flag misconfiguration
+      (lesson #62) — all four return JSON 404 from GitHub.
+
+      Tauri 2 docs do mention this, but it's easy to miss when
+      migrating from Tauri 1 (where signing was automatic given
+      env vars) or when copying a workflow template that assumes
+      Tauri 1 defaults. The official `tauri-apps/tauri-action@v0`
+      doesn't catch the gap either — it dutifully uploads whatever
+      the bundle produces, which in this case is just the
+      installers without their signature siblings.
+
+      Concrete config patch:
+
+        ```json
+        "bundle": {
+          "active": true,
+          "createUpdaterArtifacts": true,    // ← required for Tauri 2
+          "targets": ["nsis", "deb", "rpm", "appimage"],
+          ...
+        }
+        ```
+
+      Verification: `pnpm tauri:build` locally and look at
+      `apps/desktop/src-tauri/target/release/bundle/nsis/`. With
+      the flag set, you should see both
+      `Hyperspanner_<v>_x64-setup.exe` AND
+      `Hyperspanner_<v>_x64-setup.exe.sig`. If the `.sig` file is
+      absent locally, it'll be absent in the release too.
+
+      Recommendation for any new Tauri 2 project shipping
+      auto-updates: set `createUpdaterArtifacts: true` AT THE
+      SAME TIME you generate the signing keypair, before the
+      first release tag is ever pushed. The cost is zero on the
+      "I don't want signed artifacts" path (you just don't add
+      the flag), but the cost of catching it post-hoc is one or
+      two debugging sessions across draft → publish → diagnose →
+      bump → re-release cycles.
+    applied: true
+
   - id: 60
     date: 2026-04-25
     source: "session"
